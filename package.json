@@ -1,12 +1,13 @@
 {
   "name": "kotan",
   "version": "1.0.0",
-  "description": "",
+  "description": "Kotan — a modular prefix-command Discord bot with hybrid sharding.",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node index.js",
+    "dev": "node src/bot.js"
   },
-  "keywords": [],
+  "keywords": ["discord", "bot", "kotan"],
   "type": "commonjs",
   "dependencies": {
     "@discordjs/builders": "^1.14.1",
