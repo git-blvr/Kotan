@@ -1,4 +1,5 @@
 const { createCanvas, loadImage } = require('@napi-rs/canvas');
+const { fetchRetry } = require('./http');
 
 // Dominant Color — extracts the most representative color from an image so it
 // can tint embeds / CV2 containers to match the picture.
@@ -21,7 +22,7 @@ const cache = new Map(); // url -> color int
 async function toBuffer(input) {
     if (Buffer.isBuffer(input)) return input;
     if (typeof input === 'string' && /^https?:\/\//.test(input)) {
-        const res = await fetch(input);
+        const res = await fetchRetry(input);
         if (!res.ok) throw new Error(`image fetch failed: ${res.status}`);
         return Buffer.from(await res.arrayBuffer());
     }

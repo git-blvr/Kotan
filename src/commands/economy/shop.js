@@ -25,7 +25,7 @@ module.exports = {
                 title: 'Kotan Shop',
                 description:
                     `Your wallet: ${formatCoins(profile.wallet)}\n` +
-                    `Buy with \`${config.prefix}shop buy <item>\``,
+                    `Buy with \`${message.prefix}shop buy <item>\``,
             });
             for (const item of config.shop) {
                 const owned = profile.inventory[item.id] || 0;
@@ -39,12 +39,12 @@ module.exports = {
 
         // .shop buy <item>
         const query = args.slice(1).join(' ');
-        if (!query) return sendError(message, `What do you want to buy? \`${config.prefix}shop buy <item>\``);
+        if (!query) return sendError(message, `What do you want to buy? \`${message.prefix}shop buy <item>\``);
         const item = findItem(query);
         if (!item)
             return sendError(
                 message,
-                `No item called "${query}". Check \`${config.prefix}shop\` for the list.`
+                `No item called "${query}". Check \`${message.prefix}shop\` for the list.`
             );
 
         const profile = await db.getProfile(message.guild.id, message.author.id);

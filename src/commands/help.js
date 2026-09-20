@@ -1,6 +1,5 @@
 const { base, sendError } = require('../helpers/embeds');
 const { capitalize } = require('../helpers/format');
-const config = require('../config');
 
 module.exports = {
     name: 'help',
@@ -23,8 +22,8 @@ module.exports = {
             const embed = base({
                 title: 'Kotan — Help',
                 description:
-                    `Prefix: \`${config.prefix}\`\n` +
-                    `Use \`${config.prefix}help <command>\` for details about a command.\n` +
+                    `Prefix: \`${message.prefix}\`\n` +
+                    `Use \`${message.prefix}help <command>\` for details about a command.\n` +
                     'Some commands also answer to plain words (triggers) — no prefix needed.',
             });
             for (const [category, commands] of byCategory) {
@@ -46,7 +45,7 @@ module.exports = {
                 fields: [
                     {
                         name: 'Usage',
-                        value: `\`${config.prefix}${command.name}${command.usage ? ` ${command.usage}` : ''}\``,
+                        value: `\`${message.prefix}${command.name}${command.usage ? ` ${command.usage}` : ''}\``,
                         inline: true,
                     },
                     { name: 'Category', value: capitalize(command.category), inline: true },

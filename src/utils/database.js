@@ -32,8 +32,65 @@ function createStore(namespace) {
 const profiles = createStore('economy');
 const warns = createStore('warns');
 const tempbans = createStore('tempbans');
+const guilds = createStore('guilds');
+const sessions = createStore('sessions');
+
+// A store error (Redis disconnect, disk failure) must never crash the process.
+// @keyv/redis reconnects automatically; SQLite is in-process and won't drop.
+for (const store of [profiles, warns, tempbans, guilds, sessions]) {
+    store.on('error', (err) => logger.error(`Storage error in "${store.namespace}":`, err));
+}
+if (sharedRedis) sharedRedis.on('error', (err) => logger.error('Redis error:', err));
 
 const key = (guildId, userId) => `${guildId}:${userId}`;
+
+// ---------- guild settings (dashboard) ----------
+
+// Short TTL cache: website writes can come from another process, so a stale
+// entry self-heals within 30s instead of needing cross-cluster invalidation.
+const settingsCache = new Map();
+const SETTINGS_TTL = 30_000;
+
+// modules[category] === false disables a whole category; missing = enabled.
+// disabledCommands lists individually disabled command names.
+const DEFAULT_SETTINGS = {
+    prefix: null,
+    modules: {},
+    disabledCommands: [],
+    modlogChannel: null,
+};
+
+async function getGuildSettings(guildId) {
+    const hit = settingsCache.get(guildId);
+    if (hit && hit.expires > Date.now()) return hit.value;
+    const value = { ...DEFAULT_SETTINGS, ...(await guilds.get(guildId)) };
+    settingsCache.set(guildId, { value, expires: Date.now() + SETTINGS_TTL });
+    return value;
+}
+
+async function saveGuildSettings(guildId, settings) {
+    await guilds.set(guildId, settings);
+    settingsCache.delete(guildId);
+    return settings;
+}
+
+// ---------- guild stats (dashboard overview) ----------
+
+async function countWarns(guildId) {
+    let count = 0;
+    for await (const [k] of warns.iterator()) {
+        if (k.startsWith(`${guildId}:`)) count++;
+    }
+    return count;
+}
+
+async function countTempbans(guildId) {
+    let count = 0;
+    for await (const ban of iterateTempbans()) {
+        if (ban.guildId === guildId) count++;
+    }
+    return count;
+}
 
 // ---------- economy ----------
 
@@ -108,7 +165,22 @@ async function* iterateTempbans() {
     }
 }
 
+// Flushes and closes the storage backends — called on graceful shutdown so
+// no writes are lost (WAL checkpoint) and Redis disconnects cleanly.
+async function closeDatabase() {
+    try {
+        if (sharedDb) {
+            sharedDb.exec('PRAGMA wal_checkpoint(TRUNCATE)');
+            sharedDb.close();
+        }
+        if (sharedRedis) await sharedRedis.disconnect();
+    } catch (err) {
+        logger.error('Error while closing database:', err);
+    }
+}
+
 module.exports = {
+    closeDatabase,
     getProfile,
     saveProfile,
     getWarns,
@@ -118,4 +190,9 @@ module.exports = {
     setTempban,
     removeTempban,
     iterateTempbans,
+    getGuildSettings,
+    saveGuildSettings,
+    countWarns,
+    countTempbans,
+    sessions, // raw Keyv — used by the website's session store
 };

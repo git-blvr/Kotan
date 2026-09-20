@@ -3,7 +3,7 @@ const { success, sendError } = require('../../helpers/embeds');
 const { resolveMember } = require('../../helpers/resolve');
 const { canModerate } = require('../../helpers/checks');
 const { parseDuration, formatDuration } = require('../../helpers/format');
-const config = require('../../config');
+const { logModAction } = require('../../utils/modlog');
 
 const MAX_TIMEOUT = 28 * 24 * 60 * 60 * 1000; // Discord caps timeouts at 28 days
 
@@ -20,7 +20,7 @@ module.exports = {
         if (!target)
             return sendError(
                 message,
-                `Member not found. Usage: \`${config.prefix}mute @member 10m [reason]\``
+                `Member not found. Usage: \`${message.prefix}mute @member 10m [reason]\``
             );
 
         const check = canModerate(message, target);
@@ -34,6 +34,13 @@ module.exports = {
 
         const reason = args.slice(2).join(' ') || 'No reason provided';
         await target.timeout(duration, `${reason} — by ${message.author.tag}`);
+        logModAction(message.client, message.guild.id, {
+            action: 'Mute',
+            target: `${target.user.tag} (${target.id})`,
+            moderator: message.author.tag,
+            reason,
+            extra: `Duration: ${formatDuration(duration)}`,
+        });
 
         return message.reply({
             embeds: [

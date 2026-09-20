@@ -2,7 +2,7 @@ const { PermissionFlagsBits } = require('discord.js');
 const { success, sendError } = require('../../helpers/embeds');
 const { resolveMember } = require('../../helpers/resolve');
 const db = require('../../utils/database');
-const config = require('../../config');
+const { logModAction } = require('../../utils/modlog');
 
 module.exports = {
     name: 'delwarn',
@@ -16,7 +16,7 @@ module.exports = {
         if (!target)
             return sendError(
                 message,
-                `Member not found. Usage: \`${config.prefix}delwarn @member <warn id | all>\``
+                `Member not found. Usage: \`${message.prefix}delwarn @member <warn id | all>\``
             );
 
         const which = (args[1] || '').toLowerCase();
@@ -25,16 +25,29 @@ module.exports = {
         if (which === 'all') {
             const removed = await db.clearWarns(message.guild.id, target.id);
             if (!removed) return sendError(message, `**${target.user.tag}** has no warns to clear.`);
+            logModAction(message.client, message.guild.id, {
+                action: 'Clear warns',
+                target: `${target.user.tag} (${target.id})`,
+                moderator: message.author.tag,
+                extra: `Removed ${removed} warn(s)`,
+            });
             return message.reply({
                 embeds: [success(`Cleared **${removed}** warn(s) from **${target.user.tag}**.`, 'Warns cleared')],
             });
         }
 
         const removed = await db.deleteWarn(message.guild.id, target.id, which);
+        if (removed)
+            logModAction(message.client, message.guild.id, {
+                action: 'Delete warn',
+                target: `${target.user.tag} (${target.id})`,
+                moderator: message.author.tag,
+                extra: `Warn \`${removed.id}\` — "${removed.reason}"`,
+            });
         if (!removed)
             return sendError(
                 message,
-                `No warn with id \`${which}\` found for **${target.user.tag}**. Check \`${config.prefix}warns\`.`
+                `No warn with id \`${which}\` found for **${target.user.tag}**. Check \`${message.prefix}warns\`.`
             );
         return message.reply({
             embeds: [success(`Removed warn \`${removed.id}\` from **${target.user.tag}**.`, 'Warn removed')],

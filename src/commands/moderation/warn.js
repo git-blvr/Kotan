@@ -4,7 +4,7 @@ const { resolveMember } = require('../../helpers/resolve');
 const { canModerate } = require('../../helpers/checks');
 const { timestamp } = require('../../helpers/format');
 const db = require('../../utils/database');
-const config = require('../../config');
+const { logModAction } = require('../../utils/modlog');
 
 module.exports = {
     name: 'warn',
@@ -16,7 +16,7 @@ module.exports = {
     async execute(message, args) {
         const target = await resolveMember(message, args[0]);
         if (!target)
-            return sendError(message, `Member not found. Usage: \`${config.prefix}warn @member <reason>\``);
+            return sendError(message, `Member not found. Usage: \`${message.prefix}warn @member <reason>\``);
 
         const check = canModerate(message, target);
         if (!check.ok) return sendError(message, check.reason);
@@ -29,6 +29,14 @@ module.exports = {
             moderatorId: message.author.id,
         });
         const total = (await db.getWarns(message.guild.id, target.id)).length;
+
+        logModAction(message.client, message.guild.id, {
+            action: 'Warn',
+            target: `${target.user.tag} (${target.id})`,
+            moderator: message.author.tag,
+            reason,
+            extra: `Warn id \`${warn.id}\` — total warns: ${total}`,
+        });
 
         await target
             .send({

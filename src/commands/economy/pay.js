@@ -2,7 +2,6 @@ const { success, sendError } = require('../../helpers/embeds');
 const { resolveMember } = require('../../helpers/resolve');
 const { formatCoins, parseAmount } = require('../../helpers/format');
 const db = require('../../utils/database');
-const config = require('../../config');
 
 module.exports = {
     name: 'pay',
@@ -14,7 +13,7 @@ module.exports = {
     async execute(message, args) {
         const target = await resolveMember(message, args[0]);
         if (!target)
-            return sendError(message, `Member not found. Usage: \`${config.prefix}pay @member <amount>\``);
+            return sendError(message, `Member not found. Usage: \`${message.prefix}pay @member <amount>\``);
         if (target.id === message.author.id) return sendError(message, 'You cannot pay yourself.');
         if (target.user.bot) return sendError(message, 'You cannot pay a bot.');
 

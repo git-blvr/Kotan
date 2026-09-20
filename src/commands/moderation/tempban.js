@@ -4,7 +4,7 @@ const { resolveMember, extractId } = require('../../helpers/resolve');
 const { canModerate } = require('../../helpers/checks');
 const { parseDuration, formatDuration, timestamp } = require('../../helpers/format');
 const db = require('../../utils/database');
-const config = require('../../config');
+const { logModAction } = require('../../utils/modlog');
 
 module.exports = {
     name: 'tempban',
@@ -34,7 +34,7 @@ module.exports = {
             if (!userId)
                 return sendError(
                     message,
-                    `User not found. Usage: \`${config.prefix}tempban @member 1d [reason]\``
+                    `User not found. Usage: \`${message.prefix}tempban @member 1d [reason]\``
                 );
             if (userId === message.author.id) return sendError(message, 'You cannot ban yourself.');
             tag = userId;
@@ -50,6 +50,13 @@ module.exports = {
             unbanAt,
             moderatorId: message.author.id,
             reason,
+        });
+        logModAction(message.client, message.guild.id, {
+            action: 'Tempban',
+            target: `${tag} (${userId})`,
+            moderator: message.author.tag,
+            reason,
+            extra: `Duration: ${formatDuration(duration)}`,
         });
 
         return message.reply({

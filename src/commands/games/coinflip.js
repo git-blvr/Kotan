@@ -28,7 +28,7 @@ module.exports = {
         if (!bet)
             return sendError(
                 message,
-                `How much? Usage: \`${config.prefix}coinflip <heads|tails> <bet>\``
+                `How much? Usage: \`${message.prefix}coinflip <heads|tails> <bet>\``
             );
         if (bet > profile.wallet)
             return sendError(message, `You only have ${formatCoins(profile.wallet)} in your wallet.`);

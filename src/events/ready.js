@@ -2,6 +2,7 @@ const { Events, ActivityType } = require('discord.js');
 const config = require('../config');
 const logger = require('../utils/logger');
 const { startTasks } = require('../utils/tasks');
+const { startWebsite } = require('../website/server');
 
 module.exports = {
     name: Events.ClientReady,
@@ -19,5 +20,10 @@ module.exports = {
         });
 
         startTasks(client);
+
+        // The site runs once — on cluster 0 (or always when unsharded).
+        if (!client.cluster || client.cluster.id === 0) {
+            startWebsite(client).catch((err) => logger.error('Website failed to start:', err));
+        }
     },
 };

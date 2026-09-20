@@ -7,7 +7,11 @@
     "start": "node index.js",
     "dev": "node src/bot.js"
   },
-  "keywords": ["discord", "bot", "kotan"],
+  "keywords": [
+    "discord",
+    "bot",
+    "kotan"
+  ],
   "type": "commonjs",
   "dependencies": {
     "@discordjs/builders": "^1.14.1",
@@ -15,6 +19,9 @@
     "@napi-rs/canvas": "^1.0.9",
     "discord-hybrid-sharding": "^3.0.1",
     "discord.js": "^14.27.0",
-    "dotenv": "^18.0.1"
+    "dotenv": "^18.0.1",
+    "express": "^5.2.1",
+    "express-session": "^1.19.0",
+    "selfsigned": "^5.5.0"
   }
 }
