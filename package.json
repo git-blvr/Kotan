@@ -1,7 +1,7 @@
 {
   "name": "kotan",
   "version": "1.0.0",
-  "description": "Kotan — a modular prefix-command Discord bot with hybrid sharding.",
+  "description": "Kotan — a modular prefix-command Discord bot with a web dashboard.",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
@@ -17,7 +17,6 @@
     "@discordjs/builders": "^1.14.1",
     "@keyv/redis": "^5.1.6",
     "@napi-rs/canvas": "^1.0.9",
-    "discord-hybrid-sharding": "^3.0.1",
     "discord.js": "^14.27.0",
     "dotenv": "^18.0.1",
     "express": "^5.2.1",

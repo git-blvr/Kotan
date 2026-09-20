@@ -33,7 +33,6 @@ module.exports = function pagesRouter(client) {
             status: 'ok',
             uptime: Math.floor(process.uptime()),
             guilds: client.guilds.cache.size,
-            cluster: client.cluster?.id ?? null,
             timestamp: Date.now(),
         });
     });

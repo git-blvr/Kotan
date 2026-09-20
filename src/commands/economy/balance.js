@@ -2,6 +2,7 @@ const { base, sendError } = require('../../helpers/embeds');
 const { resolveUser } = require('../../helpers/resolve');
 const { formatCoins, formatNumber } = require('../../helpers/format');
 const db = require('../../utils/database');
+const { dominantColor } = require('../../utils/dominantColor');
 const config = require('../../config');
 
 module.exports = {
@@ -18,14 +19,17 @@ module.exports = {
 
         const profile = await db.getProfile(message.guild.id, user.id);
         const total = profile.wallet + profile.bank;
+        const cur = message.guildSettings?.economy?.currency || config.economy.currency;
 
+        const avatarUrl = user.displayAvatarURL({ size: 128, extension: 'png' });
         const embed = base({
+            color: (await dominantColor(avatarUrl)) ?? config.colors.main,
             title: `${user.username}'s balance`,
-            thumbnail: user.displayAvatarURL({ size: 128 }),
+            thumbnail: avatarUrl,
             fields: [
-                { name: 'Wallet', value: formatCoins(profile.wallet), inline: true },
-                { name: 'Bank', value: formatCoins(profile.bank), inline: true },
-                { name: 'Net worth', value: `**${formatNumber(total)}** ${config.economy.currency}`, inline: true },
+                { name: 'Wallet', value: formatCoins(profile.wallet, cur), inline: true },
+                { name: 'Bank', value: formatCoins(profile.bank, cur), inline: true },
+                { name: 'Net worth', value: `**${formatNumber(total)}** ${cur}`, inline: true },
             ],
         });
         return message.reply({ embeds: [embed] });

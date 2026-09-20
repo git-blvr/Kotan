@@ -18,19 +18,20 @@ module.exports = {
     triggers: ['shop'],
     cooldown: 3,
     async execute(message, args) {
+        const cur = message.guildSettings?.economy?.currency || config.economy.currency;
         // .shop — list everything
         if (args[0]?.toLowerCase() !== 'buy') {
             const profile = await db.getProfile(message.guild.id, message.author.id);
             const embed = base({
                 title: 'Kotan Shop',
                 description:
-                    `Your wallet: ${formatCoins(profile.wallet)}\n` +
+                    `Your wallet: ${formatCoins(profile.wallet, cur)}\n` +
                     `Buy with \`${message.prefix}shop buy <item>\``,
             });
             for (const item of config.shop) {
                 const owned = profile.inventory[item.id] || 0;
                 embed.addFields({
-                    name: `${item.name} — ${formatNumber(item.price)} ${config.economy.currency}`,
+                    name: `${item.name} — ${formatNumber(item.price)} ${cur}`,
                     value: `${item.description}${owned ? `\nOwned: **${owned}**` : ''}`,
                 });
             }
@@ -51,7 +52,7 @@ module.exports = {
         if (profile.wallet < item.price)
             return sendError(
                 message,
-                `**${item.name}** costs ${formatCoins(item.price)} — you only have ${formatCoins(profile.wallet)}.`
+                `**${item.name}** costs ${formatCoins(item.price, cur)} — you only have ${formatCoins(profile.wallet, cur)}.`
             );
 
         profile.wallet -= item.price;
@@ -61,8 +62,8 @@ module.exports = {
         return message.reply({
             embeds: [
                 success(
-                    `You bought **${item.name}** for ${formatCoins(item.price)}.\n` +
-                        `Owned: **${profile.inventory[item.id]}** — Wallet left: ${formatCoins(profile.wallet)}`,
+                    `You bought **${item.name}** for ${formatCoins(item.price, cur)}.\n` +
+                        `Owned: **${profile.inventory[item.id]}** — Wallet left: ${formatCoins(profile.wallet, cur)}`,
                     `${capitalize(item.name)} purchased`
                 ),
             ],

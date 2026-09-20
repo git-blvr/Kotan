@@ -30,8 +30,9 @@ module.exports = {
                 message,
                 `How much? Usage: \`${message.prefix}coinflip <heads|tails> <bet>\``
             );
+        const cur = message.guildSettings?.economy?.currency;
         if (bet > profile.wallet)
-            return sendError(message, `You only have ${formatCoins(profile.wallet)} in your wallet.`);
+            return sendError(message, `You only have ${formatCoins(profile.wallet, cur)} in your wallet.`);
 
         const won = guess === result;
         profile.wallet += won ? bet : -bet;
@@ -43,8 +44,8 @@ module.exports = {
                     title: 'Coinflip',
                     color: won ? config.colors.success : config.colors.error,
                     description:
-                        `The coin landed on **${result}** — you ${won ? 'won' : 'lost'} ${formatCoins(bet)}.\n` +
-                        `Wallet: ${formatCoins(profile.wallet)}`,
+                        `The coin landed on **${result}** — you ${won ? 'won' : 'lost'} ${formatCoins(bet, cur)}.\n` +
+                        `Wallet: ${formatCoins(profile.wallet, cur)}`,
                 }),
             ],
         });

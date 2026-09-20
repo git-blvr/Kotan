@@ -5,6 +5,7 @@ const sentry = require('../utils/sentry');
 const db = require('../utils/database');
 const { sendError } = require('../helpers/embeds');
 const { formatDuration } = require('../helpers/format');
+const automod = require('../utils/automod');
 
 // Global anti-spam: beyond per-command cooldowns, cap total command invocations
 // per user so one spammer can't hammer our API/DB in a loop.
@@ -29,9 +30,15 @@ module.exports = {
         const settings = message.guild ? await db.getGuildSettings(message.guild.id) : null;
         const prefix = settings?.prefix || config.prefix;
         message.prefix = prefix; // commands show this in usage hints
+        message.guildSettings = settings; // commands reuse it (currency etc.)
+
+        // Automod scans every message — invites, blacklist, spam velocity.
+        // If it deleted the message we stop here, before command resolution.
+        if (settings && (await automod.checkMessage(message, settings.automod, client))) return;
 
         let command = null;
         let args = [];
+        let tagName = null; // prefix used but no builtin matched -> try tags
 
         if (content.startsWith(prefix)) {
             const body = content.slice(prefix.length).trim();
@@ -39,6 +46,7 @@ module.exports = {
             args = body.split(/\s+/);
             const name = args.shift().toLowerCase();
             command = client.commands.get(name) ?? client.commands.get(client.aliases.get(name));
+            if (!command) tagName = name;
         } else {
             // Triggers let a plain word invoke a command ("net" -> ping).
             const [first, ...rest] = content.split(/\s+/);
@@ -49,6 +57,15 @@ module.exports = {
             }
         }
 
+        // Custom commands (dashboard Tags page): "<prefix><tagname>" replies
+        // with the saved text. Builtins always win over tags.
+        if (!command && tagName && message.guild) {
+            const tagContent = await db.useTag(message.guild.id, tagName);
+            if (tagContent)
+                return message
+                    .reply({ content: tagContent, allowedMentions: { parse: [] } }) // tags can't mass-ping
+                    .catch(() => {});
+        }
         if (!command) return;
 
         // Global anti-spam bucket — rejected before any expensive work runs.
@@ -114,6 +131,9 @@ module.exports = {
             }
             client.cooldowns.set(key, now + command.cooldown * 1000);
         }
+
+        // Dashboard stats — fire-and-forget so it never slows the command.
+        if (message.guild) db.trackCommandUse(message.guild.id, command.name).catch(() => {});
 
         try {
             await command.execute(message, args, client);

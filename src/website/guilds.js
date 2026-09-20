@@ -1,82 +1,50 @@
 const { PermissionFlagsBits } = require('discord.js');
 
-// Guild lookups that work no matter which cluster owns the guild.
-// Standalone mode (npm run dev) reads the local cache directly; clustered
-// mode fans out with broadcastEval and merges the answers.
+// Guild lookups for the dashboard — the website runs inside the bot process,
+// so everything reads the local client cache directly.
 
 async function botGuildIds(client) {
-    if (client.cluster) {
-        const lists = await client.cluster.broadcastEval((c) => [...c.guilds.cache.keys()]);
-        return new Set(lists.flat());
-    }
     return new Set(client.guilds.cache.keys());
 }
 
 async function botGuildInfo(client, guildId) {
-    const pick = (g) =>
-        g
-            ? {
-                  id: g.id,
-                  name: g.name,
-                  icon: g.iconURL({ size: 128 }),
-                  memberCount: g.memberCount,
-              }
-            : null;
-
-    if (client.cluster) {
-        const results = await client.cluster.broadcastEval(
-            (c, id) => {
-                const g = c.guilds.cache.get(id);
-                return g
-                    ? { id: g.id, name: g.name, icon: g.iconURL({ size: 128 }), memberCount: g.memberCount }
-                    : null;
-            },
-            { context: guildId }
-        );
-        return results.find(Boolean) ?? null;
-    }
-    return pick(client.guilds.cache.get(guildId));
+    const g = client.guilds.cache.get(guildId);
+    return g
+        ? {
+              id: g.id,
+              name: g.name,
+              icon: g.iconURL({ size: 128 }),
+              memberCount: g.memberCount,
+          }
+        : null;
 }
 
-// Text channels of a guild — for the modlog dropdown on the dashboard.
+// Text channels of a guild — for channel dropdowns on the dashboard.
 async function botGuildChannels(client, guildId) {
-    const pick = (g) =>
-        g
-            ? g.channels.cache
-                  .filter((c) => c.isTextBased() && !c.isThread())
-                  .map((c) => ({ id: c.id, name: c.name }))
-                  .sort((a, b) => a.name.localeCompare(b.name))
-            : null;
+    const g = client.guilds.cache.get(guildId);
+    if (!g) return [];
+    return g.channels.cache
+        .filter((c) => c.isTextBased() && !c.isThread())
+        .map((c) => ({ id: c.id, name: c.name }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+}
 
-    if (client.cluster) {
-        const results = await client.cluster.broadcastEval(
-            (c, id) => {
-                const g = c.guilds.cache.get(id);
-                if (!g) return null;
-                return g.channels.cache
-                    .filter((ch) => ch.isTextBased() && !ch.isThread())
-                    .map((ch) => ({ id: ch.id, name: ch.name }))
-                    .sort((a, b) => a.name.localeCompare(b.name));
-            },
-            { context: guildId }
-        );
-        return results.find(Boolean) ?? [];
-    }
-    return pick(client.guilds.cache.get(guildId)) ?? [];
+// Assignable roles of a guild — for autorole/reaction-role dropdowns.
+// Excludes @everyone, managed (bot/integration) roles, and anything at or
+// above the bot's highest role since we can't grant those.
+async function botGuildRoles(client, guildId) {
+    const g = client.guilds.cache.get(guildId);
+    if (!g) return [];
+    const top = g.members.me?.roles.highest?.position ?? 0;
+    return g.roles.cache
+        .filter((r) => r.id !== g.id && !r.managed && r.position < top)
+        .map((r) => ({ id: r.id, name: r.name, color: r.hexColor, position: r.position }))
+        .sort((a, b) => b.position - a.position || a.name.localeCompare(b.name))
+        .map(({ position, ...r }) => r);
 }
 
 // Totals for the homepage stats strip.
 async function botStats(client) {
-    if (client.cluster) {
-        const parts = await client.cluster.broadcastEval((c) => ({
-            guilds: c.guilds.cache.size,
-            users: c.users.cache.size,
-        }));
-        return parts.reduce(
-            (acc, p) => ({ guilds: acc.guilds + p.guilds, users: acc.users + p.users }),
-            { guilds: 0, users: 0 }
-        );
-    }
     return { guilds: client.guilds.cache.size, users: client.users.cache.size };
 }
 
@@ -91,6 +59,7 @@ function inviteUrl(client, guildId = null) {
         PermissionFlagsBits.KickMembers,
         PermissionFlagsBits.BanMembers,
         PermissionFlagsBits.ModerateMembers,
+        PermissionFlagsBits.ManageRoles, // autorole + reaction roles
     ].reduce((acc, p) => acc | p, 0n);
 
     const params = new URLSearchParams({
@@ -105,4 +74,4 @@ function inviteUrl(client, guildId = null) {
     return `https://discord.com/oauth2/authorize?${params}`;
 }
 
-module.exports = { botGuildIds, botGuildInfo, botGuildChannels, botStats, inviteUrl };
+module.exports = { botGuildIds, botGuildInfo, botGuildChannels, botGuildRoles, botStats, inviteUrl };

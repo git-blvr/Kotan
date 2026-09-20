@@ -12,6 +12,8 @@ module.exports = {
     cooldown: 10,
     async execute(message) {
         const { daily } = config.economy;
+        const cur = message.guildSettings?.economy?.currency;
+        const base = message.guildSettings?.economy?.dailyBase ?? daily.base;
         const profile = await db.getProfile(message.guild.id, message.author.id);
         const now = Date.now();
 
@@ -26,7 +28,7 @@ module.exports = {
         // Streak continues if claimed within the window, otherwise resets to 1.
         const streak = now - profile.lastDaily < daily.streakWindow ? profile.dailyStreak + 1 : 1;
         const bonus = Math.min(streak * daily.streakBonus, daily.maxStreakBonus);
-        const reward = daily.base + bonus;
+        const reward = base + bonus;
 
         profile.wallet += reward;
         profile.lastDaily = now;
@@ -36,9 +38,9 @@ module.exports = {
         return message.reply({
             embeds: [
                 success(
-                    `You claimed ${formatCoins(reward)} (base ${daily.base} + streak bonus ${bonus}).\n` +
+                    `You claimed ${formatCoins(reward, cur)} (base ${base} + streak bonus ${bonus}).\n` +
                         `Streak: **${streak} day${streak === 1 ? '' : 's'}**\n` +
-                        `New wallet balance: ${formatCoins(profile.wallet)}`,
+                        `New wallet balance: ${formatCoins(profile.wallet, cur)}`,
                     'Daily claimed'
                 ),
             ],

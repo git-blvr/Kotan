@@ -1,22 +1,12 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, Collection, Options } = require('discord.js');
-const { ClusterClient, getInfo } = require('discord-hybrid-sharding');
+const { Client, GatewayIntentBits, Collection, Options, Partials } = require('discord.js');
 const config = require('./config');
 const logger = require('./utils/logger');
 const sentry = require('./utils/sentry');
 const db = require('./utils/database');
 
-// This file is the actual bot process. When launched through index.js the
-// ClusterManager injects shard info via env vars and getInfo() returns it.
-// When run directly (npm run dev) getInfo() throws — we catch that and boot a
-// normal unsharded client, which is perfect for local debugging.
-
-let clusterInfo = null;
-try {
-    clusterInfo = getInfo();
-} catch {
-    logger.info('No cluster manager detected — running standalone');
-}
+// The bot process. index.js requires this file; `npm run dev` runs it
+// directly. Single process, no sharding — one client handles everything.
 
 const client = new Client({
     intents: [
@@ -25,7 +15,11 @@ const client = new Client({
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent, // privileged: required for prefix commands
         GatewayIntentBits.GuildModeration, // ban/unban events
+        GatewayIntentBits.GuildMessageReactions, // reaction roles
     ],
+    // Reaction roles and delete/edit logging need events for uncached
+    // messages too — partials deliver them with .fetch() on demand.
+    partials: [Partials.Message, Partials.Reaction, Partials.User],
     // RAM discipline for a public bot: cap every cache we don't rely on and
     // zero out the ones we never touch. Members are fetched on demand, so a
     // small member cache + always keeping ourselves is enough.
@@ -66,13 +60,7 @@ const client = new Client({
             filter: () => (user) => user.id !== client.user?.id,
         },
     },
-    ...(clusterInfo && {
-        shards: clusterInfo.SHARD_LIST,
-        shardCount: clusterInfo.TOTAL_SHARDS,
-    }),
 });
-
-if (clusterInfo) client.cluster = new ClusterClient(client);
 
 // Shared state, attached to the client so every module reaches it via `client`.
 client.config = config;
@@ -81,6 +69,8 @@ client.aliases = new Collection(); // alias -> command name
 client.triggers = new Collection(); // trigger word -> command name
 client.cooldowns = new Collection(); // "cmd:userId" -> expiry timestamp
 client.rateLimits = new Collection(); // userId -> { count, resetAt } anti-spam bucket
+client.automodSpam = new Collection(); // "guildId:userId" -> [timestamps] spam filter
+client.raidJoins = new Collection(); // guildId -> [timestamps] raid detector
 
 require('./handlers/commandHandler')(client);
 require('./handlers/eventHandler')(client);
@@ -100,8 +90,8 @@ process.on('unhandledRejection', (err) => {
 });
 
 process.on('uncaughtException', (err) => {
-    // Unrecoverable — log it, flush storage, exit. When clustered, the
-    // manager (respawn:true) brings this cluster right back; in dev it just stops.
+    // Unrecoverable — log it, flush storage, exit. PM2 (ecosystem.config.js)
+    // or the host's supervisor is responsible for restarting the process.
     logger.error('Uncaught exception:', err);
     sentry.capture(err);
     shutdown('uncaughtException', 1);

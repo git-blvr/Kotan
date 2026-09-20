@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { DatabaseSync } = require('node:sqlite');
 
 // SQLite-backed Keyv storage adapter using Node's built-in node:sqlite —
@@ -11,14 +12,60 @@ const { DatabaseSync } = require('node:sqlite');
 //
 // `opts.dialect = 'sqlite'` tells Keyv this store supports iteration, which
 // is what makes db.iterateTempbans() work.
+//
+// Values are encrypted at rest with AES-256-GCM (stored as "v1:<base64>").
+// Keys stay plaintext — they're only snowflake IDs and namespace prefixes,
+// and encrypting them would break the LIKE queries iterator()/clear() need.
+// The 256-bit key comes from the DB_KEY env var (hex or passphrase), or is
+// generated once into data/.dbkey (mode 600, gitignored with the rest of
+// data/). Losing it means losing the data — that's the point.
+
+const PREFIX = 'v1:';
+let KEY = null;
+
+function loadKey(dbFile) {
+    if (process.env.DB_KEY) {
+        const k = process.env.DB_KEY.trim();
+        return /^[0-9a-fA-F]{64}$/.test(k)
+            ? Buffer.from(k, 'hex')
+            : crypto.createHash('sha256').update(k).digest();
+    }
+    const keyPath = path.join(path.dirname(dbFile), '.dbkey');
+    if (fs.existsSync(keyPath)) {
+        return Buffer.from(fs.readFileSync(keyPath, 'utf8').trim(), 'hex');
+    }
+    const key = crypto.randomBytes(32);
+    fs.writeFileSync(keyPath, key.toString('hex'), { mode: 0o600 });
+    console.log(`[sqlite] generated encryption key at ${keyPath} — losing it makes the database unreadable`);
+    return key;
+}
+
+function encrypt(plaintext) {
+    const iv = crypto.randomBytes(12);
+    const cipher = crypto.createCipheriv('aes-256-gcm', KEY, iv);
+    const data = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
+    return PREFIX + Buffer.concat([iv, cipher.getAuthTag(), data]).toString('base64');
+}
+
+function decrypt(stored) {
+    if (typeof stored !== 'string' || !stored.startsWith(PREFIX)) return stored; // legacy plaintext
+    const raw = Buffer.from(stored.slice(PREFIX.length), 'base64');
+    const iv = raw.subarray(0, 12);
+    const tag = raw.subarray(12, 28);
+    const data = raw.subarray(28);
+    const decipher = crypto.createDecipheriv('aes-256-gcm', KEY, iv);
+    decipher.setAuthTag(tag);
+    return Buffer.concat([decipher.update(data), decipher.final()]).toString('utf8');
+}
 
 class SqliteStore {
     // Opens (or creates) the database file and prepares the schema.
     // Call once, then pass the returned DatabaseSync to `new SqliteStore(db)`.
     static connect(file) {
         fs.mkdirSync(path.dirname(file), { recursive: true });
+        KEY = loadKey(file);
         const db = new DatabaseSync(file);
-        db.exec('PRAGMA journal_mode = WAL'); // concurrent readers across clusters
+        db.exec('PRAGMA journal_mode = WAL'); // concurrent readers (bot + CLI tools)
         db.exec('PRAGMA busy_timeout = 5000'); // wait instead of failing on write contention
         db.exec('PRAGMA synchronous = NORMAL');
         db.exec(
@@ -27,6 +74,17 @@ class SqliteStore {
                 value TEXT NOT NULL
             )`
         );
+        try {
+            fs.chmodSync(file, 0o600); // owner-only read/write where supported
+        } catch {}
+
+        // One-time migration: encrypt rows written before encryption existed.
+        const plain = db.prepare(`SELECT key, value FROM kv WHERE value NOT LIKE '${PREFIX}%'`).all();
+        if (plain.length) {
+            const upd = db.prepare('UPDATE kv SET value = ? WHERE key = ?');
+            for (const row of plain) upd.run(encrypt(row.value), row.key);
+            console.log(`[sqlite] encrypted ${plain.length} existing rows`);
+        }
         return db;
     }
 
@@ -44,11 +102,11 @@ class SqliteStore {
 
     get(key) {
         const row = this._get.get(key);
-        return row ? row.value : undefined;
+        return row ? decrypt(row.value) : undefined;
     }
 
     set(key, value) {
-        this._set.run(key, value);
+        this._set.run(key, encrypt(value));
     }
 
     delete(key) {
@@ -63,7 +121,7 @@ class SqliteStore {
     // Keyv calls this with the store's namespace and expects [key, value] pairs.
     *iterator(namespace = this.namespace) {
         for (const row of this._iterate.all(`${namespace}:%`)) {
-            yield [row.key, row.value];
+            yield [row.key, decrypt(row.value)];
         }
     }
 }

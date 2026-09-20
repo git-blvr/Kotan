@@ -10,7 +10,7 @@ function renderHome({ user, stats, commands, avatarUrl, inviteUrl }) {
         <h1 style="margin-top:14px">Kotan</h1>
         <p class="muted" style="max-width:520px;margin:8px auto 26px">
             Prefix commands with aliases and word triggers, a full moderation suite,
-            an economy system and a web dashboard — built to scale with clusters.
+            automod, an economy system and a web dashboard.
         </p>
         <a class="btn" href="${esc(inviteUrl)}">Invite Kotan</a>
         <a class="btn ghost" href="/doc" style="margin-left:10px">Documentation</a>
@@ -32,7 +32,7 @@ function renderHome({ user, stats, commands, avatarUrl, inviteUrl }) {
             ['Prefix, aliases & triggers', 'Run commands with .ping, an alias, or a plain word like "net".'],
             ['Moderation toolkit', 'Warns, timeouts, bans and tempbans with automatic unban.'],
             ['Economy & games', 'Daily rewards with streaks, payments, a shop and coinflip.'],
-            ['Hybrid sharding', 'Clustered processes share shards — ready for public scale.'],
+            ['Automod & logging', 'Anti-invite, spam and raid filters plus a full server event log.'],
             ['Web dashboard', 'Per-guild settings behind Discord login.'],
             ['Dominant color embeds', 'Embeds and CV2 containers tinted to match images.'],
         ]

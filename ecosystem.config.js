@@ -1,7 +1,7 @@
 // PM2 process config — `pm2 start ecosystem.config.js`.
 //
-// IMPORTANT: keep instances:1 + fork mode. discord-hybrid-sharding is already
-// the process supervisor — PM2 only watches the manager, not the clusters.
+// IMPORTANT: keep instances:1 + fork mode — a second instance would double-
+// login the same token and fight over the SQLite file.
 
 module.exports = {
     apps: [
@@ -11,9 +11,9 @@ module.exports = {
             instances: 1,
             exec_mode: 'fork',
             autorestart: true,
-            max_memory_restart: '500M', // restart if the manager itself leaks
+            max_memory_restart: '500M', // restart on memory leaks
             restart_delay: 3000,
-            kill_timeout: 10_000, // let clusters flush the DB on SIGTERM
+            kill_timeout: 10_000, // let the bot flush the DB on SIGTERM
             env: {
                 NODE_ENV: 'production',
             },

@@ -45,7 +45,10 @@ function formatDuration(ms) {
 }
 
 const formatNumber = (n) => Math.floor(n).toLocaleString('en-US');
-const formatCoins = (n) => `**${formatNumber(n)}** ${config.economy.currency}`;
+// Per-guild currency name (dashboard Economy page) overrides the global one.
+// Nullish-coalesce rather than a default param — callers pass the guild
+// setting, which is null (not undefined) when unset.
+const formatCoins = (n, currency) => `**${formatNumber(n)}** ${currency ?? config.economy.currency}`;
 
 // Discord-relative timestamp, e.g. <t:1695000000:R> renders "2 hours ago".
 const timestamp = (ms, style = 'R') => `<t:${Math.floor(ms / 1000)}:${style}>`;

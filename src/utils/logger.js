@@ -1,6 +1,4 @@
-// Small console logger with timestamps, colors and cluster awareness.
-// Every cluster (index.js) and the bot process share this so logs are
-// always tagged with where they came from.
+// Small console logger with timestamps and colors.
 
 const colors = {
     reset: '\x1b[0m',
@@ -11,15 +9,12 @@ const colors = {
     cyan: '\x1b[36m',
 };
 
-const clusterId = process.env.CLUSTER; // set by discord-hybrid-sharding
-const scope = clusterId !== undefined ? `[Cluster ${clusterId}] ` : '';
-
 function stamp() {
     return `${colors.gray}${new Date().toLocaleTimeString('en-GB')}${colors.reset}`;
 }
 
 function line(color, level, args) {
-    return [`${stamp()} ${scope}${color}${level}${colors.reset}`, ...args];
+    return [`${stamp()} ${color}${level}${colors.reset}`, ...args];
 }
 
 module.exports = {

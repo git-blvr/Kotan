@@ -8,9 +8,8 @@ module.exports = {
     name: Events.ClientReady,
     once: true,
     async execute(client) {
-        const cluster = client.cluster ? ` (cluster ${client.cluster.id})` : '';
         logger.success(
-            `Logged in as ${client.user.tag}${cluster} — ${client.guilds.cache.size} guilds, ` +
+            `Logged in as ${client.user.tag} — ${client.guilds.cache.size} guilds, ` +
                 `${client.commands.size} commands`
         );
 
@@ -21,9 +20,7 @@ module.exports = {
 
         startTasks(client);
 
-        // The site runs once — on cluster 0 (or always when unsharded).
-        if (!client.cluster || client.cluster.id === 0) {
-            startWebsite(client).catch((err) => logger.error('Website failed to start:', err));
-        }
+        // Single process — the site lives inside it.
+        startWebsite(client).catch((err) => logger.error('Website failed to start:', err));
     },
 };

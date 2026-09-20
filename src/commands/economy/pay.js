@@ -17,11 +17,12 @@ module.exports = {
         if (target.id === message.author.id) return sendError(message, 'You cannot pay yourself.');
         if (target.user.bot) return sendError(message, 'You cannot pay a bot.');
 
+        const cur = message.guildSettings?.economy?.currency;
         const sender = await db.getProfile(message.guild.id, message.author.id);
         const amount = parseAmount(args[1], sender.wallet);
         if (!amount) return sendError(message, 'Invalid amount. Examples: `250`, `1k`, `all`, `half`.');
         if (amount > sender.wallet)
-            return sendError(message, `You only have ${formatCoins(sender.wallet)} in your wallet.`);
+            return sendError(message, `You only have ${formatCoins(sender.wallet, cur)} in your wallet.`);
 
         const receiver = await db.getProfile(message.guild.id, target.id);
         sender.wallet -= amount;
@@ -32,8 +33,8 @@ module.exports = {
         return message.reply({
             embeds: [
                 success(
-                    `You paid ${formatCoins(amount)} to **${target.user.tag}**.\n` +
-                        `Your new balance: ${formatCoins(sender.wallet)}`,
+                    `You paid ${formatCoins(amount, cur)} to **${target.user.tag}**.\n` +
+                        `Your new balance: ${formatCoins(sender.wallet, cur)}`,
                     'Payment sent'
                 ),
             ],

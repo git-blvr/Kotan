@@ -12,8 +12,7 @@ const authRouter = require('./routes/auth');
 const dashboardRouter = require('./routes/dashboard');
 const { renderError } = require('./views/error');
 
-// Kotan's website. Runs inside the bot process — only on cluster 0 when
-// sharded (ready.js decides), so there's exactly one listener.
+// Kotan's website. Runs inside the single bot process — exactly one listener.
 //
 //   GET /               home     (public)
 //   GET /doc            docs     (public, generated from loaded commands)
