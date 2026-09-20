@@ -1,7 +1,7 @@
 # Kotan
 
 A modular prefix-command Discord bot built on `discord.js` v14 with
-`discord-hybrid-sharding` clusters, Keyv storage (Redis or local JSON), aliases
+`discord-hybrid-sharding` clusters, Keyv storage (Redis or local SQLite), aliases
 and **triggers** — plain words that run a command with no prefix at all.
 
 ## Running
@@ -17,7 +17,7 @@ npm run dev    # single process, no sharding — best for debugging
 BOT_MAIN_TOKEN=your_token        # required
 PREFIX=.                         # optional, default "."
 OWNER_IDS=123,456                # optional, comma separated — bypasses cooldowns/ownerOnly
-REDIS_URL=redis://localhost:6379 # optional — without it, data goes to ./data/*.json
+REDIS_URL=redis://localhost:6379 # optional — without it, data goes to data/kotan.sqlite
 SHARDS_PER_CLUSTER=2             # optional, default 2
 ```
 
@@ -46,10 +46,10 @@ src/config.js            Token, prefix, colors, economy tuning, shop items
 src/handlers/            commandHandler (recursive loader) + eventHandler
 src/events/              ready, messageCreate, guildCreate/Delete, shardError
 src/helpers/             embeds, format (durations/amounts), resolve, checks
-src/utils/               logger, database (Keyv), jsonStore, tasks (tempbans)
+src/utils/               logger, database (Keyv), sqliteStore, tasks (tempbans)
 src/commands/            files here = "core" category
 src/commands/<dir>/      each subfolder = a category with its name
-data/                    JSON storage (auto-created, only when no Redis)
+data/                    kotan.sqlite (auto-created, only when no Redis)
 ```
 
 ## Writing a command
@@ -94,15 +94,16 @@ module.exports = {
 | `db.getProfile / saveProfile` | Economy data per guild+user |
 | `db.addWarn / getWarns / deleteWarn / clearWarns` | Warn storage |
 | `db.setTempban / removeTempban / iterateTempbans` | Tempban storage |
+| `dominantColor(urlOrBuffer)` | Dominant image color -> int for `setColor`/`accent_color` (null on failure) |
 
 Events work the same way — a file in `src/events/` exporting
 `{ name: Events.X, once?, execute: (...args, client) => {} }`.
 
 ## Data & sharding notes
 
-- Without `REDIS_URL`, each Keyv namespace writes to `data/<ns>.json` via
-  `JsonStore` (a Map that debounces saves). With Redis, all namespaces share
-  one connection.
+- Without `REDIS_URL`, all Keyv namespaces share `data/kotan.sqlite` via
+  `SqliteStore` — a `node:sqlite` adapter (built into Node 22+, no native deps).
+  With Redis, all namespaces share one connection instead.
 - `src/utils/tasks.js` sweeps expired tempbans every 60s. Each cluster only
   unbans guilds in its own cache, so multi-cluster setups never double-unban.
 - Cooldowns are intentionally in-memory per process.

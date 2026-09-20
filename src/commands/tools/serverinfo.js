@@ -1,6 +1,7 @@
 const { ChannelType } = require('discord.js');
 const { base } = require('../../helpers/embeds');
 const { formatNumber, timestamp } = require('../../helpers/format');
+const { dominantColor } = require('../../utils/dominantColor');
 
 module.exports = {
     name: 'serverinfo',
@@ -18,9 +19,11 @@ module.exports = {
         const voice = channels.filter((c) => c.type === ChannelType.GuildVoice).size;
         const bots = guild.members.cache.filter((m) => m.user.bot).size;
 
+        const icon = guild.iconURL({ size: 256 });
         const embed = base({
             title: guild.name,
-            thumbnail: guild.iconURL({ size: 256 }),
+            thumbnail: icon,
+            color: icon ? ((await dominantColor(icon)) ?? undefined) : undefined,
             fields: [
                 { name: 'Server ID', value: guild.id, inline: true },
                 { name: 'Owner', value: owner ? `${owner.user.tag}` : 'Unknown', inline: true },

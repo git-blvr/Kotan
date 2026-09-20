@@ -1,5 +1,6 @@
 const { base, sendError } = require('../../helpers/embeds');
 const { resolveUser } = require('../../helpers/resolve');
+const { dominantColor } = require('../../utils/dominantColor');
 
 module.exports = {
     name: 'banner',
@@ -32,6 +33,7 @@ module.exports = {
             title: `${user.username}'s banner`,
             description: `[Open full size](${banner})`,
             image: banner,
+            color: (await dominantColor(banner)) ?? undefined,
         });
         return message.reply({ embeds: [embed] });
     },

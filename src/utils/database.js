@@ -1,16 +1,17 @@
 const path = require('path');
 const { Keyv } = require('keyv');
-const JsonStore = require('./jsonStore');
+const SqliteStore = require('./sqliteStore');
 const logger = require('./logger');
 
 // Storage layer for Kotan.
 //
 // Each data domain gets its own Keyv instance (and therefore its own key
 // namespace). If REDIS_URL is set all namespaces share one Redis connection;
-// otherwise each namespace is backed by a JSON file under ./data so the bot
-// works out of the box with no external services.
+// otherwise everything goes into a single SQLite file at data/kotan.sqlite
+// via Node's built-in node:sqlite — no external services required.
 
 let sharedRedis = null;
+let sharedDb = null;
 
 function createStore(namespace) {
     if (process.env.REDIS_URL) {
@@ -21,8 +22,11 @@ function createStore(namespace) {
         }
         return new Keyv({ store: sharedRedis, namespace });
     }
-    const file = path.join(__dirname, '..', '..', 'data', `${namespace}.json`);
-    return new Keyv({ store: new JsonStore(file), namespace });
+    if (!sharedDb) {
+        sharedDb = SqliteStore.connect(path.join(__dirname, '..', '..', 'data', 'kotan.sqlite'));
+        logger.info('Database: using SQLite backend (data/kotan.sqlite)');
+    }
+    return new Keyv({ store: new SqliteStore(sharedDb), namespace });
 }
 
 const profiles = createStore('economy');

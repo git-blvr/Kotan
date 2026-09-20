@@ -1,5 +1,6 @@
 const { base, sendError } = require('../../helpers/embeds');
 const { resolveUser } = require('../../helpers/resolve');
+const { dominantColor } = require('../../utils/dominantColor');
 
 module.exports = {
     name: 'avatar',
@@ -20,6 +21,7 @@ module.exports = {
             title: `${user.username}'s avatar`,
             description: `[PNG](${png}) | [WEBP](${webp}) | [JPG](${jpg})`,
             image: png,
+            color: (await dominantColor(png)) ?? undefined,
         });
         return message.reply({ embeds: [embed] });
     },
