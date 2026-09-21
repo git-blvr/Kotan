@@ -19,7 +19,9 @@ function line(color, level, args) {
 
 module.exports = {
     info: (...args) => console.log(...line(colors.cyan, 'INFO ', args)),
-    success: (...args) => console.log(...line(colors.green, 'OK   ', args)),
+    success: (...args) => console.log(...line(colors.green, 'DONE ', args)),
     warn: (...args) => console.warn(...line(colors.yellow, 'WARN ', args)),
     error: (...args) => console.error(...line(colors.red, 'ERROR', args)),
+    debug: (...args) => console.log(...line(colors.gray, 'DEBUG', args)), 
+    bot: (...args) => console.log(...line(colors.cyan, 'BOT ', args)), 
 };

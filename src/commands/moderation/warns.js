@@ -1,5 +1,5 @@
 const { PermissionFlagsBits } = require('discord.js');
-const { base, sendError } = require('../../helpers/embeds');
+const { base, sendError, cv2 } = require('../../helpers/embeds');
 const { resolveMember } = require('../../helpers/resolve');
 const { timestamp } = require('../../helpers/format');
 const db = require('../../utils/database');
@@ -21,19 +21,23 @@ module.exports = {
 
         const warns = await db.getWarns(message.guild.id, target.id);
         if (!warns.length)
-            return message.reply({
-                embeds: [base({ title: 'Warns', description: `**${target.user.tag}** has no warnings.` })],
-            });
+            return message.reply(
+                cv2(base({ title: 'Warns', description: `**${target.user.tag}** has no warnings.` }))
+            );
 
-        const embed = base({ title: `Warns for ${target.user.tag} (${warns.length})` });
+        const fields = [];
         for (const warn of warns.slice(-15)) {
             const mod = await message.client.users.fetch(warn.moderatorId).catch(() => null);
-            embed.addFields({
+            fields.push({
                 name: `\`${warn.id}\` — ${timestamp(warn.at)}`,
                 value: `${warn.reason}\nBy: ${mod ? mod.tag : warn.moderatorId}`,
             });
         }
-        if (warns.length > 15) embed.setFooter({ text: `Showing latest 15 of ${warns.length}` });
-        return message.reply({ embeds: [embed] });
+        const embed = base({
+            title: `Warns for ${target.user.tag} (${warns.length})`,
+            fields,
+            footer: warns.length > 15 ? { text: `Showing latest 15 of ${warns.length}` } : undefined,
+        });
+        return message.reply(cv2(embed));
     },
 };

@@ -8,16 +8,22 @@ const { esc } = require('./layout');
 function sparkline(values, { width = 132, height = 36, color = '#7983f5' } = {}) {
     const max = Math.max(...values);
     if (max === 0)
-        return `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" aria-hidden="true">
+        return `<svg class="sparkline" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" aria-hidden="true">
             <line x1="0" y1="${height - 6}" x2="${width}" y2="${height - 6}"
                 stroke="#1e1e26" stroke-width="1.5" stroke-dasharray="3 5"/></svg>`;
+    // Constant non-zero series — a centered accent line reads as "flat data",
+    // distinct from both the dashed empty state and a filled trend.
+    if (values.every((v) => v === values[0]))
+        return `<svg class="sparkline" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" aria-hidden="true">
+            <polyline points="0,${height / 2} ${width},${height / 2}" fill="none" stroke="${color}"
+                stroke-width="2" stroke-linecap="round" opacity=".65" pathLength="100"/></svg>`;
     const step = values.length > 1 ? width / (values.length - 1) : 0;
     const y = (v) => height - 4 - (v / max) * (height - 10);
     const pts = values.map((v, i) => `${(i * step).toFixed(1)},${y(v).toFixed(1)}`);
-    return `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" aria-hidden="true">
+    return `<svg class="sparkline" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" aria-hidden="true">
         <polygon points="0,${height} ${pts.join(' ')} ${width},${height}" fill="${color}" opacity="0.12"/>
         <polyline points="${pts.join(' ')}" fill="none" stroke="${color}" stroke-width="2"
-            stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+            stroke-linejoin="round" stroke-linecap="round" pathLength="100"/></svg>`;
 }
 
 // "+N this week" badge. invert=true flips good/bad colors (more warns = bad).

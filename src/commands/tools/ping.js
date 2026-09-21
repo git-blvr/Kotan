@@ -1,4 +1,4 @@
-const { info, success } = require('../../helpers/embeds');
+const { info, success, cv2 } = require('../../helpers/embeds');
 
 module.exports = {
     name: 'ping',
@@ -7,16 +7,11 @@ module.exports = {
     triggers: ['net', 'ms'],
     cooldown: 5,
     async execute(message, args, client) {
-        const sent = await message.reply({ embeds: [info('Pinging...', 'Ping')] });
+        const sent = await message.reply(cv2(info('Pinging...', 'Ping')));
         const roundtrip = sent.createdTimestamp - message.createdTimestamp;
         const ws = Math.round(client.ws.ping);
-        return sent.edit({
-            embeds: [
-                success(
-                    `Roundtrip: **${roundtrip}ms**\nWebsocket: **${ws}ms**`,
-                    'Pong!'
-                ),
-            ],
-        });
+        return sent.edit(
+            cv2(success(`Roundtrip: **${roundtrip}ms**\nWebsocket: **${ws}ms**`, 'Pong!'))
+        );
     },
 };

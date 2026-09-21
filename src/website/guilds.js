@@ -43,6 +43,34 @@ async function botGuildRoles(client, guildId) {
         .map(({ position, ...r }) => r);
 }
 
+// A user's member object in a bot guild — used by dashboard access tiers.
+async function botGuildMember(client, guildId, userId) {
+    const g = client.guilds.cache.get(guildId);
+    if (!g) return null;
+    return g.members.fetch(userId).catch(() => null);
+}
+
+// Recent messages of a text channel — powers the reaction-role message picker.
+async function botGuildMessages(client, guildId, channelId) {
+    const ch = client.guilds.cache.get(guildId)?.channels.cache.get(channelId);
+    if (!ch?.isTextBased() || ch.isThread()) return [];
+    const msgs = await ch.messages.fetch({ limit: 50 }).catch(() => null);
+    if (!msgs) return [];
+    return [...msgs.values()]
+        .sort((a, b) => b.createdTimestamp - a.createdTimestamp)
+        .map((m) => ({
+            id: m.id,
+            label: `${m.author?.username || 'system'} · ${(m.content || '(embed/attachment)').slice(0, 60)}`,
+        }));
+}
+
+// Custom emoji of a guild — suggestion list for the reaction-role emoji field.
+async function botGuildEmojis(client, guildId) {
+    const g = client.guilds.cache.get(guildId);
+    if (!g) return [];
+    return g.emojis.cache.map((e) => ({ fmt: e.toString(), name: e.name }));
+}
+
 // Totals for the homepage stats strip.
 async function botStats(client) {
     return { guilds: client.guilds.cache.size, users: client.users.cache.size };
@@ -74,4 +102,4 @@ function inviteUrl(client, guildId = null) {
     return `https://discord.com/oauth2/authorize?${params}`;
 }
 
-module.exports = { botGuildIds, botGuildInfo, botGuildChannels, botGuildRoles, botStats, inviteUrl };
+module.exports = { botGuildIds, botGuildInfo, botGuildChannels, botGuildRoles, botGuildMember, botGuildMessages, botGuildEmojis, botStats, inviteUrl };

@@ -1,5 +1,5 @@
 const { PermissionFlagsBits } = require('discord.js');
-const { success, sendError } = require('../../helpers/embeds');
+const { success, sendError, cv2 } = require('../../helpers/embeds');
 const { resolveMember } = require('../../helpers/resolve');
 const { canModerate } = require('../../helpers/checks');
 const { timestamp } = require('../../helpers/format');
@@ -39,24 +39,24 @@ module.exports = {
         });
 
         await target
-            .send({
-                embeds: [
+            .send(
+                cv2(
                     success(
                         `You were warned in **${message.guild.name}**.\nReason: ${reason}`,
                         'You received a warn'
-                    ),
-                ],
-            })
+                    )
+                )
+            )
             .catch(() => {}); // DMs closed — warn still counts
 
-        return message.reply({
-            embeds: [
+        return message.reply(
+            cv2(
                 success(
                     `Warned **${target.user.tag}** (warn \`${warn.id}\`)\n` +
                         `Reason: ${reason}\nTotal warns: **${total}** — ${timestamp(warn.at)}`,
                     'Member warned'
-                ),
-            ],
-        });
+                )
+            )
+        );
     },
 };

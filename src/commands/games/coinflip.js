@@ -1,4 +1,4 @@
-const { base, sendError } = require('../../helpers/embeds');
+const { base, sendError, cv2 } = require('../../helpers/embeds');
 const { formatCoins, parseAmount } = require('../../helpers/format');
 const db = require('../../utils/database');
 const config = require('../../config');
@@ -18,9 +18,9 @@ module.exports = {
 
         // No guess -> plain flip, no money involved.
         if (!guess) {
-            return message.reply({
-                embeds: [base({ title: 'Coinflip', description: `The coin landed on **${result}**.` })],
-            });
+            return message.reply(
+                cv2(base({ title: 'Coinflip', description: `The coin landed on **${result}**.` }))
+            );
         }
 
         const profile = await db.getProfile(message.guild.id, message.author.id);
@@ -38,16 +38,16 @@ module.exports = {
         profile.wallet += won ? bet : -bet;
         await db.saveProfile(message.guild.id, message.author.id, profile);
 
-        return message.reply({
-            embeds: [
+        return message.reply(
+            cv2(
                 base({
                     title: 'Coinflip',
                     color: won ? config.colors.success : config.colors.error,
                     description:
                         `The coin landed on **${result}** — you ${won ? 'won' : 'lost'} ${formatCoins(bet, cur)}.\n` +
                         `Wallet: ${formatCoins(profile.wallet, cur)}`,
-                }),
-            ],
-        });
+                })
+            )
+        );
     },
 };

@@ -1,4 +1,4 @@
-const { success, sendError } = require('../../helpers/embeds');
+const { success, sendError, cv2 } = require('../../helpers/embeds');
 const { formatCoins, formatDuration, timestamp } = require('../../helpers/format');
 const db = require('../../utils/database');
 const config = require('../../config');
@@ -35,15 +35,15 @@ module.exports = {
         profile.dailyStreak = streak;
         await db.saveProfile(message.guild.id, message.author.id, profile);
 
-        return message.reply({
-            embeds: [
+        return message.reply(
+            cv2(
                 success(
                     `You claimed ${formatCoins(reward, cur)} (base ${base} + streak bonus ${bonus}).\n` +
                         `Streak: **${streak} day${streak === 1 ? '' : 's'}**\n` +
                         `New wallet balance: ${formatCoins(profile.wallet, cur)}`,
                     'Daily claimed'
-                ),
-            ],
-        });
+                )
+            )
+        );
     },
 };

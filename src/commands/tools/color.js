@@ -1,4 +1,4 @@
-const { base, sendError } = require('../../helpers/embeds');
+const { base, sendError, cv2 } = require('../../helpers/embeds');
 const { resolveUser } = require('../../helpers/resolve');
 const { dominantColor, toHex } = require('../../utils/dominantColor');
 
@@ -40,6 +40,6 @@ module.exports = {
             color,
             thumbnail: source,
         });
-        return message.reply({ embeds: [embed] });
+        return message.reply(cv2(embed));
     },
 };

@@ -1,5 +1,5 @@
 const { PermissionFlagsBits } = require('discord.js');
-const { success, sendError } = require('../../helpers/embeds');
+const { success, sendError, cv2 } = require('../../helpers/embeds');
 const { resolveMember, extractId } = require('../../helpers/resolve');
 const { canModerate } = require('../../helpers/checks');
 const { logModAction } = require('../../utils/modlog');
@@ -27,9 +27,9 @@ module.exports = {
                 moderator: message.author.tag,
                 reason,
             });
-            return message.reply({
-                embeds: [success(`**${target.user.tag}** was banned.\nReason: ${reason}`, 'Member banned')],
-            });
+            return message.reply(
+                cv2(success(`**${target.user.tag}** was banned.\nReason: ${reason}`, 'Member banned'))
+            );
         }
 
         // Not a member — allow banning by raw id so pre-emptive bans work.
@@ -50,10 +50,8 @@ module.exports = {
             extra: 'Banned by user id',
         });
         const user = await message.client.users.fetch(id).catch(() => null);
-        return message.reply({
-            embeds: [
-                success(`**${user ? user.tag : id}** was banned.\nReason: ${reason}`, 'User banned'),
-            ],
-        });
+        return message.reply(
+            cv2(success(`**${user ? user.tag : id}** was banned.\nReason: ${reason}`, 'User banned'))
+        );
     },
 };

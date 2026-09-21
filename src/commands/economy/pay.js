@@ -1,4 +1,4 @@
-const { success, sendError } = require('../../helpers/embeds');
+const { success, sendError, cv2 } = require('../../helpers/embeds');
 const { resolveMember } = require('../../helpers/resolve');
 const { formatCoins, parseAmount } = require('../../helpers/format');
 const db = require('../../utils/database');
@@ -30,14 +30,14 @@ module.exports = {
         await db.saveProfile(message.guild.id, message.author.id, sender);
         await db.saveProfile(message.guild.id, target.id, receiver);
 
-        return message.reply({
-            embeds: [
+        return message.reply(
+            cv2(
                 success(
                     `You paid ${formatCoins(amount, cur)} to **${target.user.tag}**.\n` +
                         `Your new balance: ${formatCoins(sender.wallet, cur)}`,
                     'Payment sent'
-                ),
-            ],
-        });
+                )
+            )
+        );
     },
 };

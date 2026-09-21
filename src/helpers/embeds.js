@@ -1,22 +1,82 @@
-const { EmbedBuilder } = require('discord.js');
+const {
+    ContainerBuilder,
+    TextDisplayBuilder,
+    SectionBuilder,
+    ThumbnailBuilder,
+    MediaGalleryBuilder,
+    MediaGalleryItemBuilder,
+    SeparatorBuilder,
+    SeparatorSpacingSize,
+    MessageFlags,
+} = require('discord.js');
 const config = require('../config');
 
-// Embed factories so every command produces consistent-looking output.
-// Usage: message.reply({ embeds: [success('Done!')] })
+// Component V2 factories so every command produces consistent-looking output.
+// Usage: message.reply(cv2(success('Done!')))
+
+const text = (content) => new TextDisplayBuilder().setContent(content);
+const divider = () =>
+    new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true);
+
+// Wraps CV2 components into a ready-to-send payload — works for reply, send
+// and edit. The flag is what turns the message into a components message.
+// Mentions render but never ping — bot output shouldn't notify anyone.
+const cv2 = (...components) => ({
+    components,
+    flags: MessageFlags.IsComponentsV2,
+    allowedMentions: { repliedUser: false, users: [], roles: [], everyone: false },
+});
 
 function base(options = {}) {
-    const embed = new EmbedBuilder()
-        .setColor(options.color ?? config.colors.main)
-        .setTimestamp();
-    if (options.title) embed.setTitle(options.title);
-    if (options.description) embed.setDescription(options.description);
-    if (options.fields?.length) embed.addFields(options.fields);
-    if (options.thumbnail) embed.setThumbnail(options.thumbnail);
-    if (options.image) embed.setImage(options.image);
-    if (options.author) embed.setAuthor(options.author);
-    if (options.footer) embed.setFooter(options.footer);
-    if (options.url) embed.setURL(options.url);
-    return embed;
+    const container = new ContainerBuilder().setAccentColor(options.color ?? config.colors.main);
+
+    const head = [];
+    if (options.author) head.push(`-# ${options.author.name ?? options.author}`);
+    if (options.title)
+        head.push(options.url ? `## [${options.title}](${options.url})` : `## ${options.title}`);
+    if (options.description) head.push(options.description);
+
+    if (options.thumbnail && head.length) {
+        container.addSectionComponents(
+            new SectionBuilder()
+                .addTextDisplayComponents(text(head.join('\n')))
+                .setThumbnailAccessory(new ThumbnailBuilder().setURL(options.thumbnail))
+        );
+    } else if (head.length) {
+        container.addTextDisplayComponents(text(head.join('\n')));
+    }
+
+    if (options.fields?.length) {
+        if (head.length) container.addSeparatorComponents(divider());
+        // Inline fields collapse into one wrapped line separated by middots;
+        // block fields get their own display with the name above the value.
+        let inline = [];
+        const flush = () => {
+            if (inline.length) container.addTextDisplayComponents(text(inline.join('  ·  ')));
+            inline = [];
+        };
+        for (const f of options.fields) {
+            if (f.inline) {
+                inline.push(`**${f.name}:** ${f.value}`);
+                continue;
+            }
+            flush();
+            container.addTextDisplayComponents(text(`**${f.name}**\n${f.value}`));
+        }
+        flush();
+    }
+
+    if (options.image) {
+        if (head.length || options.fields?.length) container.addSeparatorComponents(divider());
+        container.addMediaGalleryComponents(
+            new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(options.image))
+        );
+    }
+
+    if (options.footer)
+        container.addTextDisplayComponents(text(`-# ${options.footer.text ?? options.footer}`));
+
+    return container;
 }
 
 const info = (description, title = 'Kotan') =>
@@ -25,18 +85,15 @@ const info = (description, title = 'Kotan') =>
 const success = (description, title = 'Success') =>
     base({ color: config.colors.success, title, description });
 
-const error = (description, title = 'Error') =>
-    base({ color: config.colors.error, title, description });
-
-const warning = (description, title = 'Warning') =>
-    base({ color: config.colors.warning, title, description });
+// Errors and warnings are one-liners: accent-colored container, description
+// text only, no title — they should glance, not headline.
+const error = (description) => base({ color: config.colors.error, description });
+const warning = (description) => base({ color: config.colors.warning, description });
 
 // Shortcut used all over commands and the message handler for user-facing
 // failures. Always resolves so callers can safely `return sendError(...)`.
 function sendError(message, description) {
-    return message
-        .reply({ embeds: [error(description)], allowedMentions: { repliedUser: false } })
-        .catch(() => {});
+    return message.reply(cv2(error(description))).catch(() => {});
 }
 
-module.exports = { base, info, success, error, warning, sendError };
+module.exports = { base, info, success, error, warning, sendError, cv2 };

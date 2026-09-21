@@ -36,10 +36,11 @@ const guilds = createStore('guilds');
 const sessions = createStore('sessions');
 const usage = createStore('usage');
 const tags = createStore('tags');
+const audit = createStore('audit');
 
 // A store error (Redis disconnect, disk failure) must never crash the process.
 // @keyv/redis reconnects automatically; SQLite is in-process and won't drop.
-for (const store of [profiles, warns, tempbans, guilds, sessions, usage, tags]) {
+for (const store of [profiles, warns, tempbans, guilds, sessions, usage, tags, audit]) {
     store.on('error', (err) => logger.error(`Storage error in "${store.namespace}":`, err));
 }
 if (sharedRedis) sharedRedis.on('error', (err) => logger.error('Redis error:', err));
@@ -91,11 +92,36 @@ const DEFAULT_SETTINGS = {
         currency: null,     // null -> config.economy.currency
         dailyBase: null,    // null -> config.economy.daily.base
     },
+    leveling: {
+        enabled: false,
+        xpMin: 15,          // xp granted per message, random between min/max
+        xpMax: 25,
+        cooldown: 60,       // seconds between xp gains per member
+        multiplier: 1,      // scales every gain
+        announce: true,     // level-up announcements
+        channel: null,      // level-up channel; null = the channel they leveled in
+        message: 'GG {user} — you reached **level {level}**!',
+        rewards: [],        // [{ level, roleId }] granted when reaching a level
+    },
+    // Dashboard access control — who may view/edit each section.
+    access: {
+        modRoles: [],       // member holding any -> 'mod' tier
+        adminRoles: [],     // member holding any -> 'admin' tier
+        // slug -> 'member'|'mod'|'admin'|'manager'. Missing = 'manager'
+        // (current behavior: only Discord-manageable users reach pages).
+        sections: {},
+    },
+    // Discord roles allowed to use each command module. Empty = everyone.
+    moduleRoles: {},        // category -> [roleIds]
+    overview: {
+        // which stat cards show on Overview, in display order
+        cards: ['members', 'commands', 'warns', 'tempbans'],
+    },
 };
 
 // Nested sections must merge key-by-key — a saved doc written before a new
 // sub-key existed shouldn't lose the defaults.
-const NESTED = ['automod', 'logging', 'welcome', 'roles', 'economy'];
+const NESTED = ['automod', 'logging', 'welcome', 'roles', 'economy', 'leveling', 'access', 'overview'];
 
 async function getGuildSettings(guildId) {
     const hit = settingsCache.get(guildId);
@@ -110,6 +136,21 @@ async function saveGuildSettings(guildId, settings) {
     await guilds.set(guildId, settings);
     settingsCache.delete(guildId);
     return settings;
+}
+
+// ---------- audit trail ----------
+
+const AUDIT_KEEP = 30;
+
+// Records who changed what on the dashboard — shown on the Access page.
+async function logAudit(guildId, userId, section) {
+    const list = (await audit.get(guildId)) || [];
+    list.unshift({ userId, section, at: Date.now() });
+    await audit.set(guildId, list.slice(0, AUDIT_KEEP));
+}
+
+async function getAudit(guildId, limit = 15) {
+    return ((await audit.get(guildId)) || []).slice(0, limit);
 }
 
 // ---------- guild stats (dashboard) ----------
@@ -134,13 +175,17 @@ function weekDelta(perDay) {
 
 // One doc per guild: all-time per-command counts + per-day buckets for
 // trends. Written fire-and-forget from messageCreate — never on a hot path.
-async function trackCommandUse(guildId, commandName) {
-    const data = (await usage.get(guildId)) || { commands: {}, daily: {} };
+async function trackCommandUse(guildId, commandName, userId) {
+    const data = (await usage.get(guildId)) || { commands: {}, daily: {}, recent: [] };
     data.commands[commandName] = (data.commands[commandName] || 0) + 1;
     const day = (data.daily[dayKey(Date.now())] ||= {});
     day[commandName] = (day[commandName] || 0) + 1;
     const cutoff = dayKey(Date.now() - USAGE_KEEP_DAYS * DAY);
     for (const k of Object.keys(data.daily)) if (k < cutoff) delete data.daily[k];
+    // Ring of the latest invocations for the Overview activity feed.
+    data.recent = data.recent || [];
+    data.recent.unshift({ cmd: commandName, userId, at: Date.now() });
+    if (data.recent.length > 10) data.recent.length = 10;
     await usage.set(guildId, data);
 }
 
@@ -163,6 +208,7 @@ async function getCommandUsage(guildId, days = 14) {
             .slice(0, 8)
             .map(([name, count]) => ({ name, count })),
         series,
+        recent: data.recent || [],
         ...weekDelta(perDay),
     };
 }
@@ -241,7 +287,15 @@ async function getModActivity(guildId, days = 14) {
 
 // ---------- economy ----------
 
-const DEFAULT_PROFILE = { wallet: 0, bank: 0, lastDaily: 0, dailyStreak: 0, inventory: {} };
+const DEFAULT_PROFILE = {
+    wallet: 0,
+    lastDaily: 0,
+    dailyStreak: 0,
+    inventory: {},
+    xp: 0,      // progress toward the next level
+    level: 0,
+    lastXp: 0,  // timestamp of last xp gain (cooldown)
+};
 
 async function getProfile(guildId, userId) {
     const profile = await profiles.get(key(guildId, userId));
@@ -251,6 +305,48 @@ async function getProfile(guildId, userId) {
 async function saveProfile(guildId, userId, profile) {
     await profiles.set(key(guildId, userId), profile);
     return profile;
+}
+
+// Leaderboards — iterate the guild's profiles and rank them. Fine at guild
+// scale; both commands are cooldown-gated.
+async function getTopLevels(guildId, limit = 10) {
+    const rows = [];
+    for await (const [k, p] of profiles.iterator()) {
+        if (!k.startsWith(`${guildId}:`) || !p) continue;
+        rows.push({ userId: k.slice(guildId.length + 1), level: p.level || 0, xp: p.xp || 0 });
+    }
+    return rows.sort((a, b) => b.level - a.level || b.xp - a.xp).slice(0, limit);
+}
+
+async function getTopRich(guildId, limit = 10) {
+    const rows = [];
+    for await (const [k, p] of profiles.iterator()) {
+        if (!k.startsWith(`${guildId}:`) || !p) continue;
+        rows.push({
+            userId: k.slice(guildId.length + 1),
+            total: p.wallet || 0,
+        });
+    }
+    return rows.sort((a, b) => b.total - a.total).slice(0, limit);
+}
+
+// Latest warns + tempbans merged by timestamp — feeds the Overview
+// "recent activity" list. Records without `at` (pre-timestamp data) are skipped.
+async function getRecentModActions(guildId, limit = 5) {
+    const out = [];
+    for await (const [k, list] of warns.iterator()) {
+        if (!k.startsWith(`${guildId}:`) || !Array.isArray(list)) continue;
+        const targetId = k.slice(guildId.length + 1);
+        for (const w of list) {
+            if (w.at)
+                out.push({ type: 'warn', userId: targetId, moderatorId: w.moderatorId, reason: w.reason, at: w.at });
+        }
+    }
+    for await (const b of iterateTempbans()) {
+        if (b.guildId === guildId && b.at)
+            out.push({ type: 'tempban', userId: b.userId, moderatorId: b.moderatorId, reason: b.reason, at: b.at });
+    }
+    return out.sort((a, b) => b.at - a.at).slice(0, limit);
 }
 
 // ---------- warns ----------
@@ -371,6 +467,11 @@ module.exports = {
     closeDatabase,
     getProfile,
     saveProfile,
+    getTopLevels,
+    getTopRich,
+    getRecentModActions,
+    logAudit,
+    getAudit,
     getWarns,
     addWarn,
     deleteWarn,

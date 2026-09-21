@@ -1,5 +1,5 @@
 const { PermissionFlagsBits } = require('discord.js');
-const { success, sendError } = require('../../helpers/embeds');
+const { success, sendError, cv2 } = require('../../helpers/embeds');
 const { extractId } = require('../../helpers/resolve');
 const { logModAction } = require('../../utils/modlog');
 
@@ -27,10 +27,8 @@ module.exports = {
             moderator: message.author.tag,
             reason,
         });
-        return message.reply({
-            embeds: [
-                success(`**${ban.user.tag}** was unbanned.\nReason: ${reason}`, 'User unbanned'),
-            ],
-        });
+        return message.reply(
+            cv2(success(`**${ban.user.tag}** was unbanned.\nReason: ${reason}`, 'User unbanned'))
+        );
     },
 };

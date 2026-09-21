@@ -1,5 +1,5 @@
 const { PermissionFlagsBits } = require('discord.js');
-const { success, sendError } = require('../../helpers/embeds');
+const { success, sendError, cv2 } = require('../../helpers/embeds');
 const { resolveMember } = require('../../helpers/resolve');
 const { canModerate } = require('../../helpers/checks');
 const { logModAction } = require('../../utils/modlog');
@@ -29,8 +29,8 @@ module.exports = {
             target: `${target.user.tag} (${target.id})`,
             moderator: message.author.tag,
         });
-        return message.reply({
-            embeds: [success(`**${target.user.tag}** is no longer muted.`, 'Member unmuted')],
-        });
+        return message.reply(
+            cv2(success(`**${target.user.tag}** is no longer muted.`, 'Member unmuted'))
+        );
     },
 };

@@ -6,6 +6,7 @@ const db = require('../utils/database');
 const { sendError } = require('../helpers/embeds');
 const { formatDuration } = require('../helpers/format');
 const automod = require('../utils/automod');
+const leveling = require('../utils/leveling');
 
 // Global anti-spam: beyond per-command cooldowns, cap total command invocations
 // per user so one spammer can't hammer our API/DB in a loop.
@@ -35,6 +36,10 @@ module.exports = {
         // Automod scans every message — invites, blacklist, spam velocity.
         // If it deleted the message we stop here, before command resolution.
         if (settings && (await automod.checkMessage(message, settings.automod, client))) return;
+
+        // Leveling — every surviving message earns XP (commands included).
+        // Fire-and-forget: never blocks or slows command resolution.
+        if (settings) leveling.awardXp(message, settings.leveling).catch(() => {});
 
         let command = null;
         let args = [];
@@ -94,6 +99,17 @@ module.exports = {
                 return sendError(message, `The \`${command.category}\` module is disabled in this server.`);
             if (settings.disabledCommands?.includes(command.name))
                 return sendError(message, `The \`${command.name}\` command is disabled in this server.`);
+            // Per-module role gate — configured on the Modules page.
+            const need = settings.moduleRoles?.[command.category];
+            if (
+                need?.length &&
+                !message.member?.permissions.has(PermissionFlagsBits.ManageGuild) &&
+                !message.member?.roles.cache.some((r) => need.includes(r.id))
+            )
+                return sendError(
+                    message,
+                    `The \`${command.category}\` module requires one of these roles: ${need.map((r) => `<@&${r}>`).join(', ')}`
+                );
         }
 
         if (message.guild) {
@@ -133,7 +149,7 @@ module.exports = {
         }
 
         // Dashboard stats — fire-and-forget so it never slows the command.
-        if (message.guild) db.trackCommandUse(message.guild.id, command.name).catch(() => {});
+        if (message.guild) db.trackCommandUse(message.guild.id, command.name, message.author.id).catch(() => {});
 
         try {
             await command.execute(message, args, client);

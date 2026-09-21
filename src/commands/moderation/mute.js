@@ -1,5 +1,5 @@
 const { PermissionFlagsBits } = require('discord.js');
-const { success, sendError } = require('../../helpers/embeds');
+const { success, sendError, cv2 } = require('../../helpers/embeds');
 const { resolveMember } = require('../../helpers/resolve');
 const { canModerate } = require('../../helpers/checks');
 const { parseDuration, formatDuration } = require('../../helpers/format');
@@ -42,13 +42,13 @@ module.exports = {
             extra: `Duration: ${formatDuration(duration)}`,
         });
 
-        return message.reply({
-            embeds: [
+        return message.reply(
+            cv2(
                 success(
                     `**${target.user.tag}** was muted for **${formatDuration(duration)}**.\nReason: ${reason}`,
                     'Member muted'
-                ),
-            ],
-        });
+                )
+            )
+        );
     },
 };

@@ -1,4 +1,4 @@
-const { base, sendError } = require('../../helpers/embeds');
+const { base, sendError, cv2 } = require('../../helpers/embeds');
 const { resolveUser } = require('../../helpers/resolve');
 const { dominantColor } = require('../../utils/dominantColor');
 
@@ -24,7 +24,7 @@ module.exports = {
                     description: 'This user has no banner image — showing their accent color.',
                     color: user.accentColor,
                 });
-                return message.reply({ embeds: [embed] });
+                return message.reply(cv2(embed));
             }
             return sendError(message, `**${user.username}** does not have a banner.`);
         }
@@ -35,6 +35,6 @@ module.exports = {
             image: banner,
             color: (await dominantColor(banner)) ?? undefined,
         });
-        return message.reply({ embeds: [embed] });
+        return message.reply(cv2(embed));
     },
 };

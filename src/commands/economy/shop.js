@@ -1,4 +1,4 @@
-const { base, success, sendError } = require('../../helpers/embeds');
+const { base, success, sendError, cv2 } = require('../../helpers/embeds');
 const { formatCoins, formatNumber, capitalize } = require('../../helpers/format');
 const db = require('../../utils/database');
 const config = require('../../config');
@@ -27,15 +27,15 @@ module.exports = {
                 description:
                     `Your wallet: ${formatCoins(profile.wallet, cur)}\n` +
                     `Buy with \`${message.prefix}shop buy <item>\``,
+                fields: config.shop.map((item) => {
+                    const owned = profile.inventory[item.id] || 0;
+                    return {
+                        name: `${item.name} — ${formatNumber(item.price)} ${cur}`,
+                        value: `${item.description}${owned ? `\nOwned: **${owned}**` : ''}`,
+                    };
+                }),
             });
-            for (const item of config.shop) {
-                const owned = profile.inventory[item.id] || 0;
-                embed.addFields({
-                    name: `${item.name} — ${formatNumber(item.price)} ${cur}`,
-                    value: `${item.description}${owned ? `\nOwned: **${owned}**` : ''}`,
-                });
-            }
-            return message.reply({ embeds: [embed] });
+            return message.reply(cv2(embed));
         }
 
         // .shop buy <item>
@@ -59,14 +59,14 @@ module.exports = {
         profile.inventory[item.id] = (profile.inventory[item.id] || 0) + 1;
         await db.saveProfile(message.guild.id, message.author.id, profile);
 
-        return message.reply({
-            embeds: [
+        return message.reply(
+            cv2(
                 success(
                     `You bought **${item.name}** for ${formatCoins(item.price, cur)}.\n` +
                         `Owned: **${profile.inventory[item.id]}** — Wallet left: ${formatCoins(profile.wallet, cur)}`,
                     `${capitalize(item.name)} purchased`
-                ),
-            ],
-        });
+                )
+            )
+        );
     },
 };

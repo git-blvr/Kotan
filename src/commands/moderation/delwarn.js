@@ -1,5 +1,5 @@
 const { PermissionFlagsBits } = require('discord.js');
-const { success, sendError } = require('../../helpers/embeds');
+const { success, sendError, cv2 } = require('../../helpers/embeds');
 const { resolveMember } = require('../../helpers/resolve');
 const db = require('../../utils/database');
 const { logModAction } = require('../../utils/modlog');
@@ -31,9 +31,11 @@ module.exports = {
                 moderator: message.author.tag,
                 extra: `Removed ${removed} warn(s)`,
             });
-            return message.reply({
-                embeds: [success(`Cleared **${removed}** warn(s) from **${target.user.tag}**.`, 'Warns cleared')],
-            });
+            return message.reply(
+                cv2(
+                    success(`Cleared **${removed}** warn(s) from **${target.user.tag}**.`, 'Warns cleared')
+                )
+            );
         }
 
         const removed = await db.deleteWarn(message.guild.id, target.id, which);
@@ -49,8 +51,8 @@ module.exports = {
                 message,
                 `No warn with id \`${which}\` found for **${target.user.tag}**. Check \`${message.prefix}warns\`.`
             );
-        return message.reply({
-            embeds: [success(`Removed warn \`${removed.id}\` from **${target.user.tag}**.`, 'Warn removed')],
-        });
+        return message.reply(
+            cv2(success(`Removed warn \`${removed.id}\` from **${target.user.tag}**.`, 'Warn removed'))
+        );
     },
 };

@@ -1,5 +1,5 @@
 const { PermissionFlagsBits } = require('discord.js');
-const { success, sendError } = require('../../helpers/embeds');
+const { success, sendError, cv2 } = require('../../helpers/embeds');
 const { resolveMember, extractId } = require('../../helpers/resolve');
 const { canModerate } = require('../../helpers/checks');
 const { parseDuration, formatDuration, timestamp } = require('../../helpers/format');
@@ -59,14 +59,14 @@ module.exports = {
             extra: `Duration: ${formatDuration(duration)}`,
         });
 
-        return message.reply({
-            embeds: [
+        return message.reply(
+            cv2(
                 success(
                     `**${tag}** was banned for **${formatDuration(duration)}**.\n` +
                         `Reason: ${reason}\nUnban: ${timestamp(unbanAt)}`,
                     'Member tempbanned'
-                ),
-            ],
-        });
+                )
+            )
+        );
     },
 };
