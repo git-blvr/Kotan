@@ -33,21 +33,22 @@ const profiles = createStore('economy');
 const warns = createStore('warns');
 const tempbans = createStore('tempbans');
 const guilds = createStore('guilds');
-const sessions = createStore('sessions');
 const usage = createStore('usage');
 const tags = createStore('tags');
 const audit = createStore('audit');
+const meta = createStore('meta'); // process heartbeat for the website's status page
+const sessions = createStore('sessions'); // website login sessions
 
 // A store error (Redis disconnect, disk failure) must never crash the process.
 // @keyv/redis reconnects automatically; SQLite is in-process and won't drop.
-for (const store of [profiles, warns, tempbans, guilds, sessions, usage, tags, audit]) {
+for (const store of [profiles, warns, tempbans, guilds, usage, tags, audit, meta, sessions]) {
     store.on('error', (err) => logger.error(`Storage error in "${store.namespace}":`, err));
 }
 if (sharedRedis) sharedRedis.on('error', (err) => logger.error('Redis error:', err));
 
 const key = (guildId, userId) => `${guildId}:${userId}`;
 
-// ---------- guild settings (dashboard) ----------
+// ---------- per-guild settings ----------
 
 // Short TTL cache: keeps per-message settings reads cheap. Writes through
 // saveGuildSettings drop the entry immediately; the TTL is just a backstop
@@ -113,6 +114,9 @@ const DEFAULT_SETTINGS = {
     },
     // Discord roles allowed to use each command module. Empty = everyone.
     moduleRoles: {},        // category -> [roleIds]
+    // Scoped disables: a command blocked in a channel and/or a time window.
+    // { command, channelId|null, start|'HH:MM'|null, end|'HH:MM'|null, tz }
+    commandRules: [],
     overview: {
         // which stat cards show on Overview, in display order
         cards: ['members', 'commands', 'warns', 'tempbans'],
@@ -142,7 +146,7 @@ async function saveGuildSettings(guildId, settings) {
 
 const AUDIT_KEEP = 30;
 
-// Records who changed what on the dashboard — shown on the Access page.
+// Records who changed which settings section.
 async function logAudit(guildId, userId, section) {
     const list = (await audit.get(guildId)) || [];
     list.unshift({ userId, section, at: Date.now() });
@@ -153,7 +157,7 @@ async function getAudit(guildId, limit = 15) {
     return ((await audit.get(guildId)) || []).slice(0, limit);
 }
 
-// ---------- guild stats (dashboard) ----------
+// ---------- guild stats ----------
 
 const DAY = 86_400_000;
 const dayKey = (ts) => new Date(ts).toISOString().slice(0, 10);
@@ -228,7 +232,7 @@ async function trackMemberCount(guildId, count) {
     await usage.set(key, data);
 }
 
-// Member-count series for the dashboard sparkline + growth badge. Days with no
+// Member-count series. Days with no
 // snapshot carry the last known count forward; before the first snapshot they
 // backfill it, so the line spans the whole window.
 async function getMemberGrowth(guildId, days = 14) {
@@ -409,6 +413,84 @@ async function* iterateTempbans() {
     }
 }
 
+// ---------- guild blacklist (developer-controlled) ----------
+
+// Single source of truth: the blacklisted_guilds table (written by the
+// website's /api/admin/blacklist route). Guild-level only — no user
+// blacklist exists anywhere. Short TTL cache keeps the check off the hot
+// path; Redis-mode deployments have no table and fall through unblocked.
+let blCheck = null;
+const blCache = new Map();
+const BL_TTL = 30_000;
+
+function isGuildBlacklisted(guildId) {
+    if (!guildId || !sharedDb) return false;
+    if (!blCheck)
+        blCheck = sharedDb.prepare('SELECT 1 FROM blacklisted_guilds WHERE guild_id = ?');
+    const hit = blCache.get(guildId);
+    if (hit && hit.expires > Date.now()) return hit.value;
+    const value = !!blCheck.get(guildId);
+    blCache.set(guildId, { value, expires: Date.now() + BL_TTL });
+    return value;
+}
+
+// Admin writes from the website — same table the gate above reads. The TTL
+// cache is dropped on write so enforcement is immediate. No-ops under a Redis
+// backend (no SQLite table exists there).
+function blacklistGuild(guildId, reason, developerId) {
+    if (!sharedDb) return false;
+    sharedDb.prepare(
+        'INSERT INTO blacklisted_guilds (guild_id, reason, blacklisted_by, blacklisted_at) VALUES (?, ?, ?, ?) ' +
+        'ON CONFLICT(guild_id) DO UPDATE SET reason = excluded.reason, blacklisted_by = excluded.blacklisted_by, blacklisted_at = excluded.blacklisted_at'
+    ).run(String(guildId), String(reason), String(developerId), Date.now());
+    blCache.delete(String(guildId));
+    return true;
+}
+
+function unblacklistGuild(guildId) {
+    if (!sharedDb) return false;
+    const { changes } = sharedDb.prepare('DELETE FROM blacklisted_guilds WHERE guild_id = ?').run(String(guildId));
+    blCache.delete(String(guildId));
+    return changes > 0;
+}
+
+function listBlacklistedGuilds() {
+    if (!sharedDb) return [];
+    return sharedDb.prepare(
+        'SELECT guild_id, reason, blacklisted_by, blacklisted_at FROM blacklisted_guilds ORDER BY blacklisted_at DESC'
+    ).all();
+}
+
+// ---------- heartbeat (website status page reads this) ----------
+
+const UPTIME_LOG_CAP = 1440; // one sample per minute = 24h
+
+// Writes a liveness record the website reads through the shared DB —
+// the site has no other channel into this process.
+async function writeHeartbeat(client) {
+    const now = Date.now();
+    await meta.set('heartbeat', {
+        at: now,
+        guilds: client.guilds.cache.size,
+        users: client.guilds.cache.reduce((a, g) => a + (g.memberCount || 0), 0),
+        ping: Math.round(client.ws.ping),
+        memoryMB: Math.round(process.memoryUsage().rss / 1048576),
+    });
+    // Ring of minute-bucketed heartbeat timestamps -> real uptime history.
+    const minute = Math.floor(now / 60_000);
+    const log = (await meta.get('uptimeLog')) || [];
+    if (log[log.length - 1] !== minute) log.push(minute);
+    if (log.length > UPTIME_LOG_CAP) log.splice(0, log.length - UPTIME_LOG_CAP);
+    await meta.set('uptimeLog', log);
+}
+
+async function getHeartbeat() {
+    return {
+        heartbeat: (await meta.get('heartbeat')) || null,
+        uptimeLog: (await meta.get('uptimeLog')) || [],
+    };
+}
+
 // ---------- custom commands (tags) ----------
 
 // One doc per guild: { name: { content, authorId, uses, at } }. Tags are
@@ -491,5 +573,11 @@ module.exports = {
     addTag,
     deleteTag,
     useTag,
-    sessions, // raw Keyv — used by the website's session store
+    isGuildBlacklisted,
+    blacklistGuild,
+    unblacklistGuild,
+    listBlacklistedGuilds,
+    writeHeartbeat,
+    getHeartbeat,
+    sessions,
 };

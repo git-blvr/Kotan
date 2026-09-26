@@ -45,7 +45,7 @@ function formatDuration(ms) {
 }
 
 const formatNumber = (n) => Math.floor(n).toLocaleString('en-US');
-// Per-guild currency name (dashboard Economy page) overrides the global one.
+// Per-guild currency name overrides the global one.
 // Nullish-coalesce rather than a default param — callers pass the guild
 // setting, which is null (not undefined) when unset.
 const formatCoins = (n, currency) => `**${formatNumber(n)}** ${currency ?? config.economy.currency}`;

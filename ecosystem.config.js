@@ -18,5 +18,7 @@ module.exports = {
                 NODE_ENV: 'production',
             },
         },
+        // No separate web process — the dashboard runs inside the bot
+        // (src/web/server.js, started from ready.js).
     ],
 };

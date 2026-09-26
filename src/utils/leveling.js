@@ -2,8 +2,8 @@ const db = require('./database');
 const logger = require('./logger');
 
 // XP engine — called fire-and-forget from messageCreate for every message that
-// survives automod. Per-guild config comes from settings.leveling (dashboard
-// Leveling page): rate, cooldown, multiplier, announcements, role rewards.
+// survives automod. Per-guild config comes from settings.leveling:
+// rate, cooldown, multiplier, announcements, role rewards.
 
 // XP needed to advance level L -> L+1. Quadratic curve (MEE6-style).
 const xpForLevel = (level) => 5 * level * level + 50 * level + 100;

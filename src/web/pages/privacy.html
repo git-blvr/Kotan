@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy Policy — Kotan</title>
+<link rel="stylesheet" href="/stylesheets/tokens.css">
+<link rel="stylesheet" href="/stylesheets/site.css">
+<script src="/script/site.js" defer></script>
+</head>
+<body>
+<nav class="nav"><div class="nav-inner">
+    <a class="nav-logo" href="/"><span class="dot">K</span>Kotan</a>
+    <div class="nav-links">
+        <a href="/" data-nav="home">Home</a>
+        <a href="/doc" data-nav="doc">Docs</a>
+        <a href="/uptime" data-nav="uptime">Status</a>
+        <a href="/dashboard" data-nav="dash">Dashboard</a>
+        <span class="nav-user" id="nav-user"></span>
+    </div>
+</div></nav>
+
+<main class="wrap">
+<div class="legal" style="padding: var(--s6) 0;">
+    <h1>Privacy Policy</h1>
+    <p class="updated">Last updated: <span id="last-updated"></span></p>
+
+    <h2>What we collect</h2>
+    <p>Kotan stores only what its features require:</p>
+    <ul>
+        <li><b>Discord user IDs</b> — to associate warns, economy profiles, levels, tag authorship and moderation history with accounts.</li>
+        <li><b>Discord guild (server) IDs</b> — to store per-server configuration, blacklists and statistics.</li>
+        <li><b>Channel and role IDs</b> — as part of your server's configuration (log channels, autoroles, reaction roles).</li>
+        <li><b>Moderation records</b> — warn reasons, tempban durations, the acting moderator's ID and timestamps.</li>
+        <li><b>Custom command (tag) content</b> — text you explicitly save through the tag system.</li>
+        <li><b>Dashboard account data</b> — when you log in, your Discord user ID, username, avatar and guild list, kept in a session record.</li>
+    </ul>
+    <p><b>Message content is not stored.</b> Automod and logging features read message content in memory to evaluate rules or report events; message text is discarded and never written to the database. Logged events record metadata (author, channel, timestamps) — not message bodies.</p>
+
+    <h2>How data is stored</h2>
+    <p>Data is stored in an AES-256-GCM-encrypted SQLite database on the bot's host. Dashboard sessions expire after 30 days of inactivity.</p>
+
+    <h2>Retention</h2>
+    <ul>
+        <li>Guild configuration persists until the bot is removed or deletion is requested.</li>
+        <li>Command-usage statistics roll off after 45 days.</li>
+        <li>Settings audit entries keep the most recent 30 changes per guild.</li>
+        <li>Uptime heartbeat history keeps the last 24 hours.</li>
+        <li>Temporary bans are deleted when they expire or are removed.</li>
+    </ul>
+
+    <h2>Third parties</h2>
+    <ul>
+        <li><b>Discord</b> — the bot operates via the Discord API; Discord's own privacy policy applies to data they collect.</li>
+        <li><b>Hosting provider</b> — the bot and site run on infrastructure operated by the bot owner; no analytics or advertising providers are used.</li>
+    </ul>
+    <p>We do not sell, share or monetize your data.</p>
+
+    <h2>Your rights</h2>
+    <p>You may request a copy or deletion of data associated with your user ID or guild at any time by contacting the bot operator (see the documentation page for contact channels). Server managers can delete most guild data themselves via the dashboard or by removing the bot.</p>
+
+    <h2>Age</h2>
+    <p>The service is not directed at children under 13, consistent with Discord's minimum age requirement.</p>
+
+    <h2>Changes</h2>
+    <p>This policy may be updated; the "last updated" date reflects the current version.</p>
+
+    <h2>Contact</h2>
+    <p>For privacy questions or deletion requests, contact the bot operator via the channels listed on the documentation page.</p>
+</div>
+</main>
+
+<footer><div class="wrap">
+    <span>© <span id="yr"></span> Kotan</span>
+    <a href="/doc">Docs</a><a href="/tos">Terms</a><a href="/privacy">Privacy</a><a href="/uptime">Status</a>
+</div></footer>
+</body>
+</html>

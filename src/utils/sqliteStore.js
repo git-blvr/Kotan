@@ -74,6 +74,17 @@ class SqliteStore {
                 value TEXT NOT NULL
             )`
         );
+        // Developer-maintained guild blacklist — written by the website's
+        // /api/admin/blacklist route, read here for the command gate and
+        // auto-leave. Mirrors web/migrations/0001 exactly.
+        db.exec(
+            `CREATE TABLE IF NOT EXISTS blacklisted_guilds (
+                guild_id       TEXT PRIMARY KEY,
+                reason         TEXT NOT NULL,
+                blacklisted_by TEXT NOT NULL,
+                blacklisted_at INTEGER NOT NULL
+            )`
+        );
         try {
             fs.chmodSync(file, 0o600); // owner-only read/write where supported
         } catch {}

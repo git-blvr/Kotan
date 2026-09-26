@@ -19,7 +19,7 @@ module.exports = {
                 cv2(
                     base({
                         title: 'Leaderboard',
-                        description: 'Nobody has earned XP yet — enable leveling on the dashboard and start chatting.',
+                        description: 'Nobody has earned XP yet — enable leveling and start chatting.',
                     })
                 )
             );

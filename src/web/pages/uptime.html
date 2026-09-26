@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Status — Kotan</title>
+<link rel="stylesheet" href="/stylesheets/tokens.css">
+<link rel="stylesheet" href="/stylesheets/site.css">
+<script src="/script/site.js" defer></script>
+<script src="/script/uptime.js" defer></script>
+</head>
+<body>
+<nav class="nav"><div class="nav-inner">
+    <a class="nav-logo" href="/"><span class="dot">K</span>Kotan</a>
+    <div class="nav-links">
+        <a href="/" data-nav="home">Home</a>
+        <a href="/doc" data-nav="doc">Docs</a>
+        <a href="/uptime" data-nav="uptime">Status</a>
+        <a href="/dashboard" data-nav="dash">Dashboard</a>
+        <span class="nav-user" id="nav-user"></span>
+    </div>
+</div></nav>
+
+<main class="wrap">
+    <div class="page-head"><h1>System status</h1><p>Live readings from the bot process — refreshed every 5 seconds.</p></div>
+
+    <div class="status-banner" id="banner">
+        <span class="dot ok" id="banner-dot"></span>
+        <b id="banner-text">Checking…</b>
+        <span id="banner-sub"></span>
+    </div>
+
+    <div class="big-uptime" id="uptime">—</div>
+    <div class="uptime-sub">current uptime · <span id="up24">—</span>% over the last 24h</div>
+
+    <div class="stat-cards">
+        <div class="card sc"><b id="st-ping">—</b><span>gateway ping</span></div>
+        <div class="card sc"><b id="st-guilds">—</b><span>servers</span></div>
+        <div class="card sc"><b id="st-users">—</b><span>users</span></div>
+        <div class="card sc"><b id="st-mem">—</b><span>memory (RSS)</span></div>
+        <div class="card sc"><b id="st-node">—</b><span>node</span></div>
+    </div>
+
+    <div class="health-rows" id="health"></div>
+
+    <div class="card chart-card">
+        <div class="chart-head"><b>Gateway latency</b><span id="ch-ping-val">— ms</span></div>
+        <svg id="ch-ping" preserveAspectRatio="none"></svg>
+    </div>
+    <div class="card chart-card">
+        <div class="chart-head"><b>Memory (RSS)</b><span id="ch-mem-val">— MB</span></div>
+        <svg id="ch-mem" preserveAspectRatio="none"></svg>
+    </div>
+</main>
+
+<footer><div class="wrap">
+    <span>© <span id="yr"></span> Kotan</span>
+    <a href="/doc">Docs</a><a href="/tos">Terms</a><a href="/privacy">Privacy</a><a href="/uptime">Status</a>
+</div></footer>
+</body>
+</html>

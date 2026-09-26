@@ -1,7 +1,7 @@
 const db = require('./database');
 const logger = require('./logger');
 
-// Reaction roles — the dashboard maps emoji on a message to a role. Both
+// Reaction roles — per-guild emoji→role mappings on a message. Both
 // messageReactionAdd and messageReactionRemove route through here.
 
 // Stored emoji can be a unicode char ("🔥"), a custom id ("1234…"), or the

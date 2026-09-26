@@ -3,7 +3,7 @@ const config = require('../config');
 const logger = require('./logger');
 const { logModAction } = require('./modlog');
 
-// Automod — configured per guild on the dashboard (automod page). Runs on
+// Automod — configured per guild (settings.automod). Runs on
 // every message before command resolution. Members who can manage messages
 // or the guild are exempt, as are bot owners.
 

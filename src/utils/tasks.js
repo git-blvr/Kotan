@@ -22,15 +22,21 @@ async function checkExpiredTempbans(client) {
     }
 }
 
-// Records each guild's member count so the dashboard can chart growth.
+// Records each guild's member count.
 function snapshotMemberCounts(client) {
     for (const guild of client.guilds.cache.values())
         db.trackMemberCount(guild.id, guild.memberCount).catch(() => {});
 }
 
+// Liveness record for the website's /uptime page — one write per minute.
+function heartbeat(client) {
+    db.writeHeartbeat(client).catch((err) => logger.warn('Heartbeat write failed:', err.message));
+}
+
 function startTasks(client) {
     checkExpiredTempbans(client).catch((err) => logger.error('Tempban check failed', err));
     snapshotMemberCounts(client);
+    heartbeat(client);
     const interval = setInterval(
         () => checkExpiredTempbans(client).catch((err) => logger.error('Tempban check failed', err)),
         60_000
@@ -38,6 +44,8 @@ function startTasks(client) {
     interval.unref?.();
     const memberSnap = setInterval(() => snapshotMemberCounts(client), 30 * 60_000);
     memberSnap.unref?.();
+    const hb = setInterval(() => heartbeat(client), 60_000);
+    hb.unref?.();
 }
 
 module.exports = { startTasks, checkExpiredTempbans };

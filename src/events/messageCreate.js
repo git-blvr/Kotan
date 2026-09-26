@@ -3,6 +3,7 @@ const config = require('../config');
 const logger = require('../utils/logger');
 const sentry = require('../utils/sentry');
 const db = require('../utils/database');
+const { ruleBlocks } = require('../utils/commandRules');
 const { sendError } = require('../helpers/embeds');
 const { formatDuration } = require('../helpers/format');
 const automod = require('../utils/automod');
@@ -24,9 +25,13 @@ module.exports = {
     async execute(message, client) {
         if (message.author.bot || message.webhookId) return;
 
+        // Developer guild blacklist — a blacklisted guild gets nothing, not
+        // even an error reply or tag expansion (silent by design).
+        if (message.guild && db.isGuildBlacklisted(message.guild.id)) return;
+
         const content = message.content.trim();
 
-        // Per-guild settings (dashboard): prefix, module toggles, disabled
+        // Per-guild settings: prefix, module toggles, disabled
         // commands. One fetch covers all of it — settings are TTL-cached.
         const settings = message.guild ? await db.getGuildSettings(message.guild.id) : null;
         const prefix = settings?.prefix || config.prefix;
@@ -62,7 +67,7 @@ module.exports = {
             }
         }
 
-        // Custom commands (dashboard Tags page): "<prefix><tagname>" replies
+        // Custom commands (tags): "<prefix><tagname>" replies
         // with the saved text. Builtins always win over tags.
         if (!command && tagName && message.guild) {
             const tagContent = await db.useTag(message.guild.id, tagName);
@@ -110,6 +115,13 @@ module.exports = {
                     message,
                     `The \`${command.category}\` module requires one of these roles: ${need.map((r) => `<@&${r}>`).join(', ')}`
                 );
+            // Scoped rules — channel and/or daily time-window disables.
+            const hit = settings.commandRules?.find((r) => ruleBlocks(r, command.name, message.channel));
+            if (hit) {
+                const where = hit.channelId ? 'in this channel' : 'in this server';
+                const when = hit.start ? ` between ${hit.start}–${hit.end} ${hit.tz || 'UTC'}` : '';
+                return sendError(message, `The \`${command.name}\` command is disabled ${where}${when}.`);
+            }
         }
 
         if (message.guild) {

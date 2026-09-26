@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kotan — Discord Bot</title>
+<meta name="description" content="Kotan — all-in-one Discord bot for moderation, economy, games, leveling and automation.">
+<link rel="stylesheet" href="/stylesheets/tokens.css">
+<link rel="stylesheet" href="/stylesheets/site.css">
+<script src="/script/site.js" defer></script>
+</head>
+<body>
+<nav class="nav"><div class="nav-inner">
+    <a class="nav-logo" href="/"><span class="dot">K</span>Kotan</a>
+    <div class="nav-links">
+        <a href="/" data-nav="home">Home</a>
+        <a href="/doc" data-nav="doc">Docs</a>
+        <a href="/uptime" data-nav="uptime">Status</a>
+        <a href="/dashboard" data-nav="dash">Dashboard</a>
+        <span class="nav-user" id="nav-user"></span>
+    </div>
+</div></nav>
+
+<header class="hero wrap">
+    <h1>Your server,<br>fully managed.</h1>
+    <p>Kotan covers moderation, economy, games, leveling, automod, logging and more — configured per-server, from Discord or this dashboard.</p>
+    <div class="cta">
+        <a class="btn primary" href="/dashboard">Open Dashboard</a>
+        <a class="btn" href="/doc">Documentation</a>
+    </div>
+</header>
+
+<section class="wrap stats-band" id="stats">
+    <div class="bstat"><b data-stat="guilds">—</b><span>servers</span></div>
+    <div class="bstat"><b data-stat="users">—</b><span>users</span></div>
+    <div class="bstat"><b data-stat="commands">—</b><span>commands</span></div>
+</section>
+
+<section class="wrap features">
+    <div class="card feature"><div class="icon">🛡️</div><h3>Moderation</h3><p class="sub">Warns, bans, tempbans, timeouts and purges — with a full audit trail.</p></div>
+    <div class="card feature"><div class="icon">⚡</div><h3>Automod</h3><p class="sub">Anti-invite, word blacklist, spam and raid protection that acts before you do.</p></div>
+    <div class="card feature"><div class="icon">💰</div><h3>Economy</h3><p class="sub">Currency, daily rewards, shop and payments — configurable per server.</p></div>
+    <div class="card feature"><div class="icon">🎮</div><h3>Games</h3><p class="sub">Slots, coinflip, RPS, hi-lo, scramble and more, with wager support.</p></div>
+    <div class="card feature"><div class="icon">📈</div><h3>Leveling</h3><p class="sub">XP, ranks, leaderboards and role rewards for activity.</p></div>
+    <div class="card feature"><div class="icon">📋</div><h3>Logging</h3><p class="sub">Message edits, deletes, joins and channel changes — all captured.</p></div>
+</section>
+
+<footer><div class="wrap">
+    <span>© <span id="yr"></span> Kotan</span>
+    <a href="/doc">Docs</a><a href="/tos">Terms</a><a href="/privacy">Privacy</a><a href="/uptime">Status</a>
+</div></footer>
+</body>
+</html>

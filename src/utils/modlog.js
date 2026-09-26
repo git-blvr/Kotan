@@ -4,7 +4,7 @@ const logger = require('./logger');
 const { base, cv2 } = require('../helpers/embeds');
 
 // Sends a moderation log entry to the guild's configured modlog channel
-// (settable from the web dashboard). Silently no-ops when not configured.
+// (per-guild setting). Silently no-ops when not configured.
 
 async function logModAction(client, guildId, { action, target, moderator, reason, extra }) {
     try {
