@@ -1,21 +1,26 @@
 /* Kotan design tokens — every color/space/radius flows from here.
    Per-user theme (accent, mode, density, motion) overrides these on :root. */
 :root {
-    --accent: #6d6ff2;
-    --accent-2: #8b7ff5;
-    --accent-soft: rgba(109, 111, 242, 0.14);
+    /* palette from the mascot: navy uniform / green eyes / chestnut hair */
+    --accent: #6e8f5c;
+    --accent-2: #8fae7e;
+    --accent-soft: rgba(110, 143, 92, 0.16);
+    --brand: #1b2a4a;
+    --brand-2: #24365e;
+    --on-brand: #f5f1e8;
+    --warm: #8b5a3c;
 
-    --bg: #090a0f;
-    --bg-soft: #0e1017;
+    --bg: #14161c;
+    --bg-soft: #191d29;
     --panel: rgba(255, 255, 255, 0.035);
-    --panel-solid: #12141c;
+    --panel-solid: #1c2130;
     --panel-2: rgba(255, 255, 255, 0.06);
     --border: rgba(255, 255, 255, 0.09);
     --border-soft: rgba(255, 255, 255, 0.05);
 
-    --text: #e8eaf2;
-    --text-2: #b6bacb;
-    --muted: #7c8095;
+    --text: #f0ebe0;
+    --text-2: #c3c9dd;
+    --muted: #8b93ab;
 
     --ok: #3dd68c;
     --ok-soft: rgba(61, 214, 140, 0.12);
@@ -33,7 +38,7 @@
 
     --shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
     --shadow-lg: 0 18px 60px rgba(0, 0, 0, 0.5);
-    --glow: 0 0 0 1px rgba(109, 111, 242, 0.35), 0 8px 30px rgba(109, 111, 242, 0.15);
+    --glow: 0 0 0 1px rgba(110, 143, 92, 0.32), 0 8px 30px rgba(110, 143, 92, 0.14);
 
     --sidebar-w: 236px;
     --topbar-h: 58px;
@@ -42,19 +47,21 @@
 }
 
 [data-mode="light"] {
-    --bg: #f4f5fa;
-    --bg-soft: #eceef6;
+    --bg: #faf6f0;
+    --bg-soft: #f2ede4;
     --panel: #ffffff;
     --panel-solid: #ffffff;
-    --panel-2: #eef0f8;
-    --border: rgba(15, 18, 35, 0.1);
-    --border-soft: rgba(15, 18, 35, 0.06);
-    --text: #181b26;
-    --text-2: #3d4257;
-    --muted: #6b7086;
-    --accent-soft: rgba(109, 111, 242, 0.12);
-    --shadow: 0 6px 24px rgba(30, 34, 60, 0.08);
-    --shadow-lg: 0 18px 50px rgba(30, 34, 60, 0.14);
+    --panel-2: #f0ebdf;
+    --border: rgba(27, 42, 74, 0.12);
+    --border-soft: rgba(27, 42, 74, 0.07);
+    --text: #1b2a4a;
+    --text-2: #43506e;
+    --muted: #7a7568;
+    --accent: #5f7f4e;
+    --accent-2: #4f6f42;
+    --accent-soft: rgba(110, 143, 92, 0.14);
+    --shadow: 0 6px 24px rgba(27, 42, 74, 0.08);
+    --shadow-lg: 0 18px 50px rgba(27, 42, 74, 0.14);
 }
 
 [data-density="compact"] { --density: 0.82; }

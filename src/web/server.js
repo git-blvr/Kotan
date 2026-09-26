@@ -73,6 +73,7 @@ function startWebsite(client) {
     });
     app.use('/script', express.static(path.join(WEB_DIR, 'script'), { maxAge: '5m' }));
     app.use('/stylesheets', express.static(path.join(WEB_DIR, 'stylesheets'), { maxAge: '5m' }));
+    app.use('/assets', express.static(path.join(WEB_DIR, 'assets'), { maxAge: '1h' }));
 
     app.use((req, res) => res.status(404).sendFile(page('error.html')));
     app.use((err, req, res, next) => {
