@@ -62,7 +62,7 @@
         const panel = document.createElement('div');
         panel.className = 'theme-panel'; panel.style.display = 'none';
         panel.innerHTML = `<h4>Appearance</h4>
-            <div class="row">Accent <input type="color" id="th-accent" value="${theme.accent || '#6e8f5c'}"></div>
+            <div class="row">Accent <input type="color" id="th-accent" value="${theme.accent || '#e8622e'}"></div>
             <div class="row">Mode <select id="th-mode"><option value="">Dark</option><option value="light">Light</option></select></div>
             <div class="row">Density <select id="th-density"><option value="">Comfortable</option><option value="compact">Compact</option></select></div>
             <div class="row">Motion <select id="th-motion"><option value="">On</option><option value="off">Off</option></select></div>`;

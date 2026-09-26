@@ -29,13 +29,19 @@
     $$('#last-updated').forEach((el) => (el.textContent = el.dataset.v || '2025-09-22'));
 
     api('/api/me').then((d) => {
+        if (!d) return;
         const slot = $('#nav-user');
-        if (!slot || !d) return;
         if (d.user) {
+            if (!slot) return;
             const av = d.user.avatar
                 ? `https://cdn.discordapp.com/avatars/${d.user.id}/${d.user.avatar}.png?size=64`
                 : 'https://cdn.discordapp.com/embed/avatars/0.png';
             slot.innerHTML = `<img src="${av}" alt=""> <span>${esc(d.user.username)}</span> <a class="btn sm ghost" href="/auth/logout">Sign out</a>`;
+        } else {
+            // logged out: "Dashboard" → "Log in", and every CTA points at /login
+            const dashLink = $('[data-nav="dash"]');
+            if (dashLink) { dashLink.textContent = 'Log in'; dashLink.href = '/login'; }
+            $$('.js-cta').forEach((b) => { b.textContent = 'Log in'; b.href = '/login'; });
         }
     });
 

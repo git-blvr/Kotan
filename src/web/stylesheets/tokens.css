@@ -1,26 +1,26 @@
 /* Kotan design tokens — every color/space/radius flows from here.
    Per-user theme (accent, mode, density, motion) overrides these on :root. */
 :root {
-    /* palette from the mascot: navy uniform / green eyes / chestnut hair */
-    --accent: #6e8f5c;
-    --accent-2: #8fae7e;
-    --accent-soft: rgba(110, 143, 92, 0.16);
-    --brand: #1b2a4a;
-    --brand-2: #24365e;
-    --on-brand: #f5f1e8;
-    --warm: #8b5a3c;
+    /* palette from the mascot's hair: red-orange accent on warm dark */
+    --accent: #e8622e;
+    --accent-2: #c94e20;
+    --accent-soft: rgba(232, 98, 46, 0.15);
+    --brand: #e8622e;
+    --brand-2: #c94e20;
+    --on-brand: #ffffff;
+    --warm: #c94e20;
 
-    --bg: #14161c;
-    --bg-soft: #191d29;
+    --bg: #14151b;
+    --bg-soft: #1d1f29;
     --panel: rgba(255, 255, 255, 0.035);
-    --panel-solid: #1c2130;
+    --panel-solid: #1d1f29;
     --panel-2: rgba(255, 255, 255, 0.06);
-    --border: rgba(255, 255, 255, 0.09);
-    --border-soft: rgba(255, 255, 255, 0.05);
+    --border: rgba(244, 240, 232, 0.09);
+    --border-soft: rgba(244, 240, 232, 0.05);
 
-    --text: #f0ebe0;
-    --text-2: #c3c9dd;
-    --muted: #8b93ab;
+    --text: #f4f0e8;
+    --text-2: #b8bcc9;
+    --muted: #9ca1b4;
 
     --ok: #3dd68c;
     --ok-soft: rgba(61, 214, 140, 0.12);
@@ -31,14 +31,17 @@
 
     --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px; --s7: 48px;
 
-    --r-sm: 8px; --r-md: 11px; --r-lg: 16px; --r-xl: 20px;
+    --r-sm: 8px; --r-md: 11px; --r-lg: 18px; --r-xl: 20px;
 
     --font: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    --font-display: 'Baloo 2', 'Inter', system-ui, sans-serif;
+    --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
     --mono: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
 
     --shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
     --shadow-lg: 0 18px 60px rgba(0, 0, 0, 0.5);
-    --glow: 0 0 0 1px rgba(110, 143, 92, 0.32), 0 8px 30px rgba(110, 143, 92, 0.14);
+    --glow: 0 0 0 1px rgba(232, 98, 46, 0.32), 0 8px 30px rgba(232, 98, 46, 0.14);
 
     --sidebar-w: 236px;
     --topbar-h: 58px;
@@ -47,21 +50,24 @@
 }
 
 [data-mode="light"] {
-    --bg: #faf6f0;
-    --bg-soft: #f2ede4;
+    --bg: #faf5ee;
+    --bg-soft: #f3ede2;
     --panel: #ffffff;
     --panel-solid: #ffffff;
-    --panel-2: #f0ebdf;
-    --border: rgba(27, 42, 74, 0.12);
-    --border-soft: rgba(27, 42, 74, 0.07);
-    --text: #1b2a4a;
-    --text-2: #43506e;
-    --muted: #7a7568;
-    --accent: #5f7f4e;
-    --accent-2: #4f6f42;
-    --accent-soft: rgba(110, 143, 92, 0.14);
-    --shadow: 0 6px 24px rgba(27, 42, 74, 0.08);
-    --shadow-lg: 0 18px 50px rgba(27, 42, 74, 0.14);
+    --panel-2: #f3ede2;
+    --border: rgba(42, 32, 22, 0.12);
+    --border-soft: rgba(42, 32, 22, 0.07);
+    --text: #26211b;
+    --text-2: #4d4438;
+    --muted: #84796a;
+    --accent: #d9541f;
+    --accent-2: #b8441a;
+    --brand: #d9541f;
+    --brand-2: #b8441a;
+    --warm: #b8441a;
+    --accent-soft: rgba(217, 84, 31, 0.12);
+    --shadow: 0 6px 24px rgba(42, 32, 22, 0.08);
+    --shadow-lg: 0 18px 50px rgba(42, 32, 22, 0.14);
 }
 
 [data-density="compact"] { --density: 0.82; }

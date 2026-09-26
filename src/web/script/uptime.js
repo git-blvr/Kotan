@@ -70,7 +70,7 @@
         series.mem.push(d.memoryMB); if (series.mem.length > SAMPLES) series.mem.shift();
         $('#ch-ping-val').textContent = d.ping >= 0 ? `${d.ping} ms` : '—';
         $('#ch-mem-val').textContent = `${d.memoryMB} MB`;
-        draw($('#ch-ping'), series.ping, getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#6e8f5c');
+        draw($('#ch-ping'), series.ping, getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#e8622e');
         draw($('#ch-mem'), series.mem, getComputedStyle(document.documentElement).getPropertyValue('--ok').trim() || '#3dd68c');
     }
 

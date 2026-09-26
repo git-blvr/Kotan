@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Kotan — the Discord bot that minds your server</title>
+<title>Kotan | Landpage</title>
 <meta name="description" content="Kotan is a configurable Discord bot: moderation, automod, economy, games, leveling and logging — all per-server.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -58,6 +58,9 @@
     a:hover { color: var(--accent-2); }
     .wrap { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
 
+    /* springy ease for anything that moves — transitions only */
+    :root { --spring: cubic-bezier(0.34, 1.56, 0.64, 1); --ease-out: cubic-bezier(0.22, 1, 0.36, 1); }
+
     /* ---------- floating pill nav ---------- */
     .nav-wrap {
         position: sticky; top: 14px; z-index: 50;
@@ -73,18 +76,21 @@
     }
     .brand { display: flex; align-items: center; gap: 10px; color: var(--text); font-size: 21px; font-weight: 800; letter-spacing: .2px; }
     .brand:hover { color: var(--text); }
+    .brand svg { transition: transform 0.3s var(--spring); }
+    .brand:hover svg { transform: rotate(-8deg); }
     .nav-links { display: flex; gap: 4px; margin: 0 auto; align-items: center; }
     .nav-links a {
         position: relative; color: var(--text-2); font-weight: 500;
         font-size: 15px; padding: 8px 13px; border-radius: 10px;
-        transition: color var(--speed);
+        transition: color var(--speed), transform 0.25s var(--spring);
     }
     .nav-links a::after {
         content: ''; position: absolute; left: 13px; right: 13px; bottom: 4px;
         height: 2px; border-radius: 2px; background: var(--accent);
-        transform: scaleX(0); transform-origin: left; transition: transform var(--speed);
+        transform: scaleX(0); transform-origin: left;
+        transition: transform 0.28s var(--ease-out);
     }
-    .nav-links a:hover { color: var(--text); }
+    .nav-links a:hover { color: var(--text); transform: translateY(-1px); }
     .nav-links a:hover::after, .nav-links a.active::after { transform: scaleX(1); }
     .nav-links a.active { color: var(--text); }
     #nav-user { display: flex; align-items: center; gap: 8px; color: var(--text-2); font-size: 14px; }
@@ -94,13 +100,15 @@
         display: inline-flex; align-items: center; gap: 8px;
         font: 600 15px 'Inter', sans-serif; padding: 12px 22px;
         border-radius: 12px; border: 1px solid transparent; cursor: pointer;
-        transition: background var(--speed), border-color var(--speed), color var(--speed), transform var(--speed);
+        transition: background var(--speed), border-color var(--speed), color var(--speed),
+                    transform 0.3s var(--spring), box-shadow var(--speed);
     }
+    .btn:active { transform: translateY(0) scale(0.97); }
     .btn.sm { padding: 9px 16px; font-size: 13.5px; border-radius: 999px; }
     .btn.primary { background: var(--accent); color: #fff; }
-    .btn.primary:hover { background: var(--accent-2); color: #fff; transform: translateY(-1px); }
+    .btn.primary:hover { background: var(--accent-2); color: #fff; transform: translateY(-2px); box-shadow: 0 8px 22px rgba(232, 98, 46, 0.35); }
     .btn.ghost { border-color: var(--border); color: var(--text-2); background: transparent; }
-    .btn.ghost:hover { border-color: var(--accent); color: var(--accent); }
+    .btn.ghost:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-2px); }
 
     /* ---------- hero ---------- */
     .hero {
@@ -127,15 +135,10 @@
     .sub { font-size: 17px; color: var(--text-2); max-width: 480px; margin: 0 0 26px; }
     .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 30px; }
 
-    .stats-pill {
-        display: inline-flex; border: 1px solid var(--border);
-        border-radius: 999px; background: var(--panel);
-        overflow: hidden;
-    }
-    .bstat { padding: 14px 26px; text-align: center; }
-    .bstat + .bstat { border-left: 1px solid var(--border); }
-    .bstat b { display: block; font-family: 'Baloo 2', sans-serif; font-size: 22px; font-weight: 800; color: var(--accent); line-height: 1.15; }
-    .bstat span { font-size: 12.5px; color: var(--muted); }
+    .stats { display: flex; gap: 34px; }
+    .bstat { display: flex; flex-direction: column; }
+    .bstat b { font-family: 'Baloo 2', sans-serif; font-size: 26px; font-weight: 800; color: var(--accent); line-height: 1.15; }
+    .bstat span { font-size: 13px; color: var(--muted); }
 
     /* ---------- features ---------- */
     .features { padding: 24px 0 70px; }
@@ -143,16 +146,38 @@
     .features > p { color: var(--text-2); margin: 0 0 30px; max-width: 520px; }
     .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
     .feature {
+        position: relative; overflow: hidden;
         background: var(--panel); border: 1px solid var(--border);
         border-radius: var(--r); padding: 22px;
-        transition: border-color var(--speed), transform var(--speed);
+        transition: border-color var(--speed), transform 0.35s var(--spring);
     }
-    .feature:hover { border-color: var(--accent); transform: translateY(-2px); }
+    /* accent hairline that draws itself across the card top */
+    .feature::after {
+        content: ''; position: absolute; top: 0; left: 22px; right: 22px;
+        height: 2px; border-radius: 2px; background: var(--accent);
+        transform: scaleX(0); transform-origin: left;
+        transition: transform 0.32s var(--ease-out);
+    }
+    /* soft accent wash fading in behind the content */
+    .feature::before {
+        content: ''; position: absolute; inset: 0;
+        background: radial-gradient(340px 170px at 18% -12%, var(--accent-soft), transparent 70%);
+        opacity: 0; transition: opacity 0.35s var(--ease-out);
+        pointer-events: none;
+    }
+    .feature > * { position: relative; }
+    .feature:hover { border-color: var(--accent); transform: translateY(-4px); }
+    .feature:hover::before { opacity: 1; }
+    .feature:hover::after { transform: scaleX(1); }
     .feature .icon {
         width: 42px; height: 42px; border-radius: 12px;
         background: var(--accent-soft); color: var(--accent);
         display: grid; place-items: center; margin-bottom: 14px;
+        transition: background var(--speed), transform 0.3s var(--spring);
     }
+    .feature:hover .icon { transform: scale(1.08) rotate(-4deg); }
+    .feature h3 { font-size: 18px; font-weight: 700; margin: 0 0 6px; transition: color var(--speed); }
+    .feature:hover h3 { color: var(--accent); }
     .feature h3 { font-size: 18px; font-weight: 700; margin: 0 0 6px; }
     .feature p { font-size: 14.5px; color: var(--text-2); margin: 0; }
 
@@ -160,14 +185,21 @@
     footer { border-top: 1px solid var(--border); padding: 26px 0; color: var(--muted); font-size: 13.5px; }
     .foot { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
     .foot .links { display: flex; gap: 18px; margin-left: auto; }
-    .foot .links a { color: var(--muted); }
+    .foot .links a { color: var(--muted); position: relative; }
+    .foot .links a::after {
+        content: ''; position: absolute; left: 0; right: 0; bottom: -3px;
+        height: 1.5px; border-radius: 2px; background: var(--accent);
+        transform: scaleX(0); transform-origin: left;
+        transition: transform 0.25s var(--ease-out);
+    }
     .foot .links a:hover { color: var(--accent); }
+    .foot .links a:hover::after { transform: scaleX(1); }
 
     @media (max-width: 880px) {
         .hero { grid-template-columns: 1fr; gap: 34px; padding: 40px 0 50px; text-align: center; }
         .hero-img img { max-width: 280px; }
         .sub { margin-left: auto; margin-right: auto; }
-        .hero-actions, .stats-pill { justify-content: center; }
+        .hero-actions, .stats { justify-content: center; }
         .grid { grid-template-columns: repeat(2, 1fr); }
         .nav-links a:not(.btn) { display: none; }
         .nav { gap: 14px; }
@@ -199,7 +231,7 @@
             <a href="/dashboard" data-nav="dash">Dashboard</a>
         </div>
         <span id="nav-user"></span>
-        <a class="btn primary sm" href="/dashboard">Open Dashboard</a>
+        <a class="btn primary sm js-cta" href="/dashboard">Open Dashboard</a>
     </nav>
 </div>
 
@@ -212,11 +244,11 @@
             <h1>Meet <em>Kotan</em>, your server's new class rep.</h1>
             <p class="sub">Moderation, automod, economy, games, leveling and logging — one configurable bot, tuned per server. She keeps the class in order so you don't have to.</p>
             <div class="hero-actions">
-                <a class="btn primary" href="/dashboard">Open Dashboard</a>
+                <a class="btn primary js-cta" href="/dashboard">Open Dashboard</a>
                 <a class="btn ghost" href="/doc">Documentation</a>
             </div>
-            <div class="stats-pill" id="stats">
-                <div class="bstat"><b data-stat="servers">—</b><span>servers</span></div>
+            <div class="stats" id="stats">
+                <div class="bstat"><b data-stat="guilds">—</b><span>servers</span></div>
                 <div class="bstat"><b data-stat="users">—</b><span>users</span></div>
                 <div class="bstat"><b data-stat="commands">—</b><span>commands</span></div>
             </div>

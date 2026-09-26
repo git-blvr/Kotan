@@ -173,3 +173,10 @@ resolve only when no builtin command/alias matches, and reply with
 - **Monitoring** — set `SENTRY_DSN` (+`npm i @sentry/node`) for crash reporting.
 - **PM2** — `pm2 start ecosystem.config.js` supervises the process
   (instances:1, fork mode — a second instance would fight over SQLite).
+
+## License
+
+Kotan Development-Only License — you may use, run, and modify this project
+for development purposes only. Redistribution in any form (public repo,
+package registry, hosted service, or sharing copies) is not permitted.
+See [LICENSE](LICENSE).
