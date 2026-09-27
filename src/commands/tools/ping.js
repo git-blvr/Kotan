@@ -1,4 +1,12 @@
 const { info, success, cv2 } = require('../../helpers/embeds');
+const { fromMessage, fromInteraction } = require('../../helpers/ctx');
+
+async function run(ctx) {
+    const sent = await ctx.reply(cv2(info('Pinging...', 'Ping')));
+    const roundtrip = sent.createdTimestamp - ctx.createdAt;
+    const ws = Math.round(ctx.client.ws.ping);
+    return sent.edit(cv2(success(`Roundtrip: **${roundtrip}ms**\nWebsocket: **${ws}ms**`, 'Pong!')));
+}
 
 module.exports = {
     name: 'ping',
@@ -6,12 +14,9 @@ module.exports = {
     aliases: ['latency', 'pong'],
     triggers: ['net', 'ms'],
     cooldown: 5,
-    async execute(message, args, client) {
-        const sent = await message.reply(cv2(info('Pinging...', 'Ping')));
-        const roundtrip = sent.createdTimestamp - message.createdTimestamp;
-        const ws = Math.round(client.ws.ping);
-        return sent.edit(
-            cv2(success(`Roundtrip: **${roundtrip}ms**\nWebsocket: **${ws}ms**`, 'Pong!'))
-        );
-    },
+    slash: [],
+    execute: (message, args, client) =>
+        run(fromMessage(message, { createdAt: message.createdTimestamp, client })),
+    executeSlash: (interaction, client) =>
+        run(fromInteraction(interaction, { createdAt: interaction.createdTimestamp, client })),
 };

@@ -1,15 +1,11 @@
+const { ApplicationCommandOptionType: Opt } = require('discord.js');
 const { base, sendError, cv2 } = require('../helpers/embeds');
 const { capitalize } = require('../helpers/format');
+const { fromMessage, fromInteraction } = require('../helpers/ctx');
 
-module.exports = {
-    name: 'help',
-    description: 'Lists all commands, or shows details about one command or category.',
-    usage: '[command | category]',
-    aliases: ['h', 'commands', 'cmds'],
-    triggers: ['commands'],
-    cooldown: 5,
-    async execute(message, args, client) {
-        const query = args.join(' ').toLowerCase();
+async function run(ctx, query) {
+    {
+        const client = ctx.client;
 
         // .help — overview grouped by category
         if (!query) {
@@ -22,15 +18,15 @@ module.exports = {
             const embed = base({
                 title: 'Kotan — Help',
                 description:
-                    `Prefix: \`${message.prefix}\`\n` +
-                    `Use \`${message.prefix}help <command>\` for details about a command.\n` +
+                    `Prefix: \`${ctx.prefix}\`\n` +
+                    `Use \`${ctx.prefix}help <command>\` for details about a command.\n` +
                     'Some commands also answer to plain words (triggers) — no prefix needed.',
                 fields: [...byCategory].map(([category, commands]) => ({
                     name: `${capitalize(category)} (${commands.length})`,
                     value: commands.join(', '),
                 })),
             });
-            return message.reply(cv2(embed));
+            return ctx.reply(cv2(embed));
         }
 
         // .help <command>
@@ -40,7 +36,7 @@ module.exports = {
             const fields = [
                 {
                     name: 'Usage',
-                    value: `\`${message.prefix}${command.name}${command.usage ? ` ${command.usage}` : ''}\``,
+                    value: `\`${ctx.prefix}${command.name}${command.usage ? ` ${command.usage}` : ''}\``,
                     inline: true,
                 },
                 { name: 'Category', value: capitalize(command.category), inline: true },
@@ -68,7 +64,7 @@ module.exports = {
                 description: command.description || 'No description provided.',
                 fields,
             });
-            return message.reply(cv2(embed));
+            return ctx.reply(cv2(embed));
         }
 
         // .help <category>
@@ -80,9 +76,25 @@ module.exports = {
                     .map((c) => `\`${c.name}\` — ${c.description || 'No description.'}`)
                     .join('\n'),
             });
-            return message.reply(cv2(embed));
+            return ctx.reply(cv2(embed));
         }
 
-        return sendError(message, `There is no command or category called \`${query}\`.`);
-    },
+        return sendError(ctx, `There is no command or category called \`${query}\`.`);
+    }
+}
+
+module.exports = {
+    name: 'help',
+    description: 'Lists all commands, or shows details about one command or category.',
+    usage: '[command | category]',
+    aliases: ['h', 'commands', 'cmds'],
+    triggers: ['commands'],
+    cooldown: 5,
+    slash: [
+        { name: 'command', description: 'A command or category to inspect', type: Opt.String },
+    ],
+    execute: (message, args, client) =>
+        run(fromMessage(message, { client }), args.join(' ').toLowerCase()),
+    executeSlash: (interaction, client) =>
+        run(fromInteraction(interaction, { client }), interaction.options.getString('command')?.toLowerCase()),
 };

@@ -1,8 +1,9 @@
 const path = require('node:path');
-const { AttachmentBuilder } = require('discord.js');
+const { AttachmentBuilder, ApplicationCommandOptionType: Opt } = require('discord.js');
 const { createCanvas, loadImage, GlobalFonts } = require('@napi-rs/canvas');
 const { base, sendError, cv2 } = require('../../helpers/embeds');
 const { resolveMember } = require('../../helpers/resolve');
+const { fromMessage, fromInteraction } = require('../../helpers/ctx');
 const { fetchRetry } = require('../../utils/http');
 
 // Bundled so the % renders even on hosts with no system fonts.
@@ -134,30 +135,38 @@ const shipLine = pct => {
     return `${pct}% | ${lines[Math.floor(Math.random() * lines.length)]}`;
 };
 
+async function run(ctx, user) {
+    if (!user)
+        return sendError(ctx, `Mention someone to ship you with. Usage: \`${ctx.prefix}ship @member\``);
+
+    const pct = shipPercent(ctx.user.id, user.id);
+    const buf = await shipCard(ctx.user, user, pct).catch(() => null);
+    if (!buf) return sendError(ctx, 'Could not render the ship card.');
+
+    const container = base({
+        color: pct >= 30 ? 0xff6b9d : 0x8a93a8,
+        title: `💞 ${ctx.user.username} × ${user.username}`,
+        description: shipLine(pct),
+        image: 'attachment://ship.png',
+    });
+    return ctx.reply({
+        ...cv2(container),
+        files: [new AttachmentBuilder(buf, { name: 'ship.png' })],
+    });
+}
+
 module.exports = {
     name: 'ship',
     description: 'Ships you with another member — draws a card with both avatars and the match %.',
     usage: '<@member>',
     aliases: ['love', 'match'],
     cooldown: 5,
-    async execute(message, args) {
-        const target = await resolveMember(message, args[0]);
-        if (!target)
-            return sendError(message, `Mention someone to ship you with. Usage: \`${message.prefix}ship @member\``);
-
-        const pct = shipPercent(message.author.id, target.id);
-        const buf = await shipCard(message.author, target.user, pct).catch(() => null);
-        if (!buf) return sendError(message, 'Could not render the ship card.');
-
-        const container = base({
-            color: pct >= 30 ? 0xff6b9d : 0x8a93a8,
-            title: `💞 ${message.author.username} × ${target.user.username}`,
-            description: shipLine(pct),
-            image: 'attachment://ship.png',
-        });
-        return message.reply({
-            ...cv2(container),
-            files: [new AttachmentBuilder(buf, { name: 'ship.png' })],
-        });
-    },
+    slash: [
+        { name: 'member', description: 'Who to ship you with', type: Opt.User, required: true },
+    ],
+    execute: async (message, args) =>
+        run(fromMessage(message), (await resolveMember(message, args[0]))?.user ?? null),
+    executeSlash: (interaction) =>
+        run(fromInteraction(interaction), interaction.options.getUser('member')),
 };
+

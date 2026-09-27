@@ -1,0 +1,622 @@
+[90m22:06:55[0m [36mINFO [0m Database: using SQLite backend (data/kotan.sqlite)
+[90m22:06:55[0m [36mINFO [0m Loaded 37 commands (78 aliases, 28 triggers)
+[
+  {
+    "name": "disable",
+    "description": "Disable a command globally, in a channel, or during a daily time window.",
+    "options": [
+      {
+        "name": "command",
+        "description": "The command",
+        "type": 3,
+        "required": true
+      },
+      {
+        "name": "channel",
+        "description": "The channel",
+        "type": 7,
+        "required": false,
+        "channel_types": [
+          0,
+          5,
+          2
+        ]
+      },
+      {
+        "name": "hhmm-hhmm",
+        "description": "The HH:MM-HH:MM",
+        "type": 3,
+        "required": false
+      },
+      {
+        "name": "timezone",
+        "description": "The timezone",
+        "type": 3,
+        "required": false
+      }
+    ],
+    "dm_permission": false,
+    "default_member_permissions": "32"
+  },
+  {
+    "name": "enable",
+    "description": "Re-enable a command — removes global or scoped disable rules.",
+    "options": [
+      {
+        "name": "command",
+        "description": "The command",
+        "type": 3,
+        "required": true
+      },
+      {
+        "name": "channel",
+        "description": "The channel",
+        "type": 7,
+        "required": false,
+        "channel_types": [
+          0,
+          5,
+          2
+        ]
+      }
+    ],
+    "dm_permission": false,
+    "default_member_permissions": "32"
+  },
+  {
+    "name": "balance",
+    "description": "Shows your (or another user's) wallet, level and rankings.",
+    "options": [
+      {
+        "name": "user",
+        "description": "The user",
+        "type": 6,
+        "required": false
+      }
+    ],
+    "dm_permission": false
+  },
+  {
+    "name": "daily",
+    "description": "Claims your daily reward. Claim every day to grow your streak.",
+    "options": [],
+    "dm_permission": false
+  },
+  {
+    "name": "pay",
+    "description": "Transfers coins from your wallet to another member.",
+    "options": [
+      {
+        "name": "member",
+        "description": "The member",
+        "type": 6,
+        "required": true
+      },
+      {
+        "name": "amount",
+        "description": "The amount",
+        "type": 3,
+        "required": true
+      }
+    ],
+    "dm_permission": false
+  },
+  {
+    "name": "shop",
+    "description": "Shows the item shop. Use \"shop buy <item>\" to purchase.",
+    "options": [
+      {
+        "name": "input",
+        "description": "Input",
+        "type": 3,
+        "required": false
+      }
+    ],
+    "dm_permission": false
+  },
+  {
+    "name": "coinflip",
+    "description": "Flips a coin — free, against the house, or wagered against another member.",
+    "options": [
+      {
+        "name": "choice",
+        "description": "The heads",
+        "type": 3,
+        "required": false,
+        "choices": [
+          {
+            "name": "heads",
+            "value": "heads"
+          },
+          {
+            "name": "tails",
+            "value": "tails"
+          }
+        ]
+      },
+      {
+        "name": "bet",
+        "description": "The bet",
+        "type": 3,
+        "required": false
+      }
+    ],
+    "dm_permission": false
+  },
+  {
+    "name": "8ball",
+    "description": "Ask the magic 8-ball a question.",
+    "options": [
+      {
+        "name": "question",
+        "description": "The question",
+        "type": 3,
+        "required": true
+      }
+    ],
+    "dm_permission": true
+  },
+  {
+    "name": "guess",
+    "description": "I'm thinking of a number 1-50 — guess it in 4 tries to win coins.",
+    "options": [],
+    "dm_permission": false
+  },
+  {
+    "name": "hilo",
+    "description": "Bet coins, then guess whether the next card is higher or lower.",
+    "options": [
+      {
+        "name": "bet",
+        "description": "The bet",
+        "type": 3,
+        "required": true
+      }
+    ],
+    "dm_permission": false
+  },
+  {
+    "name": "roll",
+    "description": "Rolls a die. Add a bet to duel the bot — higher roll wins.",
+    "options": [
+      {
+        "name": "sides",
+        "description": "The sides",
+        "type": 4,
+        "required": false
+      },
+      {
+        "name": "bet",
+        "description": "The bet vs bot",
+        "type": 3,
+        "required": false
+      }
+    ],
+    "dm_permission": false
+  },
+  {
+    "name": "rps",
+    "description": "Rock paper scissors against the bot. Optionally bet coins on it.",
+    "options": [
+      {
+        "name": "choice",
+        "description": "The rock",
+        "type": 3,
+        "required": true,
+        "choices": [
+          {
+            "name": "rock",
+            "value": "rock"
+          },
+          {
+            "name": "paper",
+            "value": "paper"
+          },
+          {
+            "name": "scissors",
+            "value": "scissors"
+          }
+        ]
+      },
+      {
+        "name": "bet",
+        "description": "The bet",
+        "type": 3,
+        "required": false
+      }
+    ],
+    "dm_permission": false
+  },
+  {
+    "name": "scramble",
+    "description": "Unscramble the word — first correct answer in the channel wins coins.",
+    "options": [],
+    "dm_permission": false
+  },
+  {
+    "name": "ship",
+    "description": "Ships you with another member — draws a card with both avatars and the match %.",
+    "options": [
+      {
+        "name": "member",
+        "description": "The member",
+        "type": 6,
+        "required": true
+      }
+    ],
+    "dm_permission": false
+  },
+  {
+    "name": "slots",
+    "description": "Spins the slot machine. Three of a kind pays big, a pair refunds half.",
+    "options": [
+      {
+        "name": "bet",
+        "description": "The bet",
+        "type": 3,
+        "required": true
+      }
+    ],
+    "dm_permission": false
+  },
+  {
+    "name": "help",
+    "description": "Lists all commands, or shows details about one command or category.",
+    "options": [
+      {
+        "name": "command",
+        "description": "The command",
+        "type": 3,
+        "required": false
+      }
+    ],
+    "dm_permission": false
+  },
+  {
+    "name": "leaderboard",
+    "description": "Shows the top 10 members by level.",
+    "options": [],
+    "dm_permission": false
+  },
+  {
+    "name": "rank",
+    "description": "Shows your (or another member's) level and XP progress.",
+    "options": [
+      {
+        "name": "user",
+        "description": "The user",
+        "type": 6,
+        "required": false
+      }
+    ],
+    "dm_permission": false
+  },
+  {
+    "name": "richboard",
+    "description": "Shows the top 10 richest members by wallet.",
+    "options": [],
+    "dm_permission": false
+  },
+  {
+    "name": "ban",
+    "description": "Bans a member. Also accepts a user id to ban someone who left.",
+    "options": [
+      {
+        "name": "member",
+        "description": "The member",
+        "type": 6,
+        "required": true
+      },
+      {
+        "name": "reason",
+        "description": "The reason",
+        "type": 3,
+        "required": false
+      }
+    ],
+    "dm_permission": false,
+    "default_member_permissions": "4"
+  },
+  {
+    "name": "delwarn",
+    "description": "Removes one warning by id, or all warnings with \"all\".",
+    "options": [
+      {
+        "name": "member",
+        "description": "The member",
+        "type": 6,
+        "required": true
+      },
+      {
+        "name": "warn",
+        "description": "The warn id",
+        "type": 3,
+        "required": true
+      }
+    ],
+    "dm_permission": false,
+    "default_member_permissions": "1099511627776"
+  },
+  {
+    "name": "lock",
+    "description": "Locks a channel — members can no longer send messages in it.",
+    "options": [
+      {
+        "name": "channel",
+        "description": "The channel",
+        "type": 7,
+        "required": false,
+        "channel_types": [
+          0,
+          5,
+          2
+        ]
+      },
+      {
+        "name": "reason",
+        "description": "The reason",
+        "type": 3,
+        "required": false
+      }
+    ],
+    "dm_permission": false,
+    "default_member_permissions": "16"
+  },
+  {
+    "name": "mute",
+    "description": "Times out a member for a given duration (e.g. 10m, 1h, 2d).",
+    "options": [
+      {
+        "name": "member",
+        "description": "The member",
+        "type": 6,
+        "required": true
+      },
+      {
+        "name": "duration",
+        "description": "The duration",
+        "type": 3,
+        "required": true
+      },
+      {
+        "name": "reason",
+        "description": "The reason",
+        "type": 3,
+        "required": false
+      }
+    ],
+    "dm_permission": false,
+    "default_member_permissions": "1099511627776"
+  },
+  {
+    "name": "purge",
+    "description": "Deletes a batch of recent messages in this channel. Optionally only from one member.",
+    "options": [
+      {
+        "name": "amount",
+        "description": "The 1-100",
+        "type": 4,
+        "required": true,
+        "min_value": 1,
+        "max_value": 100
+      },
+      {
+        "name": "member",
+        "description": "The member",
+        "type": 6,
+        "required": false
+      }
+    ],
+    "dm_permission": false,
+    "default_member_permissions": "8192"
+  },
+  {
+    "name": "role",
+    "description": "Gives a role to a member.",
+    "options": [
+      {
+        "name": "member",
+        "description": "The member",
+        "type": 6,
+        "required": true
+      },
+      {
+        "name": "role",
+        "description": "The role",
+        "type": 8,
+        "required": true
+      }
+    ],
+    "dm_permission": false,
+    "default_member_permissions": "268435456"
+  },
+  {
+    "name": "tempban",
+    "description": "Bans a user for a limited time, then automatically unbans them.",
+    "options": [
+      {
+        "name": "member",
+        "description": "The member",
+        "type": 6,
+        "required": true
+      },
+      {
+        "name": "duration",
+        "description": "The duration",
+        "type": 3,
+        "required": true
+      },
+      {
+        "name": "reason",
+        "description": "The reason",
+        "type": 3,
+        "required": false
+      }
+    ],
+    "dm_permission": false,
+    "default_member_permissions": "4"
+  },
+  {
+    "name": "unban",
+    "description": "Unbans a user by their id.",
+    "options": [
+      {
+        "name": "user",
+        "description": "The user id",
+        "type": 6,
+        "required": true
+      },
+      {
+        "name": "reason",
+        "description": "The reason",
+        "type": 3,
+        "required": false
+      }
+    ],
+    "dm_permission": false,
+    "default_member_permissions": "4"
+  },
+  {
+    "name": "unlock",
+    "description": "Unlocks a channel — lifts the message restriction set by lock.",
+    "options": [
+      {
+        "name": "channel",
+        "description": "The channel",
+        "type": 7,
+        "required": false,
+        "channel_types": [
+          0,
+          5,
+          2
+        ]
+      }
+    ],
+    "dm_permission": false,
+    "default_member_permissions": "16"
+  },
+  {
+    "name": "unmute",
+    "description": "Removes a member's timeout.",
+    "options": [
+      {
+        "name": "member",
+        "description": "The member",
+        "type": 6,
+        "required": true
+      }
+    ],
+    "dm_permission": false,
+    "default_member_permissions": "1099511627776"
+  },
+  {
+    "name": "unrole",
+    "description": "Removes a role from a member.",
+    "options": [
+      {
+        "name": "member",
+        "description": "The member",
+        "type": 6,
+        "required": true
+      },
+      {
+        "name": "role",
+        "description": "The role",
+        "type": 8,
+        "required": true
+      }
+    ],
+    "dm_permission": false,
+    "default_member_permissions": "268435456"
+  },
+  {
+    "name": "warn",
+    "description": "Warns a member and stores the warning.",
+    "options": [
+      {
+        "name": "member",
+        "description": "The member",
+        "type": 6,
+        "required": true
+      },
+      {
+        "name": "reason",
+        "description": "The reason",
+        "type": 3,
+        "required": true
+      }
+    ],
+    "dm_permission": false,
+    "default_member_permissions": "1099511627776"
+  },
+  {
+    "name": "warns",
+    "description": "Lists the warnings of a member (or your own).",
+    "options": [
+      {
+        "name": "member",
+        "description": "The member",
+        "type": 6,
+        "required": false
+      }
+    ],
+    "dm_permission": false
+  },
+  {
+    "name": "avatar",
+    "description": "Shows a user's avatar in full size.",
+    "options": [
+      {
+        "name": "user",
+        "description": "The user",
+        "type": 6,
+        "required": false
+      }
+    ],
+    "dm_permission": false
+  },
+  {
+    "name": "banner",
+    "description": "Shows a user's profile banner.",
+    "options": [
+      {
+        "name": "user",
+        "description": "The user",
+        "type": 6,
+        "required": false
+      }
+    ],
+    "dm_permission": false
+  },
+  {
+    "name": "color",
+    "description": "Extracts the dominant color of an image attachment or a user's avatar.",
+    "options": [
+      {
+        "name": "user",
+        "description": "The user",
+        "type": 6,
+        "required": false
+      },
+      {
+        "name": "image",
+        "description": "An image to use",
+        "type": 11,
+        "required": false
+      }
+    ],
+    "dm_permission": false
+  },
+  {
+    "name": "ping",
+    "description": "Shows the bot's response time and websocket latency.",
+    "options": [],
+    "dm_permission": false
+  },
+  {
+    "name": "serverinfo",
+    "description": "Shows information about this server.",
+    "options": [],
+    "dm_permission": false
+  }
+]

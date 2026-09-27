@@ -1,6 +1,7 @@
 const { base, cv2 } = require('../../helpers/embeds');
 const { awaitReply } = require('../../helpers/collect');
 const { formatCoins } = require('../../helpers/format');
+const { fromMessage, fromInteraction } = require('../../helpers/ctx');
 const db = require('../../utils/database');
 const config = require('../../config');
 
@@ -18,6 +19,46 @@ function scramble(word) {
     return out;
 }
 
+async function run(ctx) {
+    const word = WORDS[Math.floor(Math.random() * WORDS.length)];
+    const cur = ctx.settings?.economy?.currency;
+
+    await ctx.reply(
+        cv2(
+            base({
+                title: 'Word Scramble',
+                description:
+                    `Unscramble this: \`${scramble(word)}\`\n` +
+                    `First correct answer wins ${formatCoins(REWARD, cur)} — 30s.`,
+            })
+        )
+    );
+
+    const winner = await awaitReply(
+        ctx.channel,
+        (m) => !m.author.bot && m.content.trim().toLowerCase() === word,
+        30_000
+    );
+
+    if (!winner)
+        return ctx.channel.send(
+            cv2(base({ color: config.colors.warning, description: `Nobody got it — the word was **${word}**.` }))
+        );
+
+    const profile = await db.getProfile(ctx.guild.id, winner.author.id);
+    profile.wallet += REWARD;
+    await db.saveProfile(ctx.guild.id, winner.author.id, profile);
+
+    return ctx.channel.send(
+        cv2(
+            base({
+                color: config.colors.success,
+                description: `⚡ **${winner.author.username}** unscrambled **${word}** and won ${formatCoins(REWARD, cur)}!`,
+            })
+        )
+    );
+}
+
 module.exports = {
     name: 'scramble',
     description: 'Unscramble the word — first correct answer in the channel wins coins.',
@@ -25,43 +66,7 @@ module.exports = {
     aliases: ['unscramble', 'scrambled'],
     triggers: ['scramble'],
     cooldown: 15,
-    async execute(message) {
-        const word = WORDS[Math.floor(Math.random() * WORDS.length)];
-        const cur = message.guildSettings?.economy?.currency;
-
-        await message.reply(
-            cv2(
-                base({
-                    title: 'Word Scramble',
-                    description:
-                        `Unscramble this: \`${scramble(word)}\`\n` +
-                        `First correct answer wins ${formatCoins(REWARD, cur)} — 30s.`,
-                })
-            )
-        );
-
-        const winner = await awaitReply(
-            message.channel,
-            (m) => !m.author.bot && m.content.trim().toLowerCase() === word,
-            30_000
-        );
-
-        if (!winner)
-            return message.channel.send(
-                cv2(base({ color: config.colors.warning, description: `Nobody got it — the word was **${word}**.` }))
-            );
-
-        const profile = await db.getProfile(message.guild.id, winner.author.id);
-        profile.wallet += REWARD;
-        await db.saveProfile(message.guild.id, winner.author.id, profile);
-
-        return message.channel.send(
-            cv2(
-                base({
-                    color: config.colors.success,
-                    description: `⚡ **${winner.author.username}** unscrambled **${word}** and won ${formatCoins(REWARD, cur)}!`,
-                })
-            )
-        );
-    },
+    slash: [],
+    execute: (message) => run(fromMessage(message)),
+    executeSlash: (interaction) => run(fromInteraction(interaction)),
 };

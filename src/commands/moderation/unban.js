@@ -1,7 +1,27 @@
-const { PermissionFlagsBits } = require('discord.js');
+const { PermissionFlagsBits, ApplicationCommandOptionType: Opt } = require('discord.js');
 const { success, sendError, cv2 } = require('../../helpers/embeds');
 const { extractId } = require('../../helpers/resolve');
 const { logModAction } = require('../../utils/modlog');
+const { fromMessage, fromInteraction } = require('../../helpers/ctx');
+
+async function run(ctx, id, reason) {
+    if (!id)
+        return sendError(ctx, `Give me a user id. Usage: \`${ctx.prefix}unban <id> [reason]\``);
+
+    const ban = await ctx.guild.bans.fetch(id).catch(() => null);
+    if (!ban) return sendError(ctx, 'That user is not banned.');
+
+    await ctx.guild.members.unban(id, `${reason} — by ${ctx.user.tag}`);
+    logModAction(ctx.client, ctx.guild.id, {
+        action: 'Unban',
+        target: `${ban.user.tag} (${id})`,
+        moderator: ctx.user.tag,
+        reason,
+    });
+    return ctx.reply(
+        cv2(success(`**${ban.user.tag}** was unbanned.\nReason: ${reason}`, 'User unbanned'))
+    );
+}
 
 module.exports = {
     name: 'unban',
@@ -11,24 +31,16 @@ module.exports = {
     userPermissions: [PermissionFlagsBits.BanMembers],
     botPermissions: [PermissionFlagsBits.BanMembers],
     cooldown: 3,
-    async execute(message, args) {
-        const id = extractId(args[0]);
-        if (!id)
-            return sendError(message, `Give me a user id. Usage: \`${message.prefix}unban <id> [reason]\``);
-
-        const ban = await message.guild.bans.fetch(id).catch(() => null);
-        if (!ban) return sendError(message, 'That user is not banned.');
-
-        const reason = args.slice(1).join(' ') || 'No reason provided';
-        await message.guild.members.unban(id, `${reason} — by ${message.author.tag}`);
-        logModAction(message.client, message.guild.id, {
-            action: 'Unban',
-            target: `${ban.user.tag} (${id})`,
-            moderator: message.author.tag,
-            reason,
-        });
-        return message.reply(
-            cv2(success(`**${ban.user.tag}** was unbanned.\nReason: ${reason}`, 'User unbanned'))
-        );
-    },
+    slash: [
+        { name: 'user', description: 'The banned user', type: Opt.User, required: true },
+        { name: 'reason', description: 'Why they\'re being unbanned', type: Opt.String },
+    ],
+    execute: (message, args) =>
+        run(fromMessage(message), extractId(args[0]), args.slice(1).join(' ') || 'No reason provided'),
+    executeSlash: (interaction) =>
+        run(
+            fromInteraction(interaction),
+            interaction.options.getUser('user')?.id,
+            interaction.options.getString('reason') || 'No reason provided'
+        ),
 };

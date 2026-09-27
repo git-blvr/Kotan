@@ -1,4 +1,6 @@
+const { ApplicationCommandOptionType: Opt } = require('discord.js');
 const { base, sendError, cv2 } = require('../../helpers/embeds');
+const { fromMessage, fromInteraction } = require('../../helpers/ctx');
 const config = require('../../config');
 
 const ANSWERS = [
@@ -17,6 +19,21 @@ const ANSWERS = [
     { text: 'Very doubtful.', tone: 'error' },
 ];
 
+async function run(ctx, question) {
+    if (!question) return sendError(ctx, `Ask me something: \`${ctx.prefix}8ball <question>\``);
+
+    const answer = ANSWERS[Math.floor(Math.random() * ANSWERS.length)];
+    return ctx.reply(
+        cv2(
+            base({
+                title: '🎱 8-ball',
+                color: config.colors[answer.tone],
+                description: `**${question}**\n${answer.text}`,
+            })
+        )
+    );
+}
+
 module.exports = {
     name: '8ball',
     description: 'Ask the magic 8-ball a question.',
@@ -25,19 +42,10 @@ module.exports = {
     triggers: ['8ball'],
     guildOnly: false,
     cooldown: 3,
-    async execute(message, args) {
-        const question = args.join(' ');
-        if (!question) return sendError(message, `Ask me something: \`${message.prefix}8ball <question>\``);
-
-        const answer = ANSWERS[Math.floor(Math.random() * ANSWERS.length)];
-        return message.reply(
-            cv2(
-                base({
-                    title: '🎱 8-ball',
-                    color: config.colors[answer.tone],
-                    description: `**${question}**\n${answer.text}`,
-                })
-            )
-        );
-    },
+    slash: [
+        { name: 'question', description: 'What do you want to ask?', type: Opt.String, required: true },
+    ],
+    execute: (message, args) => run(fromMessage(message), args.join(' ')),
+    executeSlash: (interaction) =>
+        run(fromInteraction(interaction), interaction.options.getString('question')),
 };

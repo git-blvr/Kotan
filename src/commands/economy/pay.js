@@ -1,7 +1,39 @@
+const { ApplicationCommandOptionType: Opt } = require('discord.js');
 const { success, sendError, cv2 } = require('../../helpers/embeds');
 const { resolveMember } = require('../../helpers/resolve');
 const { formatCoins, parseAmount } = require('../../helpers/format');
+const { fromMessage, fromInteraction } = require('../../helpers/ctx');
 const db = require('../../utils/database');
+
+async function run(ctx, target, amountInput) {
+    if (!target)
+        return sendError(ctx, `Member not found. Usage: \`${ctx.prefix}pay @member <amount>\``);
+    if (target.id === ctx.user.id) return sendError(ctx, 'You cannot pay yourself.');
+    if (target.user.bot) return sendError(ctx, 'You cannot pay a bot.');
+
+    const cur = ctx.settings?.economy?.currency;
+    const sender = await db.getProfile(ctx.guild.id, ctx.user.id);
+    const amount = parseAmount(amountInput, sender.wallet);
+    if (!amount) return sendError(ctx, 'Invalid amount. Examples: `250`, `1k`, `all`, `half`.');
+    if (amount > sender.wallet)
+        return sendError(ctx, `You only have ${formatCoins(sender.wallet, cur)} in your wallet.`);
+
+    const receiver = await db.getProfile(ctx.guild.id, target.id);
+    sender.wallet -= amount;
+    receiver.wallet += amount;
+    await db.saveProfile(ctx.guild.id, ctx.user.id, sender);
+    await db.saveProfile(ctx.guild.id, target.id, receiver);
+
+    return ctx.reply(
+        cv2(
+            success(
+                `You paid ${formatCoins(amount, cur)} to **${target.user.tag}**.\n` +
+                    `Your new balance: ${formatCoins(sender.wallet, cur)}`,
+                'Payment sent'
+            )
+        )
+    );
+}
 
 module.exports = {
     name: 'pay',
@@ -10,34 +42,16 @@ module.exports = {
     aliases: ['transfer', 'give', 'send'],
     triggers: ['pay'],
     cooldown: 5,
-    async execute(message, args) {
-        const target = await resolveMember(message, args[0]);
-        if (!target)
-            return sendError(message, `Member not found. Usage: \`${message.prefix}pay @member <amount>\``);
-        if (target.id === message.author.id) return sendError(message, 'You cannot pay yourself.');
-        if (target.user.bot) return sendError(message, 'You cannot pay a bot.');
-
-        const cur = message.guildSettings?.economy?.currency;
-        const sender = await db.getProfile(message.guild.id, message.author.id);
-        const amount = parseAmount(args[1], sender.wallet);
-        if (!amount) return sendError(message, 'Invalid amount. Examples: `250`, `1k`, `all`, `half`.');
-        if (amount > sender.wallet)
-            return sendError(message, `You only have ${formatCoins(sender.wallet, cur)} in your wallet.`);
-
-        const receiver = await db.getProfile(message.guild.id, target.id);
-        sender.wallet -= amount;
-        receiver.wallet += amount;
-        await db.saveProfile(message.guild.id, message.author.id, sender);
-        await db.saveProfile(message.guild.id, target.id, receiver);
-
-        return message.reply(
-            cv2(
-                success(
-                    `You paid ${formatCoins(amount, cur)} to **${target.user.tag}**.\n` +
-                        `Your new balance: ${formatCoins(sender.wallet, cur)}`,
-                    'Payment sent'
-                )
-            )
-        );
-    },
+    slash: [
+        { name: 'member', description: 'Who receives the coins', type: Opt.User, required: true },
+        { name: 'amount', description: 'How much — e.g. 250, 1k, all', type: Opt.String, required: true },
+    ],
+    execute: async (message, args) =>
+        run(fromMessage(message), await resolveMember(message, args[0]), args[1]),
+    executeSlash: (interaction) =>
+        run(
+            fromInteraction(interaction),
+            interaction.options.getMember('member'),
+            interaction.options.getString('amount')
+        ),
 };

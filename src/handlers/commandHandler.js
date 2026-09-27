@@ -19,8 +19,13 @@ const logger = require('../utils/logger');
 //       ownerOnly: false,             // restrict to OWNER_IDS
 //       userPermissions: ['BanMembers'],  // required member permissions
 //       botPermissions: ['BanMembers'],   // required bot permissions
-//       execute: async (message, args, client) => {},
+//       execute: async (message, args, client) => {},      // prefix path
+//       slash: [{ name: 'user', type: 6, required: true, description: '...' }],
+//       executeSlash: async (interaction, client) => {},   // slash path
 //   };
+//
+// `slash` + `executeSlash` are both required for the command to be registered
+// as a slash command (see scripts/deploySlash.js and helpers/slash.js).
 
 module.exports = function loadCommands(client) {
     const baseDir = path.join(__dirname, '..', 'commands');
