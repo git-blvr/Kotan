@@ -16,6 +16,7 @@ module.exports = [
     { name: 'roll', description: 'Rolls a die. Add a bet to duel the bot — higher roll wins.', module: 'games' },
     { name: 'rps', description: 'Rock paper scissors against the bot. Optionally bet coins on it.', module: 'games' },
     { name: 'scramble', description: 'Unscramble the word — first correct answer in the channel wins coins.', module: 'games' },
+    { name: 'ship', description: 'Ships you with another member — draws a card with both avatars and the match %.', module: 'games' },
     { name: 'slots', description: 'Spins the slot machine. Three of a kind pays big, a pair refunds half.', module: 'games' },
     { name: 'leaderboard', description: 'Shows the top 10 members by level.', module: 'leveling' },
     { name: 'rank', description: 'Shows your (or another member\'s) level and XP progress.', module: 'leveling' },

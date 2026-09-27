@@ -29,53 +29,23 @@
 }
 .dside .nav-logo { padding: var(--s2) var(--s2) 0; }
 .dnav { display: flex; flex-direction: column; gap: var(--s5); }
-.dnav-group { display: flex; flex-direction: column; gap: 2px; position: relative; padding-left: 17px; }
-/* spine — the vertical line the edges branch off */
-.dnav-group::before {
-    content: ''; position: absolute; left: 5px; top: 7px; bottom: 7px;
-    width: 1.5px; background: var(--border); border-radius: 2px;
-}
+.dnav-group { display: flex; flex-direction: column; gap: 2px; }
 .dnav-group > span {
     font-size: 11px; font-weight: 700; text-transform: uppercase;
     letter-spacing: 0.08em; color: var(--muted); padding: 0 var(--s3) var(--s2);
-    position: relative; display: flex; align-items: center;
-}
-/* root node marker on the group label */
-.dnav-group > span::before {
-    content: ''; position: absolute; left: -15.5px; top: 0;
-    width: 9px; height: 9px; border-radius: 50%;
-    background: var(--panel-solid); border: 1.5px solid var(--muted);
 }
 .dnav a {
     display: flex; align-items: center; gap: var(--s3);
     padding: calc(7px * var(--density)) var(--s3);
-    border-radius: var(--r-sm); color: var(--text-2);
+    border-radius: var(--r-md); color: var(--text-2);
     font-size: 14px; font-weight: 500; transition: all var(--speed);
-    position: relative;
-}
-/* edge — horizontal connector from the spine to the node */
-.dnav a::before {
-    content: ''; position: absolute; left: -12px; top: 50%;
-    width: 12px; height: 1.5px; background: var(--border);
-    transition: background var(--speed);
-}
-/* node dot on the spine */
-.dnav a::after {
-    content: ''; position: absolute; left: -14px; top: 50%; margin-top: -3px;
-    width: 4.5px; height: 4.5px; border-radius: 50%;
-    background: var(--panel-solid); border: 1.5px solid var(--border);
-    transition: background var(--speed), border-color var(--speed);
 }
 .dnav a:hover { color: var(--text); background: var(--panel-2); text-decoration: none; }
-.dnav a:hover::before { background: var(--accent-2); }
-.dnav a:hover::after { border-color: var(--accent-2); }
 .dnav a.active {
     color: var(--text);
-    background: linear-gradient(90deg, var(--accent-soft), transparent);
-    box-shadow: inset 2px 0 0 var(--accent);
+    background: var(--panel-2);
+    box-shadow: inset 2.5px 0 0 var(--accent);
 }
-.dnav a.active::before { background: var(--accent); }
-.dnav a.active::after { background: var(--accent); border-color: var(--accent); }
 .dnav a .ic { width: 16px; opacity: 0.85; display: inline-flex; }
 .dnav a .ic svg { width: 15px; height: 15px; display: block; }
 /* ---- guild selector card (sidebar top) ---- */

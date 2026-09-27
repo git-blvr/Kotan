@@ -122,6 +122,9 @@
             if (!open) renderPop();
         };
         pop.onclick = (e) => {
+            // dsel often sits inside a <label class="fld"> — the label would
+            // forward clicks on the pop to the toggle button, re-opening it.
+            e.preventDefault();
             const opt = e.target.closest('.opt');
             if (!opt) return;
             const v = opt.dataset.v;
