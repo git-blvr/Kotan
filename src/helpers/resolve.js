@@ -35,4 +35,19 @@ async function resolveUser(client, input) {
     return client.users.fetch(id).catch(() => null);
 }
 
-module.exports = { extractId, resolveMember, resolveUser };
+// Resolves a guild role by mention (<@&id>), id or (partial) name.
+function resolveRole(guild, input) {
+    if (!input) return null;
+    const str = String(input).trim();
+    const mention = str.match(/^<@&(\d{17,20})>$/) || str.match(/^(\d{17,20})$/);
+    if (mention) return guild.roles.cache.get(mention[1]) || null;
+    const query = str.toLowerCase();
+    return (
+        guild.roles.cache.find((r) => r.name.toLowerCase() === query) ||
+        guild.roles.cache.find((r) => r.name.toLowerCase().startsWith(query)) ||
+        guild.roles.cache.find((r) => r.name.toLowerCase().includes(query)) ||
+        null
+    );
+}
+
+module.exports = { extractId, resolveMember, resolveUser, resolveRole };
