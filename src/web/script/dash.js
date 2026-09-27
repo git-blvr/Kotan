@@ -239,11 +239,26 @@
     }
 
     // ---------- GUILD APP ----------
+    const svg = (inner) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
     const NAV = [
-        { group: 'General', items: [['overview', '◈', 'Overview'], ['modules', '▦', 'Modules'], ['commands', '⌘', 'Commands'], ['custom-commands', '✎', 'Custom Commands']] },
-        { group: 'Safety', items: [['automod', '🛡', 'Automod'], ['mod-log', '⚖', 'Mod Log']] },
-        { group: 'Engagement', items: [['logging', '≣', 'Logging'], ['welcome', '👋', 'Welcome'], ['roles', '🏷', 'Roles']] },
-        { group: '', items: [['settings', '⚙', 'Settings']] },
+        { group: 'General', items: [
+            ['overview', svg('<path d="M3 12h4l2.5-7 4 14 2.5-7H21"/>'), 'Overview'],
+            ['modules', svg('<rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/>'), 'Modules'],
+            ['commands', svg('<path d="M5 7l4 4-4 4"/><path d="M12 17h7"/><rect x="3" y="4" width="18" height="16" rx="2"/>'), 'Commands'],
+            ['custom-commands', svg('<path d="M17 3l4 4L8 20l-5 1 1-5L17 3z"/>'), 'Custom Commands'],
+        ] },
+        { group: 'Safety', items: [
+            ['automod', svg('<path d="M12 3l8 3v6c0 4.5-3.2 7.6-8 9-4.8-1.4-8-4.5-8-9V6l8-3z"/><path d="M9 12l2 2 4-4"/>'), 'Automod'],
+            ['mod-log', svg('<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4"/><path d="M9.5 12h6M9.5 16h6M9.5 8h2"/>'), 'Mod Log'],
+        ] },
+        { group: 'Engagement', items: [
+            ['logging', svg('<path d="M4 5h16M4 12h16M4 19h10"/>'), 'Logging'],
+            ['welcome', svg('<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>'), 'Welcome'],
+            ['roles', svg('<path d="M3 12V4h8l9 9-8 8-9-9z"/><circle cx="7.5" cy="8.5" r="1.2" fill="currentColor" stroke="none"/>'), 'Roles'],
+        ] },
+        { group: '', items: [
+            ['settings', svg('<circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M4.9 4.9l2.2 2.2M16.9 16.9l2.2 2.2M2.5 12h3M18.5 12h3M4.9 19.1l2.2-2.2M16.9 7.1l2.2-2.2"/>'), 'Settings'],
+        ] },
     ];
 
     function shell(activeSlug) {
@@ -254,7 +269,7 @@
         app.className = '';
         app.innerHTML = `<div class="dwrap">
             <aside class="dside" id="dside">
-                <a class="nav-logo" href="/"><span class="dot">K</span>Kotan</a>
+                <a class="nav-logo" href="/">Kotan</a>
                 <nav class="dnav">${nav}</nav>
                 <a class="btn ghost sm back" href="/dashboard">← All servers</a>
             </aside>
@@ -263,7 +278,9 @@
                     <button class="burger" id="burger">☰</button>
                     <span class="gname">${icon}${esc(g.name)}</span>
                     <span class="spacer"></span>
-                    <span class="uinfo">${esc(CTX.user.username)} <a class="btn sm ghost" href="/auth/logout">Sign out</a></span>
+                    <span class="uinfo">${CTX.user.avatar
+                        ? `<img src="https://cdn.discordapp.com/avatars/${CTX.user.id}/${CTX.user.avatar}.png?size=64" alt="">`
+                        : ''}${esc(CTX.user.username)} <a class="btn sm ghost" href="/auth/logout">Sign out</a></span>
                 </div>
                 <div class="dcontent" id="page"></div>
             </div>

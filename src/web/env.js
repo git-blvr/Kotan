@@ -15,9 +15,16 @@ module.exports = {
     SESSION_SECRET: env.SESSION_SECRET,
     SITE_URL: env.SITE_URL || `http://localhost:${env.PORT || 3000}`,
     DEVELOPER_IDS: (env.DEVELOPER_IDS || '').split(',').map((s) => s.trim()).filter(Boolean),
-    // Loopback by default (local debugging) — set WEB_HOST=0.0.0.0 to expose
-    // the dashboard on the network, or another interface IP to pin it.
-    HOST: env.WEB_HOST || '127.0.0.1',
+    // Bind address — WEB_HOST accepts friendly modes or a raw interface IP:
+    //   local (default) → 127.0.0.1  — this machine only
+    //   public / lan    → 0.0.0.0    — visible to the whole network
+    //   <ip>            → bind to that specific interface
+    HOST: (() => {
+        const h = (env.WEB_HOST || 'local').trim().toLowerCase();
+        if (['public', 'lan', 'all', '0.0.0.0'].includes(h)) return '0.0.0.0';
+        if (['local', 'localhost', 'loopback', '127.0.0.1'].includes(h)) return '127.0.0.1';
+        return env.WEB_HOST.trim(); // custom interface IP
+    })(),
     PORT: Number(env.WEB_PORT || env.PORT || 3000),
     COOKIE_SECURE: env.COOKIE_SECURE === 'true',
     crypto,

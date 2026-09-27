@@ -19,33 +19,29 @@ function parseCookies(req) {
     return out;
 }
 
-// Attaches req.session / req.sid for every request.
-async function sessionMiddleware(req, res, next) {
+// Attaches req.session / req.sid for every request (preHandler hook).
+async function sessionMiddleware(req) {
     req.sid = parseCookies(req)[COOKIE] || null;
     req.session = req.sid ? await sessions.get(req.sid) : null;
-    next();
 }
 
 // Page guard — unauthenticated users go to /login with their destination
 // preserved for post-login redirect.
-function requireAuth(req, res, next) {
-    if (req.session) return next();
-    res.redirect(`/login?next=${encodeURIComponent(req.originalUrl)}`);
+async function requireAuth(req, reply) {
+    if (!req.session) return reply.redirect(`/login?next=${encodeURIComponent(req.url)}`);
 }
 
 // API variant — JSON 401, no redirect.
-function requireAuthApi(req, res, next) {
-    if (req.session) return next();
-    res.status(401).json({ ok: false, error: 'Unauthorized' });
+async function requireAuthApi(req, reply) {
+    if (!req.session) return reply.code(401).send({ ok: false, error: 'Unauthorized' });
 }
 
 // Blocks cross-origin form posts/fetches on mutating methods.
-function sameOriginOnly(req, res, next) {
-    if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
+async function sameOriginOnly(req, reply) {
+    if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return;
     const origin = req.headers.origin || req.headers.referer;
     if (origin && new URL(origin).host !== req.headers.host)
-        return res.status(403).json({ ok: false, error: 'Cross-origin request rejected' });
-    next();
+        return reply.code(403).send({ ok: false, error: 'Cross-origin request rejected' });
 }
 
 module.exports = { COOKIE, cookieHeader, sessionMiddleware, requireAuth, requireAuthApi, sameOriginOnly };

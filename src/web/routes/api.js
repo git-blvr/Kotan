@@ -1,5 +1,4 @@
-const express = require('express');
-const path = require('node:path');
+const { PermissionFlagsBits } = require('discord.js');
 const db = require('../../utils/database');
 const config = require('../../config');
 const env = require('../env');
@@ -12,166 +11,172 @@ const guildData = require('../guildData');
 const commands = require('../config/commands');
 const modules = require('../config/modules');
 
-const router = express.Router();
-router.use(express.json({ limit: '256kb' }));
-router.use(rateLimit({ max: 240 }));
+const permName = (bit) => {
+    const key = Object.entries(PermissionFlagsBits).find(([, v]) => v === bit)?.[0];
+    return key ? key.replace(/([a-z])([A-Z])/g, '$1 $2') : null;
+};
 
-// ---------- public ----------
-
-router.get('/api/me', (req, res) => {
-    res.json({ user: req.session?.user || null });
-});
-
-router.get('/api/stats', rateLimit({ max: 30 }), async (req, res) => {
-    const client = req.app.locals.client;
-    res.json({
-        guilds: client?.guilds.cache.size || 0,
-        users: client ? client.guilds.cache.reduce((a, g) => a + (g.memberCount || 0), 0) : 0,
-        commands: client?.commands.size || 0,
-    });
-});
-
-router.get('/api/commands', rateLimit({ max: 30 }), (req, res) => {
-    res.json({
-        prefix: config.prefix,
-        commands: commands.map((c) => ({ name: c.name, description: c.description, module: c.module })),
-        modules,
-    });
-});
-
-// Real liveness: the website shares the bot process, so these are live
-// process reads — plus the minute-bucketed uptimeLog the bot persists.
-router.get('/api/uptime', rateLimit({ max: 60 }), async (req, res) => {
-    const client = req.app.locals.client;
-    const ready = !!client?.isReady();
-    const { uptimeLog } = await db.getHeartbeat().catch(() => ({ uptimeLog: [] }));
-    const now = Date.now();
-    const dayStart = Math.floor((now - 86400_000) / 60000);
-    const upMinutes = new Set((uptimeLog || []).filter((m) => m >= dayStart)).size;
-    const ping = client?.ws.ping ?? -1;
-    res.json({
-        status: !ready ? 'down' : ping >= 0 && ping < 500 ? 'operational' : 'degraded',
-        uptimeSeconds: client?.uptime ? Math.floor(client.uptime / 1000) : 0,
-        uptimePercent24h: Math.round((upMinutes / 1440) * 1000) / 10,
-        ping,
-        guilds: client?.guilds.cache.size || 0,
-        users: client ? client.guilds.cache.reduce((a, g) => a + (g.memberCount || 0), 0) : 0,
-        memoryMB: Math.round(process.memoryUsage().rss / 1048576),
-        heapMB: Math.round(process.memoryUsage().heapUsed / 1048576),
-        node: process.version,
-        components: {
-            gateway: !ready ? 'down' : ping >= 0 && ping < 250 ? 'ok' : ping >= 0 ? 'warn' : 'warn',
-            api: 'ok',
-            database: 'ok',
-            memory: process.memoryUsage().rss < 512 * 1048576 ? 'ok' : 'warn',
-        },
-        now,
-    });
-});
-
-// ---------- session-scoped ----------
-
-router.get('/api/guilds', requireAuthApi, (req, res) => {
-    const client = req.app.locals.client;
-    res.json({ guilds: manageableGuilds(client, req.session).filter((g) => !blacklist.isGuildBlacklisted(g.id)) });
-});
-
-// ---------- per-guild (all gated by checkGuildAccess) ----------
-
-function guildGate(req, res, next) {
-    const err = checkGuildAccess(req.app.locals.client, req.session, req.params.id);
-    if (err) return res.status(err.status).json({ ok: false, ...err });
-    req.guild = req.app.locals.client.guilds.cache.get(req.params.id);
-    next();
+async function guildGate(req, reply) {
+    const err = checkGuildAccess(req.client, req.session, req.params.id);
+    if (err) return reply.code(err.status).send({ ok: false, ...err });
+    req.guild = req.client.guilds.cache.get(req.params.id);
 }
 
-const gg = express.Router({ mergeParams: true });
-gg.use(requireAuthApi, guildGate);
+module.exports = async (app) => {
+    app.addHook('preHandler', rateLimit({ max: 240 }));
 
-gg.get('/', async (req, res) => {
-    res.json({
-        guild: { id: req.guild.id, name: req.guild.name, icon: req.guild.icon, memberCount: req.guild.memberCount },
-        settings: await settings.getSettings(req.guild.id),
-        modules,
-        commands,
+    // ---------- public ----------
+
+    app.get('/api/me', (req, reply) => reply.send({ user: req.session?.user || null }));
+
+    app.get('/api/stats', { preHandler: rateLimit({ max: 30 }) }, (req, reply) => {
+        const client = req.client;
+        reply.send({
+            guilds: client?.guilds.cache.size || 0,
+            users: client ? client.guilds.cache.reduce((a, g) => a + (g.memberCount || 0), 0) : 0,
+            commands: client?.commands.size || 0,
+        });
     });
-});
 
-gg.get('/channels', (req, res) => res.json({ channels: guildData.guildChannels(req.guild) }));
-gg.get('/roles', (req, res) => res.json({ roles: guildData.guildRoles(req.guild) }));
+    app.get('/api/commands', { preHandler: rateLimit({ max: 30 }) }, (req, reply) => {
+        const client = req.client;
+        const live = new Map();
+        if (client) for (const c of client.commands.values()) live.set(c.name, c);
+        reply.send({
+            prefix: config.prefix,
+            commands: commands.map((c) => {
+                const cmd = live.get(c.name) || {};
+                return {
+                    name: c.name,
+                    description: c.description,
+                    module: c.module,
+                    usage: cmd.usage || '',
+                    aliases: cmd.aliases || [],
+                    cooldown: cmd.cooldown || 0,
+                    permissions: (cmd.userPermissions || []).map(permName).filter(Boolean),
+                };
+            }),
+            modules,
+        });
+    });
 
-gg.get('/messages', async (req, res) => {
-    const out = await guildData.guildMessages(req.guild, String(req.query.channel || ''));
-    if (out.error) return res.status(400).json(out);
-    res.json(out);
-});
+    // Real liveness: the website shares the bot process, so these are live
+    // process reads — plus the minute-bucketed uptimeLog the bot persists.
+    app.get('/api/uptime', { preHandler: rateLimit({ max: 60 }) }, async (req, reply) => {
+        const client = req.client;
+        const ready = !!client?.isReady();
+        const { uptimeLog } = await db.getHeartbeat().catch(() => ({ uptimeLog: [] }));
+        const now = Date.now();
+        const dayStart = Math.floor((now - 86400_000) / 60000);
+        const upMinutes = new Set((uptimeLog || []).filter((m) => m >= dayStart)).size;
+        const ping = client?.ws.ping ?? -1;
+        reply.send({
+            status: !ready ? 'down' : ping >= 0 && ping < 500 ? 'operational' : 'degraded',
+            uptimeSeconds: client?.uptime ? Math.floor(client.uptime / 1000) : 0,
+            uptimePercent24h: Math.round((upMinutes / 1440) * 1000) / 10,
+            ping,
+            guilds: client?.guilds.cache.size || 0,
+            users: client ? client.guilds.cache.reduce((a, g) => a + (g.memberCount || 0), 0) : 0,
+            memoryMB: Math.round(process.memoryUsage().rss / 1048576),
+            heapMB: Math.round(process.memoryUsage().heapUsed / 1048576),
+            node: process.version,
+            components: {
+                gateway: !ready ? 'down' : ping >= 0 && ping < 250 ? 'ok' : ping >= 0 ? 'warn' : 'warn',
+                api: 'ok',
+                database: 'ok',
+                memory: process.memoryUsage().rss < 512 * 1048576 ? 'ok' : 'warn',
+            },
+            now,
+        });
+    });
 
-gg.get('/stats', async (req, res) => {
-    const id = req.guild.id;
-    const [usage, growth, mod, audit, recent] = await Promise.all([
-        db.getCommandUsage(id, 14),
-        db.getMemberGrowth(id, 14),
-        db.getModActivity(id, 14),
-        db.getAudit(id, 15),
-        db.getRecentModActions(id, 5),
-    ]);
-    res.json({ usage, growth, mod, audit, recent });
-});
+    // ---------- session-scoped ----------
 
-gg.post('/settings', async (req, res) => {
-    const { section, fields } = req.body || {};
-    const result = await settings.applySection(req.guild.id, req.session.user.id, String(section || ''), fields);
-    if (result.error) return res.status(result.status).json({ ok: false, error: result.error });
-    res.json({ ok: true, settings: result.settings });
-});
+    app.get('/api/guilds', { preHandler: requireAuthApi }, (req, reply) =>
+        reply.send({ guilds: manageableGuilds(req.client, req.session).filter((g) => !blacklist.isGuildBlacklisted(g.id)) }));
 
-gg.get('/tags', async (req, res) => {
-    res.json({ tags: await db.getTags(req.guild.id) });
-});
+    // ---------- per-guild (all gated by checkGuildAccess) ----------
 
-gg.post('/tags', async (req, res) => {
-    const { name, content } = req.body || {};
-    const tag = await db.addTag(req.guild.id, String(name || '').toLowerCase(), String(content || ''), req.session.user.id);
-    if (!tag) return res.status(400).json({ ok: false, error: 'Invalid tag name (a-z 0-9 _ -, max 32) or empty content' });
-    res.json({ ok: true, tag });
-});
+    await app.register(async (gg) => {
+        gg.addHook('preHandler', requireAuthApi);
+        gg.addHook('preHandler', guildGate);
 
-gg.delete('/tags/:name', async (req, res) => {
-    const ok = await db.deleteTag(req.guild.id, req.params.name);
-    res.status(ok ? 200 : 404).json({ ok });
-});
+        gg.get('/', async (req, reply) => reply.send({
+            guild: { id: req.guild.id, name: req.guild.name, icon: req.guild.icon, memberCount: req.guild.memberCount },
+            settings: await settings.getSettings(req.guild.id),
+            modules,
+            commands,
+        }));
 
-router.use('/api/guilds/:id', gg);
+        gg.get('/channels', (req, reply) => reply.send({ channels: guildData.guildChannels(req.guild) }));
+        gg.get('/roles', (req, reply) => reply.send({ roles: guildData.guildRoles(req.guild) }));
 
-// ---------- developer-only admin ----------
+        gg.get('/messages', async (req, reply) => {
+            const out = await guildData.guildMessages(req.guild, String(req.query.channel || ''));
+            if (out.error) return reply.code(400).send(out);
+            return reply.send(out);
+        });
 
-const admin = express.Router();
-admin.use(requireAuthApi, (req, res, next) => {
-    if (!isDeveloper(req.session.user.id)) return res.status(403).json({ ok: false, error: 'Developer only' });
-    next();
-});
+        gg.get('/stats', async (req, reply) => {
+            const id = req.guild.id;
+            const [usage, growth, mod, audit, recent] = await Promise.all([
+                db.getCommandUsage(id, 14),
+                db.getMemberGrowth(id, 14),
+                db.getModActivity(id, 14),
+                db.getAudit(id, 15),
+                db.getRecentModActions(id, 5),
+            ]);
+            return reply.send({ usage, growth, mod, audit, recent });
+        });
 
-admin.get('/', (req, res) => res.json({ entries: blacklist.list() }));
+        gg.post('/settings', async (req, reply) => {
+            const { section, fields } = req.body || {};
+            const result = await settings.applySection(req.guild.id, req.session.user.id, String(section || ''), fields);
+            if (result.error) return reply.code(result.status).send({ ok: false, error: result.error });
+            return reply.send({ ok: true, settings: result.settings });
+        });
 
-admin.post('/', (req, res) => {
-    const { guildId, reason } = req.body || {};
-    if (!/^\d{17,20}$/.test(String(guildId || ''))) return res.status(400).json({ ok: false, error: 'Invalid guild ID' });
-    blacklist.add(guildId, String(reason || 'No reason provided').slice(0, 200), req.session.user.id);
-    const guild = req.app.locals.client.guilds.cache.get(String(guildId));
-    if (guild) guild.leave().catch(() => {});
-    res.json({ ok: true });
-});
+        gg.get('/tags', async (req, reply) =>
+            reply.send({ tags: await db.getTags(req.guild.id) }));
 
-admin.delete('/:guildId', (req, res) => {
-    res.json({ ok: blacklist.remove(req.params.guildId) });
-});
+        gg.post('/tags', async (req, reply) => {
+            const { name, content } = req.body || {};
+            const tag = await db.addTag(req.guild.id, String(name || '').toLowerCase(), String(content || ''), req.session.user.id);
+            if (!tag) return reply.code(400).send({ ok: false, error: 'Invalid tag name (a-z 0-9 _ -, max 32) or empty content' });
+            return reply.send({ ok: true, tag });
+        });
 
-router.use('/api/admin/blacklist', admin);
+        gg.delete('/tags/:name', async (req, reply) => {
+            const ok = await db.deleteTag(req.guild.id, req.params.name);
+            return reply.code(ok ? 200 : 404).send({ ok });
+        });
+    }, { prefix: '/api/guilds/:id' });
 
-// ---------- pages data (html shells are static; these just gate them) ----------
+    // ---------- developer-only admin ----------
 
-router.get('/api/meta/devtools', requireAuthApi, (req, res) => {
-    res.json({ developer: isDeveloper(req.session.user.id) });
-});
+    await app.register(async (admin) => {
+        admin.addHook('preHandler', requireAuthApi);
+        admin.addHook('preHandler', async (req, reply) => {
+            if (!isDeveloper(req.session.user.id)) return reply.code(403).send({ ok: false, error: 'Developer only' });
+        });
 
-module.exports = router;
+        admin.get('/', (req, reply) => reply.send({ entries: blacklist.list() }));
+
+        admin.post('/', (req, reply) => {
+            const { guildId, reason } = req.body || {};
+            if (!/^\d{17,20}$/.test(String(guildId || ''))) return reply.code(400).send({ ok: false, error: 'Invalid guild ID' });
+            blacklist.add(guildId, String(reason || 'No reason provided').slice(0, 200), req.session.user.id);
+            const guild = req.client.guilds.cache.get(String(guildId));
+            if (guild) guild.leave().catch(() => {});
+            return reply.send({ ok: true });
+        });
+
+        admin.delete('/:guildId', (req, reply) =>
+            reply.send({ ok: blacklist.remove(req.params.guildId) }));
+    }, { prefix: '/api/admin/blacklist' });
+
+    // ---------- pages data ----------
+
+    app.get('/api/meta/devtools', { preHandler: requireAuthApi }, (req, reply) =>
+        reply.send({ developer: isDeveloper(req.session.user.id) }));
+};

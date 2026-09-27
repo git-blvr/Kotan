@@ -38,21 +38,35 @@
                 : 'https://cdn.discordapp.com/embed/avatars/0.png';
             slot.innerHTML = `<img src="${av}" alt=""> <span>${esc(d.user.username)}</span> <a class="btn sm ghost" href="/auth/logout">Sign out</a>`;
         } else {
-            // logged out: "Dashboard" → "Log in", and every CTA points at /login
-            const dashLink = $('[data-nav="dash"]');
-            if (dashLink) { dashLink.textContent = 'Log in'; dashLink.href = '/login'; }
-            $$('.js-cta').forEach((b) => { b.textContent = 'Log in'; b.href = '/login'; });
+            // logged out: drop the Dashboard link; CTAs become "Log in"
+            $('[data-nav="dash"]')?.remove();
+            const LOGIN_IC = '<svg class="cta-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>';
+            $$('.js-cta').forEach((b) => {
+                b.href = '/login';
+                if (b.classList.contains('nav-cta')) {
+                    b.innerHTML = LOGIN_IC;
+                    b.setAttribute('aria-label', 'Log in');
+                    b.title = 'Log in';
+                } else {
+                    b.textContent = 'Log in';
+                }
+            });
         }
     });
 
-    // --- homepage stats ---
+    // --- homepage stats (sessionStorage cache — refresh spam / API limits
+    //     never blank the numbers, and they paint before the fetch lands) ---
     if ($('#stats')) {
+        const statEls = $$('[data-stat]');
+        const paint = (d) => statEls.forEach((el) => {
+            const v = d?.[el.dataset.stat];
+            if (typeof v === 'number') el.textContent = v.toLocaleString();
+        });
+        try { paint(JSON.parse(sessionStorage.getItem('kotan-stats'))); } catch {}
         api('/api/stats').then((d) => {
             if (!d) return;
-            $$('[data-stat]').forEach((el) => {
-                const v = d[el.dataset.stat];
-                el.textContent = typeof v === 'number' ? v.toLocaleString() : '—';
-            });
+            paint(d);
+            try { sessionStorage.setItem('kotan-stats', JSON.stringify(d)); } catch {}
         });
     }
 
@@ -61,22 +75,56 @@
     if (docBody) {
         api('/api/commands').then((d) => {
             if (!d) { docBody.innerHTML = '<p class="muted">Could not load commands.</p>'; return; }
-            $('#prefix').textContent = d.prefix || '!';
+            const prefix = d.prefix || '!';
+            $('#prefix').textContent = prefix;
             const byMod = {};
             for (const c of d.commands) (byMod[c.module] ||= []).push(c);
-            docBody.innerHTML = d.modules
-                .filter((m) => byMod[m.id]?.length)
-                .map((m) => `
-                    <section class="doc-cat" data-mod="${esc(m.id)}">
-                        <h2>${esc(m.label)} <span class="count">${byMod[m.id].length}</span></h2>
-                        <p>${esc(m.description)}</p>
-                        <div class="cmd-grid">${byMod[m.id].map((c) => `
-                            <div class="card cmd" data-q="${esc((c.name + ' ' + c.description + ' ' + m.label).toLowerCase())}">
-                                <code>${esc(d.prefix || '!')}${esc(c.name)}</code>
-                                <p>${esc(c.description)}</p>
-                            </div>`).join('')}
-                        </div>
-                    </section>`).join('');
+            const mods = d.modules.filter((m) => byMod[m.id]?.length);
+
+            const meta = (c) => {
+                const bits = [];
+                if (c.aliases?.length) bits.push(`<span class="tag">aka ${c.aliases.map(esc).join(', ')}</span>`);
+                if (c.cooldown) bits.push(`<span class="tag">${c.cooldown}s cooldown</span>`);
+                for (const p of c.permissions || []) bits.push(`<span class="tag perm">${esc(p)}</span>`);
+                return bits.length ? `<div class="meta">${bits.join('')}</div>` : '';
+            };
+            docBody.innerHTML = mods.map((m) => `
+                <section class="doc-cat" id="mod-${esc(m.id)}" data-mod="${esc(m.id)}">
+                    <h2>${esc(m.label)} <span class="count">${byMod[m.id].length}</span></h2>
+                    <p>${esc(m.description)}</p>
+                    <div class="cmd-grid">${byMod[m.id].map((c) => `
+                        <div class="card cmd" title="Click to copy" data-q="${esc((c.name + ' ' + c.description + ' ' + m.label + ' ' + (c.aliases || []).join(' ')).toLowerCase())}">
+                            <code class="usage">${esc(prefix)}${esc(c.name)}${c.usage ? ` <span class="u">${esc(c.usage)}</span>` : ''}</code>
+                            <p>${esc(c.description)}</p>
+                            ${meta(c)}
+                            <span class="copied">copied</span>
+                        </div>`).join('')}
+                    </div>
+                </section>`).join('');
+
+            // sidebar toc + scrollspy
+            const toc = $('#doc-toc');
+            if (toc) {
+                toc.innerHTML = mods.map((m) =>
+                    `<a href="#mod-${esc(m.id)}" data-toc="${esc(m.id)}">${esc(m.label)}<span class="n">${byMod[m.id].length}</span></a>`).join('');
+                const tocLinks = $$('a', toc);
+                const spy = new IntersectionObserver((ents) => {
+                    for (const e of ents) if (e.isIntersecting) {
+                        tocLinks.forEach((l) => l.classList.toggle('on', l.dataset.toc === e.target.dataset.mod));
+                    }
+                }, { rootMargin: '-20% 0px -70% 0px' });
+                $$('.doc-cat', docBody).forEach((s) => spy.observe(s));
+            }
+
+            // click a command card to copy the invocation
+            docBody.addEventListener('click', (e) => {
+                const card = e.target.closest('.cmd');
+                if (!card) return;
+                const cmd = card.querySelector('.usage').childNodes[0].textContent.trim();
+                navigator.clipboard?.writeText(cmd).catch(() => {});
+                card.classList.add('copied');
+                setTimeout(() => card.classList.remove('copied'), 1200);
+            });
 
             $('#doc-q').addEventListener('input', (e) => {
                 const q = e.target.value.trim().toLowerCase();
@@ -90,6 +138,15 @@
                     sec.style.display = $$('.cmd', sec).some((el) => el.style.display !== 'none') ? '' : 'none';
                 });
                 $('#doc-empty').style.display = visible ? 'none' : 'block';
+                toc && (toc.parentElement.style.display = q ? 'none' : '');
+            });
+
+            // "/" focuses search like real docs
+            document.addEventListener('keydown', (e) => {
+                if (e.key === '/' && !/^(input|textarea|select)$/i.test(document.activeElement?.tagName)) {
+                    e.preventDefault();
+                    $('#doc-q').focus();
+                }
             });
         });
     }

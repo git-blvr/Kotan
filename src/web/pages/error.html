@@ -8,20 +8,19 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/stylesheets/tokens.css">
-<link rel="stylesheet" href="/stylesheets/site.css">
-<script src="/script/site.js" defer></script>
+<link rel="stylesheet" href="/stylesheets/site.css?v=2">
+<script src="/script/site.js?v=9" defer></script>
 </head>
 <body>
 <nav class="nav"><div class="nav-inner">
-    <a class="nav-logo" href="/"><span class="dot">K</span>Kotan</a>
+    <a class="nav-logo" href="/">Kotan</a>
     <div class="nav-links">
-        <a href="/" data-nav="home">Home</a>
-        <a href="/doc" data-nav="doc">Docs</a>
-        <a href="/uptime" data-nav="uptime">Status</a>
-        <a href="/dashboard" data-nav="dash">Dashboard</a>
+        <a href="/" data-nav="home"><span class="nav-label">Home</span><svg class="nav-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-7 8 7"/><path d="M6.5 9.5V19h11V9.5"/><path d="M10 19v-5h4v5"/></svg></a>
+        <a href="/doc" data-nav="doc"><span class="nav-label">Docs</span><svg class="nav-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4"/><path d="M9.5 12h6M9.5 16h6M9.5 8h2"/></svg></a>
+        <a href="/uptime" data-nav="uptime"><span class="nav-label">Status</span><svg class="nav-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l2.5-7 4 14 2.5-7H21"/></svg></a>
+        <a href="/dashboard" data-nav="dash"><span class="nav-label">Dashboard</span><svg class="nav-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></svg></a>
+        <a class="btn primary sm js-cta nav-cta" href="/dashboard" aria-label="Open Dashboard" title="Open Dashboard"><svg class="cta-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>    </div>
         <span class="nav-user" id="nav-user"></span>
-        <a class="btn primary sm js-cta" href="/dashboard">Open Dashboard</a>
-    </div>
 </div></nav>
 
 <main class="center-page wrap">
