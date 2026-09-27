@@ -12,6 +12,20 @@ const { gateCommand } = require('../helpers/commandGate');
 module.exports = {
     name: Events.InteractionCreate,
     async execute(interaction, client) {
+        // Component interactions (select menus etc.) route by custom id:
+        // "<command>:<step>:<ownerId>:<data>" -> command.executeComponent.
+        if (interaction.isMessageComponent()) {
+            const command = client.commands.get(interaction.customId.split(':')[0]);
+            if (!command?.executeComponent) return;
+            try {
+                await command.executeComponent(interaction, client);
+            } catch (err) {
+                logger.error(`Component "${interaction.customId}" failed:`, err);
+                sentry.capture(err);
+            }
+            return;
+        }
+
         if (!interaction.isChatInputCommand()) return;
         if (interaction.guild && db.isGuildBlacklisted(interaction.guild.id)) return;
 
