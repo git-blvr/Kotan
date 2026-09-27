@@ -36,17 +36,33 @@
 }
 .dnav a {
     display: flex; align-items: center; gap: var(--s3);
-    padding: calc(7px * var(--density)) var(--s3);
-    border-radius: var(--r-md); color: var(--text-2);
-    font-size: 14px; font-weight: 500; transition: all var(--speed);
+    padding: calc(6px * var(--density)) var(--s2);
+    border-radius: 12px; color: var(--text-2);
+    font-size: 14px; font-weight: 500;
+    border: 1px solid transparent;
+    transition: all var(--speed);
 }
 .dnav a:hover { color: var(--text); background: var(--panel-2); text-decoration: none; }
 .dnav a.active {
     color: var(--text);
     background: var(--panel-2);
+    border-color: var(--border);
     box-shadow: inset 2.5px 0 0 var(--accent);
 }
-.dnav a .ic { width: 16px; opacity: 0.85; display: inline-flex; }
+.dnav a .ic {
+    width: 28px; height: 28px; flex-shrink: 0;
+    display: grid; place-items: center;
+    border-radius: 8px;
+    background: var(--panel-2); border: 1px solid var(--border-soft);
+    color: var(--text-2);
+    transition: all var(--speed);
+}
+.dnav a:hover .ic { color: var(--text); }
+.dnav a.active .ic {
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+    border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+    color: var(--accent);
+}
 .dnav a .ic svg { width: 15px; height: 15px; display: block; }
 /* ---- guild selector card (sidebar top) ---- */
 .gsel {
