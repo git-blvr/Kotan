@@ -65,7 +65,7 @@ function categoryMenu(ctx, client, uid) {
         title: 'Kotan | Help',
         description:
             `Prefix: \`${ctx.prefix}\` | Slash command supported.\n` +
-            'Browse by category below, or use `help <command>` for a direct lookup.\n\n',
+            'Browse by category below, or use `help <command>` for a direct lookup.\n\n' +
             'Website: https://kotan.wisp.uno/'
     }).addActionRowComponents(new ActionRowBuilder().addComponents(select));
 }
