@@ -119,10 +119,12 @@ module.exports = async (app) => {
 
         gg.get('/stats', async (req, reply) => {
             const id = req.guild.id;
+            // Overview range pills — retention caps at 45 days.
+            const days = Math.min(Math.max(parseInt(req.query.days, 10) || 14, 7), 45);
             const [usage, growth, mod, audit, recent] = await Promise.all([
-                db.getCommandUsage(id, 14),
-                db.getMemberGrowth(id, 14),
-                db.getModActivity(id, 14),
+                db.getCommandUsage(id, days),
+                db.getMemberGrowth(id, days),
+                db.getModActivity(id, days),
                 db.getAudit(id, 15),
                 db.getRecentModActions(id, 5),
             ]);

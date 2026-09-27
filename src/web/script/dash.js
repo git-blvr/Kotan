@@ -189,11 +189,45 @@
         return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:100%;height:${h}px">${rects}</svg>`;
     }
 
+    // Catmull-Rom → cubic bezier spline through the points (the "pulse" look).
+    function smoothPath(pts) {
+        if (pts.length < 2) return `M${pts[0]?.[0] ?? 0},${pts[0]?.[1] ?? 0}`;
+        let d = `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
+        for (let i = 0; i < pts.length - 1; i++) {
+            const p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || p2;
+            d += `C${(p1[0] + (p2[0] - p0[0]) / 6).toFixed(1)},${(p1[1] + (p2[1] - p0[1]) / 6).toFixed(1)} ${(p2[0] - (p3[0] - p1[0]) / 6).toFixed(1)},${(p2[1] - (p3[1] - p1[1]) / 6).toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+        }
+        return d;
+    }
+
+    // Multi-series smoothed area chart — each series normalized to its own
+    // max so different magnitudes overlay as comparable shapes.
+    function pulseChart(series, w = 900, h = 230) {
+        const on = series.filter((s) => s.on && s.values?.some((v) => v));
+        const grid = [0.25, 0.5, 0.75].map((f) =>
+            `<line x1="0" x2="${w}" y1="${(h * f).toFixed(0)}" y2="${(h * f).toFixed(0)}" stroke="var(--border-soft)" stroke-width="1"/>`).join('');
+        let defs = '', paths = '';
+        on.forEach((s, si) => {
+            const max = Math.max(...s.values, 1);
+            const pts = s.values.map((v, i) => [10 + (i / Math.max(s.values.length - 1, 1)) * (w - 20), h - 12 - (v / max) * (h - 30)]);
+            const d = smoothPath(pts);
+            const gid = `pg${si}`;
+            defs += `<linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" style="stop-color:${s.color};stop-opacity:0.28"/>
+                <stop offset="1" style="stop-color:${s.color};stop-opacity:0"/></linearGradient>`;
+            if (si === 0) paths += `<path d="${d} L${pts.at(-1)[0].toFixed(1)},${h} L${pts[0][0].toFixed(1)},${h} Z" fill="url(#${gid})"/>`;
+            paths += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round"><title>${esc(s.label)}</title></path>`;
+        });
+        return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:100%;height:${h}px"><defs>${defs}</defs>${grid}${paths || `<text x="${w / 2}" y="${h / 2}" fill="var(--muted)" font-size="13" text-anchor="middle">No data in this range yet</text>`}</svg>`;
+    }
+
     // ---------- state ----------
     const m = location.pathname.match(/^\/dashboard(?:\/(\d+))?/);
     const guildId = m?.[1] || null;
     let CTX = null;           // {guild, settings, modules, commands}
     const DATA = { channels: [], roles: [] };
+    let rangeDays = 30;       // overview range pill selection
+    const pulseOn = new Set(['commands', 'joins', 'mod']);
 
     const fmtDelta = (cur, prev) => {
         if (!prev) return '';
@@ -221,21 +255,41 @@
     // ---------- PICKER (/dashboard) ----------
     async function renderPicker() {
         app.className = 'dmain';
-        app.innerHTML = `<div class="dcontent plain" style="margin:var(--s7) auto">
-            <div class="page-title">Your servers</div>
-            <p class="page-desc">Servers where you have Manage Server and Kotan is installed.</p>
-            <div class="srvgrid" id="srvs"><div class="skeleton" style="height:76px"></div></div></div>`;
+        app.innerHTML = `<div class="pkwrap">
+            <div class="pk-head">
+                <div><h1 class="pk-title">Your servers</h1>
+                <p class="pk-sub">Servers where you have Manage Server and Kotan is installed.</p></div>
+                <input class="pk-search" id="srvq" type="search" placeholder="Search servers…">
+            </div>
+            <div class="pk-label">Manageable <span class="pkcount" id="srvn"></span></div>
+            <div class="srvgrid" id="srvs"><div class="skeleton" style="height:180px"></div></div>
+        </div>`;
         mountThemeFab();
         const [g, me, dev] = await Promise.all([api('/api/guilds'), api('/api/me'), api('/api/meta/devtools')]);
         if (g.ok === false) return;
         const grid = $('#srvs');
         const list = g.guilds || [];
-        grid.innerHTML = (list.length ? list.map((s) => `
-            <a class="srv" href="/dashboard/${s.id}">
-                ${s.icon ? `<img src="https://cdn.discordapp.com/icons/${s.id}/${s.icon}.png?size=96" alt="">` : `<span class="noicon">${esc(s.name[0])}</span>`}
-                <span><b>${esc(s.name)}</b><span>${s.owner ? 'Owner' : 'Manager'}</span></span>
-            </a>`).join('') : '<div class="empty-state"><div class="big">🛰️</div>No manageable servers with Kotan found.</div>')
-            + (dev?.developer ? `<a class="srv" href="/dashboard/admin/blacklist" style="border-style:dashed"><span class="noicon">🛠</span><span><b>Developer</b><span>Guild blacklist</span></span></a>` : '');
+        const card = (s) => {
+            const icon = s.icon ? `https://cdn.discordapp.com/icons/${s.id}/${s.icon}.png?size=128` : '';
+            return `<a class="srv" href="/dashboard/${s.id}" data-name="${esc(s.name.toLowerCase())}">
+                ${icon ? `<div class="srvbg" style="background-image:url('${icon}')"></div>` : ''}
+                ${icon ? `<img src="${icon}" alt="">` : `<span class="noicon">${esc(s.name[0])}</span>`}
+                <b>${esc(s.name)}</b>
+                <span class="srvbadge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 4.5-3.2 7.6-8 9-4.8-1.4-8-4.5-8-9V6l8-3z"/></svg>${s.owner ? 'Owner' : 'Manager'}</span>
+                <span class="srvbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M4.9 4.9l2.2 2.2M16.9 16.9l2.2 2.2M2.5 12h3M18.5 12h3M4.9 19.1l2.2-2.2M16.9 7.1l2.2-2.2"/></svg>Manage</span>
+            </a>`;
+        };
+        grid.innerHTML = (list.length ? list.map(card).join('') : '<div class="empty-state"><div class="big">🛰️</div>No manageable servers with Kotan found.</div>')
+            + (dev?.developer ? `<a class="srv dev" href="/dashboard/admin/blacklist" data-name="developer"><span class="noicon">🛠</span><b>Developer</b><span class="srvbadge">Guild blacklist</span><span class="srvbtn">Open</span></a>` : '');
+        const cards = $$('.srv', grid);
+        const count = $('#srvn');
+        const apply = (q) => {
+            let n = 0;
+            cards.forEach((c) => { const show = c.dataset.name.includes(q); c.style.display = show ? '' : 'none'; n += show; });
+            count.textContent = n;
+        };
+        apply('');
+        $('#srvq').oninput = (e) => apply(e.target.value.trim().toLowerCase());
     }
 
     // ---------- GUILD APP ----------
@@ -263,26 +317,29 @@
 
     function shell(activeSlug) {
         const g = CTX.guild;
-        const icon = g.icon ? `<img src="https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png?size=64" alt="">` : '';
-        const nav = NAV.map((grp) => `<div class="dnav-group">${grp.group ? `<span>${grp.group}</span>` : ''}${grp.items.map(([slug, ic, label]) =>
-            `<a href="#/${slug}" class="${slug === activeSlug ? 'active' : ''}"><span class="ic">${ic}</span>${label}</a>`).join('')}</div>`).join('');
+        const icon = g.icon ? `<img src="https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png?size=64" alt="">` : `<span class="gnoicon">${esc(g.name[0])}</span>`;
+        const av = CTX.user.avatar ? `<img src="https://cdn.discordapp.com/avatars/${CTX.user.id}/${CTX.user.avatar}.png?size=64" alt="">` : '';
+        const label = NAV.flatMap((x) => x.items).find(([slug]) => slug === activeSlug)?.[2] || 'Overview';
+        const nav = NAV.map((grp) => `<div class="dnav-group">${grp.group ? `<span>${grp.group}</span>` : ''}${grp.items.map(([slug, ic, lab]) =>
+            `<a href="#/${slug}" class="${slug === activeSlug ? 'active' : ''}"><span class="ic">${ic}</span>${lab}</a>`).join('')}</div>`).join('');
         app.className = '';
         app.innerHTML = `<div class="dwrap">
             <aside class="dside" id="dside">
                 <a class="nav-logo" href="/">Kotan</a>
+                <a class="gsel" href="/dashboard" title="Switch server">${icon}<span class="gsel-t"><b>${esc(g.name)}</b><span>Switch server</span></span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></a>
                 <nav class="dnav">${nav}</nav>
-                <a class="btn ghost sm back" href="/dashboard">← All servers</a>
+                <div class="duser">
+                    ${av}<div class="du"><b>${esc(CTX.user.username)}</b><span>@${esc(CTX.user.username)}</span></div>
+                    <a class="icobtn" href="/auth/logout" title="Sign out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></a>
+                </div>
             </aside>
             <div class="dmain">
                 <div class="dtop">
                     <button class="burger" id="burger">☰</button>
-                    <span class="gname">${icon}${esc(g.name)}</span>
-                    <span class="spacer"></span>
-                    <span class="uinfo">${CTX.user.avatar
-                        ? `<img src="https://cdn.discordapp.com/avatars/${CTX.user.id}/${CTX.user.avatar}.png?size=64" alt="">`
-                        : ''}${esc(CTX.user.username)} <a class="btn sm ghost" href="/auth/logout">Sign out</a></span>
+                    <div class="crumb"><a href="/dashboard">Servers</a><span>›</span>${esc(g.name)}<span>›</span><b>${esc(label)}</b></div>
                 </div>
-                <div class="dcontent" id="page"></div>
+                <div class="dcontent"><div id="page" class="dpage"></div></div>
             </div>
         </div>`;
         $('#burger').onclick = () => $('#dside').classList.toggle('open');
@@ -314,25 +371,76 @@
     const PAGES = {
         async overview(page) {
             const s = CTX.settings;
-            const stats = await api(`/api/guilds/${guildId}/stats`);
+            const stats = await api(`/api/guilds/${guildId}/stats?days=${rangeDays}`);
+            const hr = new Date().getHours();
+            const greet = hr < 12 ? 'morning' : hr < 18 ? 'afternoon' : 'evening';
+            const av = CTX.user.avatar
+                ? `<img class="ov-av" src="https://cdn.discordapp.com/avatars/${CTX.user.id}/${CTX.user.avatar}.png?size=64" alt="">` : '';
+
+            const delta = (cur, prev) => fmtDelta(cur ?? 0, prev ?? 0);
+            const modDays = stats.mod?.days || [];
+            const joins = (stats.growth?.series || []).map((v, i, a) => Math.max(0, (v || 0) - (i ? (a[i - 1] || v || 0) : v || 0)));
+
             const CARDS = {
-                members: () => ({ label: 'Members', val: CTX.guild.memberCount, extra: stats.growth?.pct != null ? `<span class="delta ${stats.growth.pct >= 0 ? 'up' : 'dn'}">${stats.growth.pct >= 0 ? '▲' : '▼'} ${Math.abs(stats.growth.pct)}% 14d</span>` : '' }),
-                commands: () => ({ label: 'Commands run', val: stats.usage?.total ?? 0, extra: fmtDelta(stats.usage?.week || 0, stats.usage?.prevWeek || 0) }),
-                warns: () => ({ label: 'Warns', val: stats.mod?.warnsTotal ?? 0, extra: fmtDelta(stats.mod?.warnsWeek || 0, stats.mod?.warnsPrevWeek || 0), cls: 'warn' }),
-                tempbans: () => ({ label: 'Tempbans', val: stats.mod?.tempbansTotal ?? 0, extra: fmtDelta(stats.mod?.tempbansWeek || 0, stats.mod?.tempbansPrevWeek || 0), cls: 'danger' }),
+                commands: { label: 'Commands run', color: 'var(--chart)',
+                    icon: svg('<path d="M5 7l4 4-4 4"/><path d="M12 17h7"/><rect x="3" y="4" width="18" height="16" rx="2"/>'),
+                    val: stats.usage?.total ?? 0, series: (stats.usage?.series || []).map((d) => d.count),
+                    delta: delta(stats.usage?.week, stats.usage?.prevWeek) },
+                members: { label: 'Members', color: 'var(--ok)',
+                    icon: svg('<circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.6-3 2.9-4.5 5.5-4.5s4.9 1.5 5.5 4.5"/><path d="M16 8.5a3 3 0 1 1 0-.01"/><path d="M17.5 14.6c1.9.6 3.2 1.9 3.6 3.9"/>'),
+                    val: CTX.guild.memberCount, series: stats.growth?.series || [],
+                    delta: stats.growth?.pct != null ? `<span class="delta ${stats.growth.pct >= 0 ? 'up' : 'dn'}">${stats.growth.pct >= 0 ? '▲' : '▼'} ${Math.abs(stats.growth.pct)}%</span>` : '' },
+                warns: { label: 'Warns', color: 'var(--warn)',
+                    icon: svg('<path d="M12 4L2.5 20h19L12 4z"/><path d="M12 10v4"/><circle cx="12" cy="17" r="0.6" fill="currentColor"/>'),
+                    val: stats.mod?.warnsTotal ?? 0, series: modDays.map((d) => d.warns || 0),
+                    delta: delta(stats.mod?.warnsWeek, stats.mod?.warnsPrevWeek) },
+                tempbans: { label: 'Tempbans', color: 'var(--danger)',
+                    icon: svg('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>'),
+                    val: stats.mod?.tempbansTotal ?? 0, series: modDays.map((d) => d.tempbans || 0),
+                    delta: delta(stats.mod?.tempbansWeek, stats.mod?.tempbansPrevWeek) },
             };
             const cards = (s.overview.cards?.length ? s.overview.cards : Object.keys(CARDS));
+
+            const PULSE = [
+                { key: 'commands', label: 'Commands', color: 'var(--chart)', values: (stats.usage?.series || []).map((d) => d.count) },
+                { key: 'joins', label: 'Member joins', color: 'var(--ok)', values: joins },
+                { key: 'mod', label: 'Mod actions', color: 'var(--warn)', values: modDays.map((d) => (d.warns || 0) + (d.tempbans || 0)) },
+            ];
+            PULSE.forEach((s) => (s.on = pulseOn.has(s.key)));
+
             page.innerHTML = `
-                <div><div class="page-title">Overview</div><p class="page-desc">Activity and health for ${esc(CTX.guild.name)}.</p></div>
-                <div class="statrow">${cards.map((c) => CARDS[c]).filter(Boolean).map((f) => { const d = f(); return `<div class="stat ${d.cls || ''}"><b>${(d.val ?? 0).toLocaleString()}</b><span>${d.label}</span> ${d.extra || ''}</div>`; }).join('')}</div>
-                <div class="duo">
-                    <div class="card"><h3>Member growth — 14d</h3>${sparkline(stats.growth?.series || [])}</div>
-                    <div class="card"><h3>Command usage — 14d</h3>${sparkline((stats.usage?.series || []).map((d) => d.count), 'var(--accent-2)')}</div>
+                <div class="ov-head">
+                    <div class="ov-hi">${av}<div><h1>Good ${greet}, ${esc(CTX.user.username)}</h1>
+                    <p>Here's how <b>${esc(CTX.guild.name)}</b> has been doing over the last ${rangeDays} days.</p></div></div>
+                    <div class="rpills">${[7, 30, 45].map((d) => `<button class="rpill${d === rangeDays ? ' on' : ''}" data-d="${d}">${d}d</button>`).join('')}</div>
                 </div>
-                <div class="duo">
+                <div class="statrow">${cards.map((c) => CARDS[c]).filter(Boolean).map((d) => `
+                    <div class="stat2">
+                        <div class="s2h"><span class="s2i">${d.icon}</span>${d.label}${d.delta || ''}</div>
+                        <b>${(d.val ?? 0).toLocaleString()}</b>
+                        <div class="s2s">${sparkline(d.series, d.color, 400, 60)}</div>
+                    </div>`).join('')}</div>
+                <div class="card">
+                    <div class="ph"><h3>Server pulse</h3><div class="legend" id="plg">${PULSE.map((s) =>
+                        `<button class="lpill${s.on ? ' on' : ''}" data-k="${s.key}"><i style="background:${s.color}"></i>${s.label}</button>`).join('')}</div></div>
+                    <p class="muted small mb">Activity per day, last ${rangeDays} days — legend toggles each series</p>
+                    <div id="pulse">${pulseChart(PULSE)}</div>
+                </div>
+                <div class="trio">
+                    <div class="card"><h3>Top commands</h3>${(stats.usage?.top || []).length ? stats.usage.top.map(([n, c]) => `<div class="qitem"><span class="grow mono">${esc(n)}</span><span class="chip">${c}</span></div>`).join('') : '<p class="muted small">No commands run yet.</p>'}</div>
                     <div class="card"><h3>Recent activity</h3>${(stats.recent || []).length ? stats.recent.map((r) => `<div class="qitem"><span class="chip ${r.type === 'warn' ? 'warn' : 'danger'}">${r.type}</span><span class="grow muted">on <span class="mono">${r.userId}</span> — ${esc(r.reason || 'no reason')}</span><span class="muted small">${timeAgo(r.at)}</span></div>`).join('') : '<p class="muted small">No recent moderation actions.</p>'}</div>
                     <div class="card"><h3>Settings audit</h3>${(stats.audit || []).length ? stats.audit.map((a) => `<div class="qitem"><span class="grow"><b>${esc(a.section)}</b> <span class="muted">edited by</span> <span class="mono">${a.userId}</span></span><span class="muted small">${timeAgo(a.at)}</span></div>`).join('') : '<p class="muted small">No changes recorded yet.</p>'}</div>
                 </div>`;
+
+            $$('.rpill', page).forEach((b) => (b.onclick = () => { rangeDays = +b.dataset.d; PAGES.overview(page); }));
+            $$('#plg .lpill', page).forEach((b) => (b.onclick = () => {
+                const k = b.dataset.k;
+                pulseOn.has(k) && PULSE.filter((s) => s.on).length > 1 ? pulseOn.delete(k) : pulseOn.add(k);
+                const s = PULSE.find((x) => x.key === k);
+                s.on = pulseOn.has(k);
+                b.classList.toggle('on', s.on);
+                $('#pulse', page).innerHTML = pulseChart(PULSE);
+            }));
         },
 
         async modules(page) {
