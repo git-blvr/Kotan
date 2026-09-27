@@ -24,9 +24,38 @@ function slashExample(command) {
     return `/${command.name}${tail ? ` ${tail}` : ''}`;
 }
 
+const BACK = '__back__';
+
+// Select for a category's commands — first option goes back to categories,
+// the picked command is marked as the default selection.
+function commandSelect(uid, category, commands, selected) {
+    return new ActionRowBuilder().addComponents(
+        new StringSelectMenuBuilder()
+            .setCustomId(`help:cmd:${uid}:${category}`)
+            .setPlaceholder('Pick a command…')
+            .addOptions([
+                {
+                    label: '← Back to categories',
+                    value: BACK,
+                    description: 'Return to the category list',
+                },
+                ...commands.slice(0, 24).map((c) => ({
+                    label: c.name,
+                    value: c.name,
+                    description: (c.description || 'No description.').slice(0, 100),
+                    default: c.name === selected,
+                })),
+            ])
+    );
+}
+
+function categoryCommands(client, category) {
+    return [...client.commands.values()].filter((c) => c.category === category);
+}
+
 // The card shown after a command is picked — "# name / Aliases / Example".
 // Both invocation forms are always shown, regardless of how help was called.
-function commandCard(ctx, command) {
+function commandCard(ctx, client, uid, command) {
     const prefix = ctx.settings?.prefix || config.prefix;
     return base({
         color: config.colors.main,
@@ -41,7 +70,8 @@ function commandCard(ctx, command) {
                     `\`\`\`${prefix}${command.name}${command.usage ? ` ${command.usage}` : ''}\`\`\`\n` +
                     `\`\`\`${slashExample(command)}\`\`\``
             )
-        );
+        )
+        .addActionRowComponents(commandSelect(uid, command.category, categoryCommands(client, command.category), command.name));
 }
 
 // Category pick — the top level of the browser.
@@ -72,19 +102,8 @@ function categoryMenu(ctx, client, uid) {
 
 // Command pick — shown once a category is chosen.
 function commandMenu(ctx, client, uid, category) {
-    const commands = [...client.commands.values()].filter((c) => c.category === category);
-    const select = new StringSelectMenuBuilder()
-        .setCustomId(`help:cmd:${uid}:${category}`)
-        .setPlaceholder('Pick a command…')
-        .addOptions(
-            commands.slice(0, 25).map((c) => ({
-                label: c.name,
-                value: c.name,
-                description: (c.description || 'No description.').slice(0, 100),
-            }))
-        );
     return base({ title: `${capitalize(category)} > pick a command` })
-        .addActionRowComponents(new ActionRowBuilder().addComponents(select));
+        .addActionRowComponents(commandSelect(uid, category, categoryCommands(client, category)));
 }
 
 async function run(ctx, client, query) {
@@ -94,7 +113,7 @@ async function run(ctx, client, query) {
     // `help <command>`
     const command =
         client.commands.get(query) ?? client.commands.get(client.aliases.get(query));
-    if (command) return ctx.reply(cv2(commandCard(ctx, command)));
+    if (command) return ctx.reply(cv2(commandCard(ctx, client, ctx.user.id, command)));
 
     // `help <category>`
     const inCategory = [...client.commands.values()].filter((c) => c.category === query);
@@ -138,9 +157,12 @@ module.exports = {
             return interaction.update({ components: [commandMenu(ctx, client, uid, cat)] });
         }
         if (step === 'cmd') {
-            const command = client.commands.get(interaction.values[0]);
+            const value = interaction.values[0];
+            if (value === BACK)
+                return interaction.update({ components: [categoryMenu(ctx, client, uid)] });
+            const command = client.commands.get(value);
             if (!command) return interaction.reply({ ephemeral: true, content: 'That command no longer exists.' });
-            return interaction.update({ components: [commandCard(ctx, command)] });
+            return interaction.update({ components: [commandCard(ctx, client, uid, command)] });
         }
     },
 };
