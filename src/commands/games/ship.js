@@ -101,14 +101,38 @@ async function shipCard(userA, userB, pct) {
     return canvas.encode('png');
 }
 
-// Score-tiered banter for the container text.
-const DIALOGUES = [
-    [80, (a, b) => `**${a}:** so… we're basically soulmates?\n**${b}:** that's what the card says.\n**Kotan:** it's over for the rest of you.`],
-    [50, (a, b) => `**${a}:** decent odds, right?\n**${b}:** i've had worse.\n**Kotan:** that counts as a compliment, i think.`],
-    [30, (a, b) => `**${a}:** it's… a number.\n**${b}:** technically true.\n**Kotan:** i'm staying out of this one.`],
-    [0, (a, b) => `**${a}:** please tell me it's broken.\n**${b}:** it's not broken.\n**Kotan:** *slowly leaves the channel*`],
+// Score-tiered verdict lines — 3 per tier, picked at random.
+const SHIP_LINES = [
+    [100, [
+        'Both are certified ideal lovers!',
+        'A match made in heaven — frame this one.',
+        'Perfect score. The wedding date is being set as we speak.',
+    ]],
+    [75, [
+        'Looks like we got a couple over here.',
+        'Strong chemistry detected — proceed.',
+        'Cupid is already loading his bow.',
+    ]],
+    [50, [
+        'There\'s a spark — don\'t blow it.',
+        'Could go either way. Might as well flip a coin.',
+        'A solid maybe. Buy flowers just in case.',
+    ]],
+    [25, [
+        'Slim chance — but stranger things have happened.',
+        'The odds aren\'t great. They\'re not zero though.',
+        'Keep expectations… modest.',
+    ]],
+    [0, [
+        'Ship sunk before it left the harbor.',
+        'Maybe just stay friends. Distant friends.',
+        'Kotan checked twice — still a no.',
+    ]],
 ];
-const dialogue = (a, b, pct) => (DIALOGUES.find(([min]) => pct >= min) || DIALOGUES.at(-1))[1](a, b);
+const shipLine = pct => {
+    const [, lines] = SHIP_LINES.find(([min]) => pct >= min) || SHIP_LINES.at(-1);
+    return `${pct}% | ${lines[Math.floor(Math.random() * lines.length)]}`;
+};
 
 module.exports = {
     name: 'ship',
@@ -128,7 +152,7 @@ module.exports = {
         const container = base({
             color: pct >= 30 ? 0xff6b9d : 0x8a93a8,
             title: `💞 ${message.author.username} × ${target.user.username}`,
-            description: dialogue(message.author.username, target.user.username, pct),
+            description: shipLine(pct),
             image: 'attachment://ship.png',
         });
         return message.reply({
