@@ -427,7 +427,7 @@
                     <div id="pulse">${pulseChart(PULSE)}</div>
                 </div>
                 <div class="trio">
-                    <div class="card"><h3>Top commands</h3>${(stats.usage?.top || []).length ? stats.usage.top.map(([n, c]) => `<div class="qitem"><span class="grow mono">${esc(n)}</span><span class="chip">${c}</span></div>`).join('') : '<p class="muted small">No commands run yet.</p>'}</div>
+                    <div class="card"><h3>Top commands</h3>${(stats.usage?.top || []).length ? stats.usage.top.map((t) => `<div class="qitem"><span class="grow mono">${esc(t.name)}</span><span class="chip">${t.count}</span></div>`).join('') : '<p class="muted small">No commands run yet.</p>'}</div>
                     <div class="card"><h3>Recent activity</h3>${(stats.recent || []).length ? stats.recent.map((r) => `<div class="qitem"><span class="chip ${r.type === 'warn' ? 'warn' : 'danger'}">${r.type}</span><span class="grow muted">on <span class="mono">${r.userId}</span> — ${esc(r.reason || 'no reason')}</span><span class="muted small">${timeAgo(r.at)}</span></div>`).join('') : '<p class="muted small">No recent moderation actions.</p>'}</div>
                     <div class="card"><h3>Settings audit</h3>${(stats.audit || []).length ? stats.audit.map((a) => `<div class="qitem"><span class="grow"><b>${esc(a.section)}</b> <span class="muted">edited by</span> <span class="mono">${a.userId}</span></span><span class="muted small">${timeAgo(a.at)}</span></div>`).join('') : '<p class="muted small">No changes recorded yet.</p>'}</div>
                 </div>`;
