@@ -38,8 +38,8 @@ function commandCard(ctx, command) {
         .addTextDisplayComponents(
             new TextDisplayBuilder().setContent(
                 `**Example:**\n` +
-                    `\`${prefix}${command.name}${command.usage ? ` ${command.usage}` : ''}\`\n` +
-                    `\`${slashExample(command)}\``
+                    `\`\`\`${prefix}${command.name}${command.usage ? ` ${command.usage}` : ''}\`\`\`\n` +
+                    `\`\`\`${slashExample(command)}\`\`\``
             )
         );
 }
@@ -62,10 +62,11 @@ function categoryMenu(ctx, client, uid) {
             }))
         );
     return base({
-        title: 'Kotan — Help',
+        title: 'Kotan | Help',
         description:
-            `Prefix: \`${ctx.prefix}\` — every command also works as a slash command.\n` +
-            'Browse by category below, or use `help <command>` for a direct lookup.',
+            `Prefix: \`${ctx.prefix}\` | Slash command supported.\n` +
+            'Browse by category below, or use `help <command>` for a direct lookup.\n\n',
+            'Website: https://kotan.wisp.uno/'
     }).addActionRowComponents(new ActionRowBuilder().addComponents(select));
 }
 
@@ -82,7 +83,7 @@ function commandMenu(ctx, client, uid, category) {
                 description: (c.description || 'No description.').slice(0, 100),
             }))
         );
-    return base({ title: `${capitalize(category)} — pick a command` })
+    return base({ title: `${capitalize(category)} > pick a command` })
         .addActionRowComponents(new ActionRowBuilder().addComponents(select));
 }
 
