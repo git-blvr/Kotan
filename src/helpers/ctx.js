@@ -36,7 +36,9 @@ const fromInteraction = (interaction, extra) => {
     // Attachment options land in message-style form so commands using
     // `ctx.attachments.find(a => a.contentType.startsWith('image/'))` work.
     const attachments = new Collection();
-    for (const opt of interaction.options.data)
+    // `options` only exists on application-command interactions — component
+    // interactions (select menus, buttons) reaching ctx have none.
+    for (const opt of interaction.options?.data ?? [])
         if (opt.attachment) attachments.set(opt.attachment.id, opt.attachment);
 
     return {
