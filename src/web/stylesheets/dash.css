@@ -28,9 +28,17 @@
     display: flex; flex-direction: column; gap: var(--s5);
 }
 .dside .nav-logo { padding: var(--s2) var(--s2) 0; }
-.dnav { display: flex; flex-direction: column; gap: var(--s5); flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; }
-/* Pinned sidebar footer — Settings link + user chip never scroll away */
-.dfoot { flex: none; border-top: 1px solid var(--border-soft); padding-top: var(--s3); margin-top: var(--s3); }
+.dnav { display: flex; flex-direction: column; gap: var(--s5); flex: 1; min-height: 0; }
+/* Pinned sidebar footer — Settings link + user chip stay visible; items scroll under it */
+.dfoot {
+    position: sticky; bottom: 0; z-index: 5; flex: none;
+    border-top: 1px solid var(--border-soft); padding-top: var(--s3); margin-top: var(--s3);
+    margin-left: calc(-1 * var(--s3)); margin-right: calc(-1 * var(--s3));
+    padding-left: var(--s3); padding-right: var(--s3);
+    padding-bottom: 2px;
+    background: color-mix(in srgb, var(--bg) 82%, transparent);
+    backdrop-filter: blur(14px);
+}
 .dfoot .dnav { flex: none; overflow: visible; gap: 2px; }
 .dnav-group { display: flex; flex-direction: column; gap: 2px; }
 .dnav-group > span {
