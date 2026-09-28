@@ -672,7 +672,7 @@
 
         const memberAv = dcdnAv(CTX.user.id, CTX.user.avatar);
         const guildIcon = dcdnIcon(CTX.guild.id, CTX.guild.icon);
-        const botAv = CTX.bot ? dcdnAv(CTX.bot.id, CTX.bot.avatar) : '';
+        const botAv = CTX.bot ? (CTX.bot.avatarUrl || dcdnAv(CTX.bot.id, CTX.bot.avatar)) : '';
         const botName = CTX.settings.branding?.nickname || CTX.bot?.username || 'Kotan';
         const sampleFill = (s) => String(s ?? '')
             .replaceAll('{user}', `@${CTX.user.username}`)
@@ -1511,7 +1511,7 @@
                         ${fldHtml('Accent color', `<div class="clrrow"><input type="color" id="accentpick" value="${esc(/^#?[0-9a-f]{6}$/i.test(s.appearance.accent || '') ? '#' + s.appearance.accent.replace(/^#/, '') : '#f0a050')}"><input type="text" name="accent" value="${esc(s.appearance.accent || '')}" placeholder="#f0a050" maxlength="7"></div>`, 'hex — empty = default')}
                         ${fldHtml('Background image', `<div class="clrrow"><input type="text" name="bgimg" value="${esc(s.appearance.background || '')}" placeholder="https://…"><button type="button" class="btn sm" id="pick-bg">Browse…</button><input type="file" id="bgfile" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none"></div>`, 'URL or a file upload — empty = none')}
                     </div>${saveBar('appearance')}</div>
-                <div class="card"><h3>Bot profile</h3><p class="sub mb">Nickname applies to this server only; avatar and banner are global — they change everywhere. Click the preview to change them.</p>
+                <div class="card"><h3>Bot profile</h3><p class="sub mb">Everything here is per-server — nickname, avatar and banner change how Kotan looks in this guild only. Click the preview to change them.</p>
                     <div class="bpgrid">
                         <div>
                             ${fldHtml('Nickname in this server', txtIn('nickname', s.branding.nickname || '', CTX.bot?.username || 'Kotan'), 'empty = default name')}
@@ -1520,6 +1520,8 @@
                             <div class="flex">
                                 <button class="btn sm" id="pick-avatar">Change avatar…</button>
                                 <button class="btn sm" id="pick-banner">Add banner…</button>
+                                <button class="btn sm danger" id="rm-avatar">Remove avatar</button>
+                                <button class="btn sm danger" id="rm-banner">Remove banner</button>
                             </div>
                             <span class="muted small" id="avatar-status"></span>
                             ${saveBar('branding')}
@@ -1536,7 +1538,7 @@
                 const nick = nickIn.value.trim() || CTX.bot?.username || 'Kotan';
                 $('#profprev', page).innerHTML = svgProfile({
                     name: nick, username: `@${CTX.bot?.username || 'kotan'}`,
-                    avatar: CTX.bot ? dcdnAv(CTX.bot.id, CTX.bot.avatar) : '',
+                    avatar: CTX.bot ? (CTX.bot.avatarUrl || dcdnAv(CTX.bot.id, CTX.bot.avatar)) : '',
                     banner: $('[name=accent]', page)?.value || s.appearance.accent,
                     bannerImg: CTX.bot?.bannerUrl,
                 });
@@ -1560,10 +1562,24 @@
                     e.target.value = '';
                 };
             };
-            wirePick('#bavatar', 'avatar', (r) => { if (r.avatar && CTX.bot) CTX.bot.avatar = r.avatar; });
+            wirePick('#bavatar', 'avatar', (r) => { if (CTX.bot) CTX.bot.avatarUrl = r.avatarUrl || null; });
             wirePick('#bbanner', 'banner', (r) => { if (CTX.bot) CTX.bot.bannerUrl = r.bannerUrl || null; });
             $('#pick-avatar', page).onclick = () => $('#bavatar', page).click();
             $('#pick-banner', page).onclick = () => $('#bbanner', page).click();
+            const brandDel = async (key) => {
+                status.textContent = 'Removing…';
+                const r = await api(`/api/guilds/${guildId}/branding/${key}`, { method: 'DELETE' });
+                if (r.ok) {
+                    if (CTX.bot) {
+                        if (key === 'avatar') CTX.bot.avatarUrl = r.avatarUrl || null;
+                        else CTX.bot.bannerUrl = r.bannerUrl || null;
+                    }
+                    updProf();
+                    status.textContent = 'Removed — may take a minute to propagate.';
+                } else status.textContent = r.error || 'Failed';
+            };
+            $('#rm-avatar', page).onclick = () => brandDel('avatar');
+            $('#rm-banner', page).onclick = () => brandDel('banner');
             $('#profprev', page).addEventListener('click', (e) => {
                 const z = e.target.closest('[data-pick]')?.dataset.pick;
                 if (z === 'avatar') $('#bavatar', page).click();

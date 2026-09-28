@@ -110,7 +110,12 @@ module.exports = async (app) => {
                 id: req.client.user.id,
                 username: req.client.user.username,
                 avatar: req.client.user.avatar,
-                bannerUrl: req.client.user.bannerURL?.({ size: 512 }) || null,
+                // Guild-aware: member avatar/banner win over the global ones.
+                avatarUrl: req.guild.members.me?.displayAvatarURL({ size: 256 }) || null,
+                bannerUrl:
+                    req.guild.members.me?.bannerURL?.({ size: 512 }) ||
+                    req.client.user.bannerURL?.({ size: 512 }) ||
+                    null,
             },
             settings: await settings.getSettings(req.guild.id),
             modules,
@@ -164,20 +169,41 @@ module.exports = async (app) => {
             return reply.send({ ok: true, settings: result.settings });
         });
 
-        // Global avatar/banner changes — affect the bot everywhere, not just this guild.
-        const brandUpload = (key, apply, out) => async (req, reply) => {
+        // Per-guild avatar/banner via the member profile (PATCH members/@me) —
+        // the bot keeps its global identity elsewhere.
+        const brandUpload = (key) => async (req, reply) => {
             const dataUrl = String(req.body?.[key] || '');
             if (!/^data:image\/(png|jpe?g|webp|gif);base64,[a-z0-9+/=\s]+$/i.test(dataUrl) || dataUrl.length > 4_500_000)
                 return reply.code(400).send({ ok: false, error: 'Send a PNG/JPEG/WebP image under ~3MB' });
             try {
-                await apply(req.client, dataUrl);
-                return reply.send({ ok: true, ...out(req.client) });
+                await req.guild.members.editMe({ [key]: dataUrl });
+                const me = req.guild.members.me;
+                return reply.send({
+                    ok: true,
+                    avatarUrl: me?.displayAvatarURL({ size: 256 }) || null,
+                    bannerUrl: me?.bannerURL?.({ size: 512 }) || null,
+                });
             } catch (e) {
                 return reply.code(500).send({ ok: false, error: e.message });
             }
         };
-        gg.post('/branding/avatar', brandUpload('avatar', (c, d) => c.user.setAvatar(d), (c) => ({ avatar: c.user.avatar })));
-        gg.post('/branding/banner', brandUpload('banner', (c, d) => c.user.setBanner(d), (c) => ({ bannerUrl: c.user.bannerURL?.({ size: 512 }) || null })));
+        const brandClear = (key) => async (req, reply) => {
+            try {
+                await req.guild.members.editMe({ [key]: null });
+                const me = req.guild.members.me;
+                return reply.send({
+                    ok: true,
+                    avatarUrl: me?.displayAvatarURL({ size: 256 }) || null,
+                    bannerUrl: me?.bannerURL?.({ size: 512 }) || null,
+                });
+            } catch (e) {
+                return reply.code(500).send({ ok: false, error: e.message });
+            }
+        };
+        gg.post('/branding/avatar', brandUpload('avatar'));
+        gg.post('/branding/banner', brandUpload('banner'));
+        gg.delete('/branding/avatar', brandClear('avatar'));
+        gg.delete('/branding/banner', brandClear('banner'));
 
         // Dashboard wallpaper upload — stored per-guild under data/bgs and
         // served back through /bg (kept out of src/web so uploads aren't source files).
