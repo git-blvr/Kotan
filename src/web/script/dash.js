@@ -329,8 +329,11 @@
         const icon = g.icon ? `<img src="https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png?size=64" alt="">` : `<span class="gnoicon">${esc(g.name[0])}</span>`;
         const av = CTX.user.avatar ? `<img src="https://cdn.discordapp.com/avatars/${CTX.user.id}/${CTX.user.avatar}.png?size=64" alt="">` : '';
         const label = NAV.flatMap((x) => x.items).find(([slug]) => slug === activeSlug)?.[2] || 'Overview';
-        const nav = NAV.map((grp) => `<div class="dnav-group">${grp.group ? `<span>${grp.group}</span>` : ''}${grp.items.map(([slug, ic, lab]) =>
-            `<a href="#/${slug}" class="${slug === activeSlug ? 'active' : ''}"><span class="ic">${ic}</span>${lab}</a>`).join('')}</div>`).join('');
+        // Last NAV group (Settings) pins to the sidebar footer with the user
+        // chip — the main nav scrolls, those two stay put.
+        const link = ([slug, ic, lab]) => `<a href="#/${slug}" class="${slug === activeSlug ? 'active' : ''}"><span class="ic">${ic}</span>${lab}</a>`;
+        const nav = NAV.slice(0, -1).map((grp) => `<div class="dnav-group">${grp.group ? `<span>${grp.group}</span>` : ''}${grp.items.map(link).join('')}</div>`).join('');
+        const footNav = NAV[NAV.length - 1].items.map(link).join('');
         app.className = '';
         app.innerHTML = `<div class="dwrap">
             <aside class="dside" id="dside">
@@ -338,10 +341,11 @@
                 <a class="gsel" href="/dashboard" title="Switch server">${icon}<span class="gsel-t"><b>${esc(g.name)}</b><span>Switch server</span></span>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></a>
                 <nav class="dnav">${nav}</nav>
+                <div class="dfoot"><nav class="dnav foot">${footNav}</nav>
                 <div class="duser">
                     ${av}<div class="du"><b>${esc(CTX.user.username)}</b><span>@${esc(CTX.user.username)}</span></div>
                     <a class="icobtn" href="/auth/logout" title="Sign out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></a>
-                </div>
+                </div></div>
             </aside>
             <div class="dmain">
                 <div class="dtop">
@@ -352,17 +356,23 @@
             </div>
         </div>`;
         // Per-guild dashboard appearance — set in Settings > Dashboard appearance.
+        applyAppearance();
+        $('#burger').onclick = () => $('#dside').classList.toggle('open');
+        mountThemeFab();
+    }
+
+    function applyAppearance() {
         const ap = CTX.settings?.appearance || {};
         const root = document.documentElement.style;
         if (ap.accent) { root.setProperty('--accent', ap.accent); root.setProperty('--accent-2', ap.accent); }
         else { root.removeProperty('--accent'); root.removeProperty('--accent-2'); }
         const bg = $('.dwrap', app);
-        if (ap.background) {
-            bg.style.background = `url("${ap.background.replace(/["\\]/g, '')}") center / cover fixed`;
-            bg.style.backgroundBlendMode = 'normal';
-        } else bg.style.background = '';
-        $('#burger').onclick = () => $('#dside').classList.toggle('open');
-        mountThemeFab();
+        if (bg) {
+            if (ap.background) {
+                bg.style.background = `url("${ap.background.replace(/["\\]/g, '')}") center / cover fixed`;
+                bg.style.backgroundBlendMode = 'normal';
+            } else bg.style.background = '';
+        }
     }
 
     const saveBar = (section) => `<div class="flex mt"><button class="btn primary" data-save="${section}">Save changes</button></div>`;
@@ -551,7 +561,7 @@
         const badge = (cx, cy) => `
             <g class="pfbadge">
                 <circle cx="${cx}" cy="${cy}" r="11" fill="#111214" stroke="#3a3c42"/>
-                <path d="M${cx - 4.5} ${cy + 4.5} l1.5 -1.5 4.5 4.5 -1.5 1.5z M${cx + 0.5} ${cy - 0.5} l2 -2 a1.6 1.6 0 0 1 2.2 0 l-1.2 3.2 -3 -1z" fill="#dbdee1" transform="translate(-1,-1)"/>
+                <text x="${cx}" y="${cy + 4.5}" text-anchor="middle" font-family="${DFONT}" font-size="12" fill="#dbdee1">✎</text>
             </g>`;
         return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" class="dsvg" role="img">
             <defs><clipPath id="${id}"><rect width="${W}" height="${H}" rx="10"/></clipPath></defs>
@@ -1307,8 +1317,8 @@
                     ${saveBar('overview')}</div>
                 <div class="card"><h3>Dashboard appearance</h3><p class="sub mb">Only affects this server's dashboard — accent color and a background image behind the panel.</p>
                     <div class="grid2">
-                        ${fldHtml('Accent color', `<input type="text" name="accent" value="${esc(s.appearance.accent || '')}" placeholder="#f0a050" maxlength="7">`, 'hex — empty = default')}
-                        ${fldHtml('Background image URL', txtIn('bgimg', s.appearance.background || '', 'https://…'), 'empty = none')}
+                        ${fldHtml('Accent color', `<div class="clrrow"><input type="color" id="accentpick" value="${esc(/^#?[0-9a-f]{6}$/i.test(s.appearance.accent || '') ? '#' + s.appearance.accent.replace(/^#/, '') : '#f0a050')}"><input type="text" name="accent" value="${esc(s.appearance.accent || '')}" placeholder="#f0a050" maxlength="7"></div>`, 'hex — empty = default')}
+                        ${fldHtml('Background image', `<div class="clrrow"><input type="text" name="bgimg" value="${esc(s.appearance.background || '')}" placeholder="https://…"><button type="button" class="btn sm" id="pick-bg">Browse…</button><input type="file" id="bgfile" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none"></div>`, 'URL or a file upload — empty = none')}
                     </div>${saveBar('appearance')}</div>
                 <div class="card"><h3>Bot profile</h3><p class="sub mb">Nickname applies to this server only; avatar and banner are global — they change everywhere. Click the preview to change them.</p>
                     <div class="bpgrid">
@@ -1368,6 +1378,31 @@
                 if (z === 'avatar') $('#bavatar', page).click();
                 if (z === 'banner') $('#bbanner', page).click();
             });
+
+            // Appearance: color picker stays in sync with the hex field both ways.
+            const accentIn = $('[name=accent]', page);
+            const accentPick = $('#accentpick', page);
+            accentPick.oninput = () => { accentIn.value = accentPick.value; updProf(); };
+            accentIn.addEventListener('input', () => {
+                const v = accentIn.value.trim();
+                if (/^#?[0-9a-f]{6}$/i.test(v)) accentPick.value = `#${v.replace(/^#/, '')}`;
+            });
+
+            // Wallpaper browse — uploads to the server, saves, applies live.
+            $('#pick-bg', page).onclick = () => $('#bgfile', page).click();
+            $('#bgfile', page).onchange = async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                if (file.size > 6 * 1024 * 1024) return toast('Too big — max ~6MB', 'err');
+                const dataUrl = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(file); });
+                toast('Uploading wallpaper…');
+                const r = await api(`/api/guilds/${guildId}/appearance/bg`, { body: { image: dataUrl } });
+                if (r.ok) {
+                    $('[name=bgimg]', page).value = r.url;
+                    if (await save('appearance', { accent: accentIn.value, background: r.url })) applyAppearance();
+                } else toast(r.error || 'Upload failed', 'err');
+                e.target.value = '';
+            };
 
             bindSave(page, 'general', (el) => ({ prefix: formVals(el).prefix }));
             bindSave(page, 'access', () => ({ modRoles: mounts.modroles.get(), adminRoles: mounts.adminroles.get() }));

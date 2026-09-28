@@ -28,7 +28,10 @@
     display: flex; flex-direction: column; gap: var(--s5);
 }
 .dside .nav-logo { padding: var(--s2) var(--s2) 0; }
-.dnav { display: flex; flex-direction: column; gap: var(--s5); }
+.dnav { display: flex; flex-direction: column; gap: var(--s5); flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; }
+/* Pinned sidebar footer — Settings link + user chip never scroll away */
+.dfoot { flex: none; border-top: 1px solid var(--border-soft); padding-top: var(--s3); margin-top: var(--s3); }
+.dfoot .dnav { flex: none; overflow: visible; gap: 2px; }
 .dnav-group { display: flex; flex-direction: column; gap: 2px; }
 .dnav-group > span {
     font-size: 11px; font-weight: 700; text-transform: uppercase;
@@ -544,3 +547,12 @@ html { scroll-behavior: smooth; }
 .pfbadge{opacity:0;transition:opacity .18s ease}
 .pfpzone:hover .pfdim{opacity:.45}
 .pfpzone:hover .pfbadge{opacity:1}
+
+/* Color/file combo rows — picker swatch or browse button beside a text input */
+.clrrow{display:flex;gap:8px;align-items:center}
+.clrrow input[type=text]{flex:1;min-width:0}
+.clrrow input[type=color]{width:42px;height:38px;padding:3px;flex:none;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--bg-soft);cursor:pointer;transition:border-color var(--speed)}
+.clrrow input[type=color]:hover{border-color:var(--accent)}
+.clrrow input[type=color]::-webkit-color-swatch-wrapper{padding:2px}
+.clrrow input[type=color]::-webkit-color-swatch{border:0;border-radius:5px}
+.clrrow .btn{flex:none;white-space:nowrap}

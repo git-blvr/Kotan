@@ -1,4 +1,6 @@
 const { PermissionFlagsBits } = require('discord.js');
+const fs = require('fs');
+const path = require('path');
 const db = require('../../utils/database');
 const config = require('../../config');
 const env = require('../env');
@@ -163,6 +165,29 @@ module.exports = async (app) => {
         };
         gg.post('/branding/avatar', brandUpload('avatar', (c, d) => c.user.setAvatar(d), (c) => ({ avatar: c.user.avatar })));
         gg.post('/branding/banner', brandUpload('banner', (c, d) => c.user.setBanner(d), (c) => ({ bannerUrl: c.user.bannerURL?.({ size: 512 }) || null })));
+
+        // Dashboard wallpaper upload — stored per-guild under data/bgs and
+        // served back through /bg (kept out of src/web so uploads aren't source files).
+        const BG_DIR = path.join(__dirname, '..', '..', '..', 'data', 'bgs');
+        const bgFile = (gid) => (fs.existsSync(BG_DIR) ? fs.readdirSync(BG_DIR).find((f) => f.startsWith(`${gid}.`)) : null);
+        gg.post('/appearance/bg', async (req, reply) => {
+            const dataUrl = String(req.body?.image || '');
+            const m = /^data:image\/(png|jpe?g|webp|gif);base64,([a-z0-9+/=\s]+)$/i.exec(dataUrl);
+            if (!m || dataUrl.length > 8_000_000)
+                return reply.code(400).send({ ok: false, error: 'Send a PNG/JPEG/WebP/GIF under ~6MB' });
+            fs.mkdirSync(BG_DIR, { recursive: true });
+            const old = bgFile(req.guild.id);
+            if (old) fs.rmSync(path.join(BG_DIR, old), { force: true });
+            const ext = m[1].replace('jpeg', 'jpg');
+            fs.writeFileSync(path.join(BG_DIR, `${req.guild.id}.${ext}`), Buffer.from(m[2], 'base64'));
+            return reply.send({ ok: true, url: `/api/guilds/${req.guild.id}/bg?v=${Date.now()}` });
+        });
+        gg.get('/bg', async (req, reply) => {
+            const f = bgFile(req.guild.id);
+            if (!f) return reply.code(404).send({ error: 'No wallpaper set' });
+            const mime = { png: 'image/png', jpg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif' }[path.extname(f).slice(1)] || 'image/png';
+            return reply.type(mime).header('cache-control', 'public, max-age=3600').send(fs.createReadStream(path.join(BG_DIR, f)));
+        });
 
         gg.get('/tags', async (req, reply) =>
             reply.send({ tags: await db.getTags(req.guild.id) }));
