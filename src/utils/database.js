@@ -124,6 +124,7 @@ const DEFAULT_SETTINGS = {
     appearance: {
         accent: '',         // hex color; '' = default accent
         background: '',     // image URL behind the shell; '' = none
+        theme: '',          // '' = default; 'glass' = glassmorphism
     },
     // Bot presence inside this guild.
     branding: {

@@ -260,6 +260,7 @@
         // Clear per-guild theming left over from a previous guild view.
         document.documentElement.style.removeProperty('--accent');
         document.documentElement.style.removeProperty('--accent-2');
+        document.documentElement.dataset.glass = '';
         app.className = 'dmain';
         app.innerHTML = `<div class="pkwrap">
             <div class="pk-head">
@@ -365,6 +366,7 @@
 
     function applyAppearance() {
         const ap = CTX.settings?.appearance || {};
+        document.documentElement.dataset.glass = ap.theme === 'glass' ? '1' : '';
         const root = document.documentElement.style;
         if (ap.accent) { root.setProperty('--accent', ap.accent); root.setProperty('--accent-2', ap.accent); }
         else { root.removeProperty('--accent'); root.removeProperty('--accent-2'); }
@@ -1510,6 +1512,7 @@
                     <div class="grid2">
                         ${fldHtml('Accent color', `<div class="clrrow"><input type="color" id="accentpick" value="${esc(/^#?[0-9a-f]{6}$/i.test(s.appearance.accent || '') ? '#' + s.appearance.accent.replace(/^#/, '') : '#f0a050')}"><input type="text" name="accent" value="${esc(s.appearance.accent || '')}" placeholder="#f0a050" maxlength="7"></div>`, 'hex — empty = default')}
                         ${fldHtml('Background image', `<div class="clrrow"><input type="text" name="bgimg" value="${esc(s.appearance.background || '')}" placeholder="https://…"><button type="button" class="btn sm" id="pick-bg">Browse…</button><input type="file" id="bgfile" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none"></div>`, 'URL or a file upload — empty = none')}
+                        ${fldHtml('Theme', selSlot('theme'), 'glass = translucent blurred panels — pairs well with a background image')}
                     </div>${saveBar('appearance')}</div>
                 <div class="card"><h3>Bot profile</h3><p class="sub mb">Everything here is per-server — nickname, avatar and banner change how Kotan looks in this guild only. Click the preview to change them.</p>
                     <div class="bpgrid">
@@ -1531,6 +1534,10 @@
 
             mountSelect(page, 'modroles', { multi: true, options: roOpts(DATA.roles), value: s.access.modRoles, placeholder: 'None' });
             mountSelect(page, 'adminroles', { multi: true, options: roOpts(DATA.roles), value: s.access.adminRoles, placeholder: 'None' });
+            mountSelect(page, 'theme', {
+                options: [{ value: '', label: 'Default' }, { value: 'glass', label: 'Glass' }],
+                value: s.appearance.theme || '', placeholder: 'Default',
+            });
 
             // Live Discord profile popout — nickname + accent/banner from the form.
             const nickIn = $('[name=nickname]', page);
@@ -1619,7 +1626,7 @@
             });
             bindSave(page, 'appearance', (el) => {
                 const f = formVals(el);
-                return { accent: f.accent, background: f.bgimg };
+                return { accent: f.accent, background: f.bgimg, theme: f.theme };
             });
             bindSave(page, 'branding', (el) => ({ nickname: formVals(el).nickname }));
         },

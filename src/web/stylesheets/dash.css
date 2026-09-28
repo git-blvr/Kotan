@@ -566,3 +566,44 @@ html { scroll-behavior: smooth; }
 .shoprow { flex-wrap: wrap; }
 .shoprow [class^="rr_"], .shoprow [class^="rc_"], .shoprow [class*=" rr_"], .shoprow [class*=" rc_"] { display: inline-flex; gap: 6px; align-items: center; }
 .shoprow .dsel { min-width: 110px; }
+
+/* ---- glassmorphism (per-guild: Settings > Dashboard appearance > Theme) ---- */
+[data-glass='1'] {
+    --bg: #06080c;
+    --bg-soft: rgba(14 17 24 / .72);
+    --panel: rgba(255 255 255 / .05);
+    --panel-solid: rgba(17 21 30 / .85);
+    --panel-2: rgba(255 255 255 / .08);
+    --border: rgba(255 255 255 / .17);
+    --border-soft: rgba(255 255 255 / .10);
+}
+/* depth layer behind the panels when no custom wallpaper is set —
+   an inline wallpaper background overrides this entirely */
+[data-glass='1'] .dwrap {
+    background:
+        radial-gradient(1100px 750px at 12% -12%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 62%),
+        radial-gradient(850px 650px at 108% 18%, rgba(70 110 255 / .16), transparent 55%),
+        radial-gradient(700px 900px at 50% 115%, rgba(160 70 255 / .12), transparent 60%),
+        var(--bg);
+}
+[data-glass='1'] .card,
+[data-glass='1'] .gsel,
+[data-glass='1'] .duser,
+[data-glass='1'] .dtop,
+[data-glass='1'] .stat2,
+[data-glass='1'] .modrow,
+[data-glass='1'] .srv,
+[data-glass='1'] .pk-search,
+[data-glass='1'] .theme-panel,
+[data-glass='1'] .dsel > button,
+[data-glass='1'] .dsel .pop,
+[data-glass='1'] .dsel .pop .search,
+[data-glass='1'] .modal,
+[data-glass='1'] .toast,
+[data-glass='1'] .subnav {
+    backdrop-filter: blur(18px) saturate(1.45);
+    -webkit-backdrop-filter: blur(18px) saturate(1.45);
+}
+/* keep dropdown pills on the frosted token so hover states stay translucent */
+[data-glass='1'] .dnav a:hover,
+[data-glass='1'] .dnav a.on { background: var(--panel-2); }

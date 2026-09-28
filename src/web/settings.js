@@ -27,7 +27,7 @@ const DEFAULTS = {
     economy: { currency: null, dailyBase: null, dailyStreak: null, dailyMaxStreak: null, startBalance: null, shop: [] },
     games: { guessReward: 150, scrambleReward: 200, winMultiplier: 1, maxBet: 0, per: {} },
     boosts: { channel: null, message: '{user} just boosted {server}! 🚀', roleId: null },
-    appearance: { accent: '', background: '' },
+    appearance: { accent: '', background: '', theme: '' },
     branding: { nickname: '' },
     leveling: {
         enabled: false, xpMin: 15, xpMax: 25, cooldown: 60, multiplier: 1,
@@ -367,6 +367,7 @@ const SECTIONS = {
         const c = String(f.accent || '').trim();
         s.appearance.accent = /^#?[0-9a-fA-F]{6}$/.test(c) ? `#${c.replace('#', '')}` : '';
         s.appearance.background = str(f.background, 500) || '';
+        s.appearance.theme = f.theme === 'glass' ? 'glass' : '';
     },
     branding(s, f) {
         s.branding.nickname = str(f.nickname, 32) ?? '';
