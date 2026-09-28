@@ -387,14 +387,15 @@
         page.insertBefore(nav, page.firstChild);
         $$('.snv', nav).forEach((b) => (b.onclick = () => {
             const t = $(`.card[data-sec="${b.dataset.sec}"]`, page);
-            if (t) window.scrollTo({ top: t.getBoundingClientRect().top + window.scrollY - 76, behavior: 'smooth' });
+            if (t) window.scrollTo({ top: t.getBoundingClientRect().top + window.scrollY - 120, behavior: 'smooth' });
         }));
         if (scrollSpy) window.removeEventListener('scroll', scrollSpy);
         scrollSpy = () => {
+            const line = nav.getBoundingClientRect().bottom + 16;
             let cur = heads[0]?.closest('.card')?.dataset.sec;
             for (const h of heads) {
                 const card = h.closest('.card');
-                if (card.getBoundingClientRect().top < 160) cur = card.dataset.sec;
+                if (card.getBoundingClientRect().top < line) cur = card.dataset.sec;
             }
             $$('.snv', nav).forEach((b) => b.classList.toggle('on', b.dataset.sec === cur));
         };
