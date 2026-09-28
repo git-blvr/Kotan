@@ -128,22 +128,40 @@ module.exports = async (app) => {
                 db.getAudit(id, 15),
                 db.getRecentModActions(id, 5),
             ]);
-            return reply.send({ usage, growth, mod, audit, recent });
+            return reply.send({ usage, growth, mod, audit, recent, ping: req.client?.ws.ping ?? -1 });
         });
 
         gg.post('/settings', async (req, reply) => {
             const { section, fields } = req.body || {};
             const result = await settings.applySection(req.guild.id, req.session.user.id, String(section || ''), fields);
             if (result.error) return reply.code(result.status).send({ ok: false, error: result.error });
+            // Branding applies immediately — rename the bot inside this guild.
+            if (section === 'branding' && req.guild) {
+                const nick = result.settings.branding?.nickname || null;
+                req.guild.members.me?.setNickname(nick).catch(() => {});
+            }
             return reply.send({ ok: true, settings: result.settings });
+        });
+
+        // Global avatar change — affects the bot everywhere, not just this guild.
+        gg.post('/branding/avatar', async (req, reply) => {
+            const dataUrl = String(req.body?.avatar || '');
+            if (!/^data:image\/(png|jpe?g|webp);base64,[a-z0-9+/=\s]+$/i.test(dataUrl) || dataUrl.length > 4_000_000)
+                return reply.code(400).send({ ok: false, error: 'Send a PNG/JPEG/WebP image under ~3MB' });
+            try {
+                await req.client.user.setAvatar(dataUrl);
+                return reply.send({ ok: true });
+            } catch (e) {
+                return reply.code(500).send({ ok: false, error: e.message });
+            }
         });
 
         gg.get('/tags', async (req, reply) =>
             reply.send({ tags: await db.getTags(req.guild.id) }));
 
         gg.post('/tags', async (req, reply) => {
-            const { name, content } = req.body || {};
-            const tag = await db.addTag(req.guild.id, String(name || '').toLowerCase(), String(content || ''), req.session.user.id);
+            const { name, content, trigger } = req.body || {};
+            const tag = await db.addTag(req.guild.id, String(name || '').toLowerCase(), String(content || ''), req.session.user.id, trigger === true);
             if (!tag) return reply.code(400).send({ ok: false, error: 'Invalid tag name (a-z 0-9 _ -, max 32) or empty content' });
             return reply.send({ ok: true, tag });
         });

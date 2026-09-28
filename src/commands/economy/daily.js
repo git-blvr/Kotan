@@ -6,8 +6,11 @@ const config = require('../../config');
 
 async function run(ctx) {
     const { daily } = config.economy;
-    const cur = ctx.settings?.economy?.currency;
-    const base = ctx.settings?.economy?.dailyBase ?? daily.base;
+    const eco = ctx.settings?.economy;
+    const cur = eco?.currency;
+    const base = eco?.dailyBase ?? daily.base;
+    const streakBonus = eco?.dailyStreak ?? daily.streakBonus;
+    const maxBonus = eco?.dailyMaxStreak ?? daily.maxStreakBonus;
     const profile = await db.getProfile(ctx.guild.id, ctx.user.id);
     const now = Date.now();
 
@@ -21,7 +24,7 @@ async function run(ctx) {
 
     // Streak continues if claimed within the window, otherwise resets to 1.
     const streak = now - profile.lastDaily < daily.streakWindow ? profile.dailyStreak + 1 : 1;
-    const bonus = Math.min(streak * daily.streakBonus, daily.maxStreakBonus);
+    const bonus = Math.min(streak * streakBonus, maxBonus);
     const reward = base + bonus;
 
     profile.wallet += reward;

@@ -71,9 +71,12 @@ const DEFAULT_SETTINGS = {
         raidMax: 0,         // joins per window that trigger a raid alert; 0 = off
         raidWindow: 10,     // seconds
         raidAction: 'alert',// 'alert' (modlog) | 'kick' (kick the joiner)
+        exemptRoles: [],    // role ids automod never flags
+        exemptChannels: [], // channel ids automod never scans
     },
     logging: {
         channel: null,          // null = logging off
+        channels: {},           // event type -> channelId override (log-per-channel)
         messageDelete: false,
         messageEdit: false,
         joinLeave: false,
@@ -82,8 +85,12 @@ const DEFAULT_SETTINGS = {
     welcome: {
         channel: null,      // welcome off when null
         message: 'Welcome {user} to {server}! You are member #{members}.',
+        // optional rich card — when enabled, replaces the plain message
+        // style: 'embed' (classic embed) | 'cv2' (Kotan container)
+        embed: { enabled: false, style: 'embed', title: '', description: '', color: '', footer: '', thumbnail: true },
         goodbyeChannel: null,
         goodbyeMessage: '**{username}** left {server}.',
+        goodbyeEmbed: { enabled: false, style: 'embed', title: '', description: '', color: '', footer: '', thumbnail: true },
     },
     roles: {
         autorole: null,     // role id granted on join
@@ -92,6 +99,32 @@ const DEFAULT_SETTINGS = {
     economy: {
         currency: null,     // null -> config.economy.currency
         dailyBase: null,    // null -> config.economy.daily.base
+        dailyStreak: null,  // null -> config.economy.daily.streakBonus
+        dailyMaxStreak: null, // null -> config.economy.daily.maxStreakBonus
+        startBalance: null, // wallet for new profiles; null -> 0
+        shop: [],           // [{id,name,price,description}] — overrides config.shop when set
+    },
+    // Game tuning — prizes and wager limits.
+    games: {
+        guessReward: 150,   // flat payout for .guess
+        scrambleReward: 200,// flat payout for .scramble
+        winMultiplier: 1,   // scales wager wins (1 = bet back x2 net, standard)
+        maxBet: 0,          // cap on wagers; 0 = unlimited
+    },
+    // Server-boost perks — fires on premium_since appearing.
+    boosts: {
+        channel: null,      // boost announcement channel; null = off
+        message: '{user} just boosted {server}! 🚀',
+        roleId: null,       // role granted to boosters
+    },
+    // Per-guild dashboard theming — applies when viewing this guild's panel.
+    appearance: {
+        accent: '',         // hex color; '' = default accent
+        background: '',     // image URL behind the shell; '' = none
+    },
+    // Bot presence inside this guild.
+    branding: {
+        nickname: '',       // bot nickname here; '' = default name
     },
     leveling: {
         enabled: false,
@@ -114,6 +147,8 @@ const DEFAULT_SETTINGS = {
     },
     // Discord roles allowed to use each command module. Empty = everyone.
     moduleRoles: {},        // category -> [roleIds]
+    // Channels a module may be used in. Empty = anywhere.
+    moduleChannels: {},     // category -> [channelIds]
     // Scoped disables: a command blocked in a channel and/or a time window.
     // { command, channelId|null, start|'HH:MM'|null, end|'HH:MM'|null, tz }
     commandRules: [],
@@ -125,13 +160,15 @@ const DEFAULT_SETTINGS = {
 
 // Nested sections must merge key-by-key — a saved doc written before a new
 // sub-key existed shouldn't lose the defaults.
-const NESTED = ['automod', 'logging', 'welcome', 'roles', 'economy', 'leveling', 'access', 'overview'];
+const NESTED = ['automod', 'logging', 'welcome', 'roles', 'economy', 'leveling', 'access', 'overview', 'games', 'boosts', 'appearance', 'branding'];
 
 async function getGuildSettings(guildId) {
     const hit = settingsCache.get(guildId);
     if (hit && hit.expires > Date.now()) return hit.value;
     const value = { ...DEFAULT_SETTINGS, ...(await guilds.get(guildId)) };
     for (const k of NESTED) value[k] = { ...DEFAULT_SETTINGS[k], ...(value[k] || {}) };
+    value.welcome.embed = { ...DEFAULT_SETTINGS.welcome.embed, ...(value.welcome.embed || {}) };
+    value.welcome.goodbyeEmbed = { ...DEFAULT_SETTINGS.welcome.goodbyeEmbed, ...(value.welcome.goodbyeEmbed || {}) };
     settingsCache.set(guildId, { value, expires: Date.now() + SETTINGS_TTL });
     return value;
 }
@@ -303,7 +340,10 @@ const DEFAULT_PROFILE = {
 
 async function getProfile(guildId, userId) {
     const profile = await profiles.get(key(guildId, userId));
-    return { ...DEFAULT_PROFILE, ...(profile || {}) };
+    if (profile) return { ...DEFAULT_PROFILE, ...profile };
+    // New member — seed the wallet with the guild's configured start balance.
+    const start = (await getGuildSettings(guildId).catch(() => null))?.economy?.startBalance ?? 0;
+    return { ...DEFAULT_PROFILE, wallet: start };
 }
 
 async function saveProfile(guildId, userId, profile) {
@@ -505,10 +545,11 @@ async function getTag(guildId, name) {
     return (await getTags(guildId))[name] || null;
 }
 
-async function addTag(guildId, name, content, authorId) {
+async function addTag(guildId, name, content, authorId, trigger = false) {
     if (!TAG_NAME.test(name)) return null;
     const all = await getTags(guildId);
-    all[name] = { content: String(content).slice(0, 1000), authorId, uses: 0, at: Date.now() };
+    // trigger: the tag fires on a bare first word, no prefix needed
+    all[name] = { content: String(content).slice(0, 1000), authorId, uses: 0, at: Date.now(), trigger: !!trigger };
     await tags.set(guildId, all);
     return all[name];
 }
@@ -521,11 +562,12 @@ async function deleteTag(guildId, name) {
     return true;
 }
 
-// Returns the tag content and bumps its use counter.
-async function useTag(guildId, name) {
+// Returns the tag content and bumps its use counter. `triggerOnly` restricts
+// to tags flagged as bare-word triggers (fires without a prefix).
+async function useTag(guildId, name, triggerOnly = false) {
     const all = await getTags(guildId);
     const tag = all[name];
-    if (!tag) return null;
+    if (!tag || (triggerOnly && !tag.trigger)) return null;
     tag.uses = (tag.uses || 0) + 1;
     await tags.set(guildId, all);
     return tag.content;

@@ -24,7 +24,9 @@ async function logEvent(client, guildId, type, fields) {
         const log = settings?.logging;
         if (!log?.channel || !log[meta.flag]) return;
 
-        const channel = await client.channels.fetch(log.channel).catch(() => null);
+        // Log-per-channel: an event can route to its own channel, else the main one.
+        const channelId = log.channels?.[type] || log.channel;
+        const channel = await client.channels.fetch(channelId).catch(() => null);
         if (!channel?.isTextBased()) return;
 
         const container = base({

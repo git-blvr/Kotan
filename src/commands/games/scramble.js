@@ -2,6 +2,7 @@ const { base, cv2 } = require('../../helpers/embeds');
 const { awaitReply } = require('../../helpers/collect');
 const { formatCoins } = require('../../helpers/format');
 const { fromMessage, fromInteraction } = require('../../helpers/ctx');
+const { gameCfg } = require('../../helpers/gamecfg');
 const db = require('../../utils/database');
 const config = require('../../config');
 
@@ -10,7 +11,6 @@ const WORDS = [
     'library', 'quantum', 'festival', 'horizon', 'galaxy', 'phoenix', 'cascade',
     'meadow', 'lantern', 'compass', 'whisper', 'volcano', 'harvest',
 ];
-const REWARD = 200;
 
 function scramble(word) {
     let out = word;
@@ -22,6 +22,7 @@ function scramble(word) {
 async function run(ctx) {
     const word = WORDS[Math.floor(Math.random() * WORDS.length)];
     const cur = ctx.settings?.economy?.currency;
+    const reward = gameCfg(ctx.settings).scrambleReward;
 
     await ctx.reply(
         cv2(
@@ -29,7 +30,7 @@ async function run(ctx) {
                 title: 'Word Scramble',
                 description:
                     `Unscramble this: \`${scramble(word)}\`\n` +
-                    `First correct answer wins ${formatCoins(REWARD, cur)} — 30s.`,
+                    `First correct answer wins ${formatCoins(reward, cur)} — 30s.`,
             })
         )
     );
@@ -46,14 +47,14 @@ async function run(ctx) {
         );
 
     const profile = await db.getProfile(ctx.guild.id, winner.author.id);
-    profile.wallet += REWARD;
+    profile.wallet += reward;
     await db.saveProfile(ctx.guild.id, winner.author.id, profile);
 
     return ctx.channel.send(
         cv2(
             base({
                 color: config.colors.success,
-                description: `⚡ **${winner.author.username}** unscrambled **${word}** and won ${formatCoins(REWARD, cur)}!`,
+                description: `⚡ **${winner.author.username}** unscrambled **${word}** and won ${formatCoins(reward, cur)}!`,
             })
         )
     );

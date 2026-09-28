@@ -2,16 +2,17 @@ const { base, cv2 } = require('../../helpers/embeds');
 const { awaitReply } = require('../../helpers/collect');
 const { formatCoins } = require('../../helpers/format');
 const { fromMessage, fromInteraction } = require('../../helpers/ctx');
+const { gameCfg } = require('../../helpers/gamecfg');
 const db = require('../../utils/database');
 const config = require('../../config');
 
 const MAX_NUMBER = 50;
 const TRIES = 4;
-const REWARD = 150;
 
 async function run(ctx) {
     const target = 1 + Math.floor(Math.random() * MAX_NUMBER);
     const cur = ctx.settings?.economy?.currency;
+    const reward = gameCfg(ctx.settings).guessReward;
     const filter = (m) => m.author.id === ctx.user.id && /^\d+$/.test(m.content.trim());
 
     await ctx.reply(
@@ -20,7 +21,7 @@ async function run(ctx) {
                 title: 'Number Guess',
                 description:
                     `I'm thinking of a number between **1** and **${MAX_NUMBER}**.\n` +
-                    `You have **${TRIES}** guesses, 30s each. Prize: ${formatCoins(REWARD, cur)}.`,
+                    `You have **${TRIES}** guesses, 30s each. Prize: ${formatCoins(reward, cur)}.`,
             })
         )
     );
@@ -35,13 +36,13 @@ async function run(ctx) {
         const n = Number.parseInt(guess.content.trim(), 10);
         if (n === target) {
             const profile = await db.getProfile(ctx.guild.id, ctx.user.id);
-            profile.wallet += REWARD;
+            profile.wallet += reward;
             await db.saveProfile(ctx.guild.id, ctx.user.id, profile);
             return ctx.channel.send(
                 cv2(
                     base({
                         color: config.colors.success,
-                        description: `🎯 **${ctx.user.username}** got it — **${target}**! Won ${formatCoins(REWARD, cur)}.`,
+                        description: `🎯 **${ctx.user.username}** got it — **${target}**! Won ${formatCoins(reward, cur)}.`,
                     })
                 )
             );

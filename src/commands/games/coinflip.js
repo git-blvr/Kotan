@@ -4,6 +4,7 @@ const { formatCoins, parseAmount } = require('../../helpers/format');
 const { resolveMember } = require('../../helpers/resolve');
 const { awaitReply } = require('../../helpers/collect');
 const { fromMessage, fromInteraction } = require('../../helpers/ctx');
+const { betCapped, scaled } = require('../../helpers/gamecfg');
 const db = require('../../utils/database');
 const config = require('../../config');
 
@@ -35,9 +36,11 @@ async function run(ctx, guess, betInput, pvpTarget) {
     const cur = ctx.settings?.economy?.currency;
     if (bet > profile.wallet)
         return sendError(ctx, `You only have ${formatCoins(profile.wallet, cur)} in your wallet.`);
+    if (betCapped(ctx, bet, cur)) return;
 
     const won = guess === result;
-    profile.wallet += won ? bet : -bet;
+    const delta = won ? scaled(ctx.settings, bet) : -bet;
+    profile.wallet += delta;
     await db.saveProfile(ctx.guild.id, ctx.user.id, profile);
 
     return ctx.reply(
@@ -46,7 +49,7 @@ async function run(ctx, guess, betInput, pvpTarget) {
                 title: 'Coinflip',
                 color: won ? config.colors.success : config.colors.error,
                 description:
-                    `The coin landed on **${result}** — you ${won ? 'won' : 'lost'} ${formatCoins(bet, cur)}.\n` +
+                    `The coin landed on **${result}** — you ${won ? 'won' : 'lost'} ${formatCoins(Math.abs(delta), cur)}.\n` +
                     `Wallet: ${formatCoins(profile.wallet, cur)}`,
             })
         )
@@ -65,6 +68,7 @@ async function pvp(ctx, target, betInput, guess) {
         return sendError(ctx, `How much? Usage: \`${ctx.prefix}cf @member <bet> [heads|tails]\``);
     if (bet > meProfile.wallet)
         return sendError(ctx, `You only have ${formatCoins(meProfile.wallet, cur)} in your wallet.`);
+    if (betCapped(ctx, bet, cur)) return;
 
     const theirProfile = await db.getProfile(ctx.guild.id, target.id);
     if (bet > theirProfile.wallet)

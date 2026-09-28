@@ -9,8 +9,11 @@ const { logModAction } = require('./modlog');
 
 const INVITE_RE = /(?:discord\.gg|discord(?:app)?\.com\/invite)\/[a-z0-9-]+/i;
 
-function isExempt(message) {
+function isExempt(message, am) {
     if (config.ownerIds.includes(message.author.id)) return true;
+    // Dashboard whitelist — roles and channels that bypass every check.
+    if (am?.exemptChannels?.includes(message.channel.id) || am?.exemptChannels?.includes(message.channel.parentId)) return true;
+    if (am?.exemptRoles?.length && message.member?.roles.cache.some((r) => am.exemptRoles.includes(r.id))) return true;
     const perms = message.member?.permissions;
     return (
         perms?.has(PermissionFlagsBits.ManageMessages) ||
@@ -31,7 +34,7 @@ async function deleteAndLog(message, client, title, extra) {
 
 // Returns true when the message was actioned — caller must stop processing.
 async function checkMessage(message, am, client) {
-    if (!am || isExempt(message)) return false;
+    if (!am || isExempt(message, am)) return false;
     const content = message.content;
 
     if (am.antiInvite && INVITE_RE.test(content)) {

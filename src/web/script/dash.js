@@ -257,6 +257,9 @@
 
     // ---------- PICKER (/dashboard) ----------
     async function renderPicker() {
+        // Clear per-guild theming left over from a previous guild view.
+        document.documentElement.style.removeProperty('--accent');
+        document.documentElement.style.removeProperty('--accent-2');
         app.className = 'dmain';
         app.innerHTML = `<div class="pkwrap">
             <div class="pk-head">
@@ -302,16 +305,19 @@
             ['overview', svg('<path d="M3 12h4l2.5-7 4 14 2.5-7H21"/>'), 'Overview'],
             ['modules', svg('<rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/>'), 'Modules'],
             ['commands', svg('<path d="M5 7l4 4-4 4"/><path d="M12 17h7"/><rect x="3" y="4" width="18" height="16" rx="2"/>'), 'Commands'],
-            ['custom-commands', svg('<path d="M17 3l4 4L8 20l-5 1 1-5L17 3z"/>'), 'Custom Commands'],
+            ['triggers', svg('<path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z"/>'), 'Triggers'],
         ] },
         { group: 'Safety', items: [
             ['automod', svg('<path d="M12 3l8 3v6c0 4.5-3.2 7.6-8 9-4.8-1.4-8-4.5-8-9V6l8-3z"/><path d="M9 12l2 2 4-4"/>'), 'Automod'],
-            ['mod-log', svg('<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4"/><path d="M9.5 12h6M9.5 16h6M9.5 8h2"/>'), 'Mod Log'],
+            ['logging', svg('<path d="M4 5h16M4 12h16M4 19h10"/>'), 'Logging'],
         ] },
         { group: 'Engagement', items: [
-            ['logging', svg('<path d="M4 5h16M4 12h16M4 19h10"/>'), 'Logging'],
             ['welcome', svg('<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>'), 'Welcome'],
             ['roles', svg('<path d="M3 12V4h8l9 9-8 8-9-9z"/><circle cx="7.5" cy="8.5" r="1.2" fill="currentColor" stroke="none"/>'), 'Roles'],
+            ['leveling', svg('<path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/>'), 'Leveling'],
+            ['economy', svg('<circle cx="12" cy="12" r="8.5"/><path d="M12 7v10M15 9.2c-.6-1-1.7-1.4-3-1.4-1.7 0-3 .9-3 2.4 0 3.2 6 1.7 6 4.9 0 1.5-1.3 2.4-3 2.4-1.3 0-2.4-.5-3-1.5"/>'), 'Economy'],
+            ['games', svg('<rect x="2.5" y="7.5" width="19" height="11" rx="5.5"/><path d="M8 11v4M6 13h4"/><circle cx="15.5" cy="12" r="0.8" fill="currentColor" stroke="none"/><circle cx="18" cy="14" r="0.8" fill="currentColor" stroke="none"/>'), 'Games'],
+            ['boosting', svg('<path d="M5 15c-1.5 1.3-2 5-2 5s3.7-.5 5-2"/><path d="M9 15l-2-2c.5-2.6 1.6-5.2 3.4-7C12.7 3.7 15.5 2.5 21 3c.5 5.5-.7 8.3-3 10.6-1.8 1.8-4.4 2.9-7 3.4z"/><circle cx="15" cy="9" r="1.6"/>'), 'Boosting'],
         ] },
         { group: '', items: [
             ['settings', svg('<circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M4.9 4.9l2.2 2.2M16.9 16.9l2.2 2.2M2.5 12h3M18.5 12h3M4.9 19.1l2.2-2.2M16.9 7.1l2.2-2.2"/>'), 'Settings'],
@@ -345,6 +351,16 @@
                 <div class="dcontent"><div id="page" class="dpage"></div></div>
             </div>
         </div>`;
+        // Per-guild dashboard appearance — set in Settings > Dashboard appearance.
+        const ap = CTX.settings?.appearance || {};
+        const root = document.documentElement.style;
+        if (ap.accent) { root.setProperty('--accent', ap.accent); root.setProperty('--accent-2', ap.accent); }
+        else { root.removeProperty('--accent'); root.removeProperty('--accent-2'); }
+        const bg = $('.dwrap', app);
+        if (ap.background) {
+            bg.style.background = `url("${ap.background.replace(/["\\]/g, '')}") center / cover fixed`;
+            bg.style.backgroundBlendMode = 'normal';
+        } else bg.style.background = '';
         $('#burger').onclick = () => $('#dside').classList.toggle('open');
         mountThemeFab();
     }
@@ -401,6 +417,10 @@
                     icon: svg('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>'),
                     val: stats.mod?.tempbansTotal ?? 0, series: modDays.map((d) => d.tempbans || 0),
                     delta: delta(stats.mod?.tempbansWeek, stats.mod?.tempbansPrevWeek) },
+                ping: { label: 'Bot ping', color: 'var(--accent)',
+                    icon: svg('<path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z"/>'),
+                    val: stats.ping >= 0 ? stats.ping : '—', suffix: 'ms', series: [],
+                    delta: '' },
             };
             const cards = (s.overview.cards?.length ? s.overview.cards : Object.keys(CARDS));
 
@@ -420,8 +440,8 @@
                 <div class="statrow">${cards.map((c) => CARDS[c]).filter(Boolean).map((d) => `
                     <div class="stat2">
                         <div class="s2h"><span class="s2i">${d.icon}</span>${d.label}${d.delta || ''}</div>
-                        <b>${(d.val ?? 0).toLocaleString()}</b>
-                        <div class="s2s">${sparkline(d.series, d.color, 400, 60)}</div>
+                        <b>${typeof d.val === 'number' ? d.val.toLocaleString() : d.val}${d.suffix ? `<span class="muted" style="font-size:14px;font-weight:600"> ${d.suffix}</span>` : ''}</b>
+                        <div class="s2s">${d.series.length ? sparkline(d.series, d.color, 400, 60) : ''}</div>
                     </div>`).join('')}</div>
                 <div class="card">
                     <div class="ph"><h3>Server pulse</h3><div class="legend" id="plg">${PULSE.map((s) =>
@@ -457,13 +477,17 @@
                     ${tgl(`mod_${m.id}`, s.modules[m.id] === false ? 'Disabled' : 'Enabled', s.modules[m.id] !== false)}</div>`).join('')}</div></div>
                 <div class="card"><h3>Role gates</h3><p class="sub mb">Restrict a module to members holding specific roles. Empty = everyone.</p>
                     <div id="rolegates">${CTX.modules.map((m) => `<div class="modrow"><div class="mi"><b>${esc(m.label)}</b></div><div style="min-width:240px;flex:0 0 280px">${selSlot(`rg_${m.id}`)}</div></div>`).join('')}</div></div>
+                <div class="card"><h3>Channel gates</h3><p class="sub mb">Limit a module to specific channels. Empty = works everywhere.</p>
+                    <div id="changates">${CTX.modules.map((m) => `<div class="modrow"><div class="mi"><b>${esc(m.label)}</b></div><div style="min-width:240px;flex:0 0 280px">${selSlot(`cg_${m.id}`)}</div></div>`).join('')}</div></div>
                 ${saveBar('modules')}`;
             CTX.modules.forEach((m) => mountSelect(page, `rg_${m.id}`, { multi: true, options: roOpts(DATA.roles), value: s.moduleRoles[m.id] || [], placeholder: 'Everyone' }));
+            CTX.modules.forEach((m) => mountSelect(page, `cg_${m.id}`, { multi: true, options: chOpts(DATA.channels), value: s.moduleChannels?.[m.id] || [], placeholder: 'Everywhere' }));
             bindSave(page, 'modules', (el) => {
                 const f = formVals(el);
                 const modules = {}; modIds.forEach((id) => (modules[id] = !!f[`mod_${id}`]));
                 const moduleRoles = {}; CTX.modules.forEach((m) => (moduleRoles[m.id] = mounts[`rg_${m.id}`].get()));
-                return { modules, moduleRoles };
+                const moduleChannels = {}; CTX.modules.forEach((m) => (moduleChannels[m.id] = mounts[`cg_${m.id}`].get()));
+                return { modules, moduleRoles, moduleChannels };
             });
         },
 
@@ -517,20 +541,22 @@
             });
         },
 
-        async 'custom-commands'(page) {
+        async triggers(page) {
             page.innerHTML = `
-                <div><div class="page-title">Custom Commands</div><p class="page-desc">Tags — text responses triggered like normal commands.</p></div>
-                <div class="card"><h3>New tag</h3>
+                <div><div class="page-title">Triggers</div><p class="page-desc">Custom text responses — run with the prefix, or as a bare trigger word.</p></div>
+                <div class="card"><h3>New trigger</h3>
                     <div class="grid2">${fldHtml('Name', txtIn('tname', '', 'e.g. rules'), 'a-z 0-9 _ -, max 32')}${fldHtml('Content', txtIn('tcontent', '', 'Response text…'), 'max 1000 chars')}</div>
-                    <button class="btn primary sm" id="add-tag">Create tag</button></div>
-                <div class="card"><h3>Tags</h3><div id="taglist"><div class="skeleton" style="height:60px"></div></div></div>`;
+                    ${tgl('ttrigger', 'Bare trigger — fires on this word alone, no prefix needed', false)}
+                    <div class="mt"><button class="btn primary sm" id="add-tag">Create trigger</button></div></div>
+                <div class="card"><h3>Triggers</h3><div id="taglist"><div class="skeleton" style="height:60px"></div></div></div>`;
             const load = async () => {
                 const d = await api(`/api/guilds/${guildId}/tags`);
                 const tags = Object.entries(d.tags || {});
                 $('#taglist', page).innerHTML = tags.length ? tags.map(([n, t]) => `
                     <div class="qitem"><div class="grow"><b class="mono">${esc(n)}</b><div class="muted">${esc(String(t.content).slice(0, 90))}</div></div>
+                    <span class="chip ${t.trigger ? 'ok' : ''}">${t.trigger ? 'bare word' : 'prefix'}</span>
                     <span class="chip">${t.uses || 0} uses</span><button class="btn sm danger" data-del="${esc(n)}">Delete</button></div>`).join('')
-                    : '<p class="muted small">No tags yet.</p>';
+                    : '<p class="muted small">No triggers yet.</p>';
                 $$('#taglist [data-del]', page).forEach((b) => (b.onclick = async () => {
                     if (!(await confirmModal('Delete tag', `Remove "${b.dataset.del}"?`))) return;
                     const r = await api(`/api/guilds/${guildId}/tags/${encodeURIComponent(b.dataset.del)}`, { method: 'DELETE' });
@@ -540,8 +566,9 @@
             $('#add-tag', page).onclick = async () => {
                 const name = $('[name=tname]', page).value.trim();
                 const content = $('[name=tcontent]', page).value;
-                const r = await api(`/api/guilds/${guildId}/tags`, { body: { name, content } });
-                if (r.ok) { toast('Tag created'); $('[name=tname]', page).value = ''; $('[name=tcontent]', page).value = ''; load(); }
+                const trigger = $('[name=ttrigger]', page).checked;
+                const r = await api(`/api/guilds/${guildId}/tags`, { body: { name, content, trigger } });
+                if (r.ok) { toast('Trigger created'); $('[name=tname]', page).value = ''; $('[name=tcontent]', page).value = ''; $('[name=ttrigger]', page).checked = false; load(); }
                 else toast(r.error || 'Failed', 'err');
             };
             load();
@@ -564,7 +591,14 @@
                     ${fldHtml('Window (seconds)', numIn('raidWindow', a.raidWindow, 2, 120))}
                 </div>${fldHtml('Action', `<select name="raidAction"><option value="alert" ${a.raidAction === 'alert' ? 'selected' : ''}>Alert mod-log</option><option value="kick" ${a.raidAction === 'kick' ? 'selected' : ''}>Kick joiner</option></select>`)}
                 </div>
+                <div class="card"><h3>Whitelist</h3><p class="sub mb">Automod never scans these channels, and never flags members holding these roles — applies to every check above.</p>
+                    <div class="grid2">
+                        ${fldHtml('Exempt channels', selSlot('amch'), 'empty = all channels scanned')}
+                        ${fldHtml('Exempt roles', selSlot('amroles'), 'empty = everyone checked')}
+                    </div></div>
                 ${saveBar('automod')}`;
+            mountSelect(page, 'amch', { multi: true, options: chOpts(DATA.channels), value: a.exemptChannels || [], placeholder: 'All channels' });
+            mountSelect(page, 'amroles', { multi: true, options: roOpts(DATA.roles), value: a.exemptRoles || [], placeholder: 'Everyone' });
             bindSave(page, 'automod', (el) => {
                 const f = formVals(el);
                 return {
@@ -572,63 +606,112 @@
                     blacklist: String(f.blacklist || '').split('\n').map((w) => w.trim()).filter(Boolean),
                     spamMax: +f.spamMax || 0, spamWindow: +f.spamWindow || 5,
                     raidMax: +f.raidMax || 0, raidWindow: +f.raidWindow || 10, raidAction: f.raidAction || 'alert',
+                    exemptChannels: mounts.amch.get(), exemptRoles: mounts.amroles.get(),
                 };
             });
         },
 
-        async 'mod-log'(page) {
-            const s = CTX.settings;
-            const stats = await api(`/api/guilds/${guildId}/stats`);
-            page.innerHTML = `
-                <div><div class="page-title">Mod Log</div><p class="page-desc">Where moderation actions are announced, plus recent activity.</p></div>
-                <div class="card"><h3>Mod-log channel</h3>${fldHtml('Channel', selSlot('modlog'), 'warns, bans and automod alerts post here')}
-                ${saveBar('modlog')}</div>
-                <div class="card"><h3>Moderation activity — 14d</h3>${bars(stats.mod?.days || [], ['warns', 'tempbans'], ['var(--warn)', 'var(--danger)'])}
-                    <p class="hint mt">Yellow = warns · Red = tempbans</p></div>`;
-            mountSelect(page, 'modlog', { options: [{ value: '', label: 'Disabled' }, ...chOpts(DATA.channels)], value: s.modlogChannel || '', placeholder: 'Disabled' });
-            bindSave(page, 'modlog', () => ({ modlogChannel: mounts.modlog.get() || null }));
-        },
-
         async logging(page) {
-            const l = CTX.settings.logging;
+            const s = CTX.settings;
+            const l = s.logging;
+            const overrides = [
+                ['messageDelete', 'Message deletions'],
+                ['messageEdit', 'Message edits'],
+                ['memberJoin', 'Member joins'],
+                ['memberLeave', 'Member leaves'],
+                ['channelCreate', 'Channel created'],
+                ['channelDelete', 'Channel deleted'],
+            ];
             page.innerHTML = `
-                <div><div class="page-title">Logging</div><p class="page-desc">Event log channel and which events to record.</p></div>
-                <div class="card"><h3>Log channel</h3>${fldHtml('Channel', selSlot('logch'), 'empty = logging off')}</div>
+                <div><div class="page-title">Logging</div><p class="page-desc">Event and moderation logs — a default channel plus per-event overrides.</p></div>
+                <div class="card"><h3>Channels</h3><div class="grid2">
+                    ${fldHtml('Default log channel', selSlot('logch'), 'events without an override post here — empty = off')}
+                    ${fldHtml('Mod-log channel', selSlot('modlog'), 'warns, bans and automod alerts post here')}
+                </div></div>
                 <div class="card"><h3>Events</h3><div class="grid2">
                     ${tgl('messageDelete', 'Message deletions', l.messageDelete)}
                     ${tgl('messageEdit', 'Message edits', l.messageEdit)}
                     ${tgl('joinLeave', 'Member joins & leaves', l.joinLeave)}
                     ${tgl('channelEvents', 'Channel create/delete', l.channelEvents)}
                 </div></div>
+                <div class="card"><h3>Log per channel</h3><p class="sub mb">Route an event to its own channel — empty uses the default log channel.</p>
+                    <div class="grid2">
+                        ${overrides.map(([k, label]) => fldHtml(label, selSlot(`lc_${k}`))).join('')}
+                    </div></div>
                 ${saveBar('logging')}`;
             mountSelect(page, 'logch', { options: [{ value: '', label: 'Off' }, ...chOpts(DATA.channels)], value: l.channel || '', placeholder: 'Off' });
+            mountSelect(page, 'modlog', { options: [{ value: '', label: 'Disabled' }, ...chOpts(DATA.channels)], value: s.modlogChannel || '', placeholder: 'Disabled' });
+            overrides.forEach(([k]) =>
+                mountSelect(page, `lc_${k}`, { options: [{ value: '', label: 'Default channel' }, ...chOpts(DATA.channels)], value: l.channels?.[k] || '', placeholder: 'Default channel' }));
             bindSave(page, 'logging', (el) => {
                 const f = formVals(el);
-                return { channel: mounts.logch.get() || null, messageDelete: !!f.messageDelete, messageEdit: !!f.messageEdit, joinLeave: !!f.joinLeave, channelEvents: !!f.channelEvents };
+                const channels = {};
+                overrides.forEach(([k]) => { const v = mounts[`lc_${k}`].get(); if (v) channels[k] = v; });
+                return {
+                    channel: mounts.logch.get() || null,
+                    modlogChannel: mounts.modlog.get() || null,
+                    messageDelete: !!f.messageDelete, messageEdit: !!f.messageEdit,
+                    joinLeave: !!f.joinLeave, channelEvents: !!f.channelEvents,
+                    channels,
+                };
             });
         },
 
         async welcome(page) {
             const w = CTX.settings.welcome;
+            // One embed/card editor per side — on = the rich card replaces the plain message.
+            const embedEditor = (p, e) => `
+                <h4 class="mt mb">Card ${tgl(`${p}e_on`, 'enabled', e.enabled)}</h4>
+                <div id="${p}ecard">
+                    <div class="grid2">
+                        ${fldHtml('Style', `<select name="${p}e_style"><option value="embed" ${e.style !== 'cv2' ? 'selected' : ''}>Embed</option><option value="cv2" ${e.style === 'cv2' ? 'selected' : ''}>CV2 container</option></select>`)}
+                        ${fldHtml('Accent color', `<input type="text" name="${p}e_color" value="${esc(e.color ? `#${e.color}` : '')}" placeholder="#5865f2" maxlength="7">`, 'hex — empty = brand color')}
+                        ${fldHtml('Title', txtIn(`${p}e_title`, e.title || '', 'e.g. Welcome to {server}!'))}
+                        ${fldHtml('Footer', txtIn(`${p}e_footer`, e.footer || ''))}
+                    </div>
+                    ${fldHtml('Description', txtArea(`${p}e_desc`, e.description || ''), 'supports the same placeholders')}
+                    ${tgl(`${p}e_thumb`, 'Show member avatar', e.thumbnail)}
+                </div>`;
             page.innerHTML = `
                 <div><div class="page-title">Welcome &amp; Goodbye</div><p class="page-desc">Greet new members and note departures. Placeholders: <code class="mono">{user}</code> <code class="mono">{username}</code> <code class="mono">{server}</code> <code class="mono">{members}</code></p></div>
                 <div class="card"><h3>Welcome</h3>
                     ${fldHtml('Channel', selSlot('wch'), 'empty = off')}
-                    ${fldHtml('Message', txtArea('wmsg', w.message))}
-                    <div class="preview" id="wprev"></div></div>
+                    ${fldHtml('Message', txtArea('wmsg', w.message), 'sent when the card below is disabled')}
+                    <div class="preview" id="wprev"></div>
+                    ${embedEditor('w', w.embed)}
+                </div>
                 <div class="card"><h3>Goodbye</h3>
                     ${fldHtml('Channel', selSlot('gch'), 'empty = off')}
-                    ${fldHtml('Message', txtArea('gmsg', w.goodbyeMessage))}
-                    <div class="preview" id="gprev"></div></div>
+                    ${fldHtml('Message', txtArea('gmsg', w.goodbyeMessage), 'sent when the card below is disabled')}
+                    <div class="preview" id="gprev"></div>
+                    ${embedEditor('g', w.goodbyeEmbed)}
+                </div>
                 ${saveBar('welcome')}`;
             mountSelect(page, 'wch', { options: [{ value: '', label: 'Off' }, ...chOpts(DATA.channels)], value: w.channel || '', placeholder: 'Off' });
             mountSelect(page, 'gch', { options: [{ value: '', label: 'Off' }, ...chOpts(DATA.channels)], value: w.goodbyeChannel || '', placeholder: 'Off' });
             const fill = (tpl) => esc(tpl).replaceAll('{user}', `<span class="puser">@${esc(CTX.user.username)}</span>`).replaceAll('{username}', esc(CTX.user.username)).replaceAll('{server}', esc(CTX.guild.name)).replaceAll('{members}', String(CTX.guild.memberCount));
             const upd = () => { $('#wprev', page).innerHTML = fill($('[name=wmsg]', page).value); $('#gprev', page).innerHTML = fill($('[name=gmsg]', page).value); };
             $$('[name=wmsg],[name=gmsg]', page).forEach((t) => (t.oninput = upd)); upd();
+            // Card editor collapses when its toggle is off
+            ['w', 'g'].forEach((p) => {
+                const on = $(`[name=${p}e_on]`, page);
+                const sync = () => ($(`#${p}ecard`, page).style.display = on.checked ? '' : 'none');
+                on.onchange = sync; sync();
+            });
+            const embedVals = (f, p) => ({
+                enabled: !!f[`${p}e_on`],
+                style: f[`${p}e_style`],
+                title: f[`${p}e_title`], description: f[`${p}e_desc`],
+                color: f[`${p}e_color`], footer: f[`${p}e_footer`],
+                thumbnail: !!f[`${p}e_thumb`],
+            });
             bindSave(page, 'welcome', (el) => {
                 const f = formVals(el);
-                return { channel: mounts.wch.get() || null, goodbyeChannel: mounts.gch.get() || null, message: f.wmsg, goodbyeMessage: f.gmsg };
+                return {
+                    channel: mounts.wch.get() || null, goodbyeChannel: mounts.gch.get() || null,
+                    message: f.wmsg, goodbyeMessage: f.gmsg,
+                    embed: embedVals(f, 'w'), goodbyeEmbed: embedVals(f, 'g'),
+                };
             });
         },
 
@@ -684,18 +767,12 @@
             });
         },
 
-        async settings(page) {
+        async leveling(page) {
             const s = CTX.settings;
             const rewards = [...(s.leveling.rewards || [])];
-            const overviewCards = ['members', 'commands', 'warns', 'tempbans'];
             page.innerHTML = `
-                <div><div class="page-title">Settings</div><p class="page-desc">Prefix, economy, leveling and dashboard access.</p></div>
-                <div class="card"><h3>General</h3>${fldHtml('Command prefix', txtIn('prefix', s.prefix || ''), 'empty = default')} ${saveBar('general')}</div>
-                <div class="card"><h3>Economy</h3><div class="grid2">
-                    ${fldHtml('Currency name', txtIn('currency', s.economy.currency || ''), 'empty = default')}
-                    ${fldHtml('Daily base reward', numIn('dailyBase', s.economy.dailyBase, 0, 1000000), 'empty = default')}
-                </div>${saveBar('economy')}</div>
-                <div class="card"><h3>Leveling</h3>
+                <div><div class="page-title">Leveling</div><p class="page-desc">XP rates, level-up announcements, and role rewards.</p></div>
+                <div class="card"><h3>XP</h3>
                     <div class="mb">${tgl('lv_on', 'Enable XP/levels', s.leveling.enabled)} ${tgl('lv_announce', 'Announce level-ups', s.leveling.announce)}</div>
                     <div class="grid2">
                         ${fldHtml('XP min / message', numIn('xpMin', s.leveling.xpMin, 1, 1000))}
@@ -707,20 +784,8 @@
                     ${fldHtml('Level-up message', txtIn('lvmsg', s.leveling.message), '{user} {level}')}
                     <h4 class="mt mb">Level rewards</h4><div id="rewards"></div>
                     <button class="btn sm mt" id="add-rw">+ Add reward</button>
-                    ${saveBar('leveling')}</div>
-                <div class="card"><h3>Access roles</h3><p class="sub mb">Mod/admin role lists stored with this guild's config.</p>
-                    <div class="grid2">
-                        ${fldHtml('Mod roles', selSlot('modroles'))}
-                        ${fldHtml('Admin roles', selSlot('adminroles'))}
-                    </div>${saveBar('access')}</div>
-                <div class="card"><h3>Overview cards</h3><p class="sub mb">Which stats show on the Overview page.</p>
-                    <div class="flex">${overviewCards.map((c) => tgl(`oc_${c}`, c, (s.overview.cards || []).includes(c))).join('')}</div>
-                    ${saveBar('overview')}</div>`;
-
+                    ${saveBar('leveling')}</div>`;
             mountSelect(page, 'lvch', { options: [{ value: '', label: 'Same channel' }, ...chOpts(DATA.channels)], value: s.leveling.channel || '', placeholder: 'Same channel' });
-            mountSelect(page, 'modroles', { multi: true, options: roOpts(DATA.roles), value: s.access.modRoles, placeholder: 'None' });
-            mountSelect(page, 'adminroles', { multi: true, options: roOpts(DATA.roles), value: s.access.adminRoles, placeholder: 'None' });
-
             const rwEl = $('#rewards', page);
             const renderRw = () => {
                 rwEl.innerHTML = rewards.map((x, i) => `
@@ -733,9 +798,6 @@
             };
             renderRw();
             $('#add-rw', page).onclick = () => { rewards.push({ level: '', roleId: '' }); renderRw(); };
-
-            bindSave(page, 'general', (el) => ({ prefix: formVals(el).prefix }));
-            bindSave(page, 'economy', (el) => { const f = formVals(el); return { currency: f.currency, dailyBase: f.dailyBase }; });
             bindSave(page, 'leveling', (el) => {
                 const f = formVals(el);
                 return {
@@ -745,11 +807,143 @@
                     rewards: rewards.map((x, i) => ({ level: +f[`rl_${i}`] || 0, roleId: mounts[`rlr_${i}`]?.get() })),
                 };
             });
+        },
+
+        async economy(page) {
+            const s = CTX.settings;
+            const items = [...(s.economy.shop || [])];
+            page.innerHTML = `
+                <div><div class="page-title">Economy</div><p class="page-desc">Currency, daily rewards, and the item shop.</p></div>
+                <div class="card"><h3>Currency</h3><div class="grid2">
+                    ${fldHtml('Currency name', txtIn('currency', s.economy.currency || ''), 'empty = default "coins"')}
+                    ${fldHtml('Starting balance', numIn('startBalance', s.economy.startBalance, 0, 10000000), 'wallet for new members')}
+                </div></div>
+                <div class="card"><h3>Daily reward</h3><div class="grid2">
+                    ${fldHtml('Base reward', numIn('dailyBase', s.economy.dailyBase, 0, 1000000), 'empty = 500')}
+                    ${fldHtml('Streak bonus / day', numIn('dailyStreak', s.economy.dailyStreak, 0, 1000000), 'empty = 100')}
+                    ${fldHtml('Max streak bonus', numIn('dailyMaxStreak', s.economy.dailyMaxStreak, 0, 10000000), 'empty = 1000')}
+                </div></div>
+                <div class="card"><h3>Shop items</h3><p class="sub mb">Your server's catalog — empty uses the built-in shop (cookie, coffee, ticket, gem, VIP).</p>
+                    <div id="shopitems"></div><button class="btn sm mt" id="add-item">+ Add item</button></div>
+                ${saveBar('economy')}`;
+            const siEl = $('#shopitems', page);
+            const renderItems = () => {
+                siEl.innerHTML = items.map((x, i) => `
+                    <div class="modrow">
+                        <input type="text" name="sn_${i}" value="${esc(x.name || '')}" placeholder="Item name" style="flex:0 0 160px">
+                        <input type="number" name="sp_${i}" value="${x.price || ''}" placeholder="Price" min="1" style="flex:0 0 110px">
+                        <input type="text" name="sd_${i}" value="${esc(x.description || '')}" placeholder="Description" class="grow">
+                        <button class="btn sm danger" data-del="${i}">✕</button></div>`).join('') || '<p class="muted small">No custom items — the built-in shop is used.</p>';
+                $$('#shopitems [data-del]', page).forEach((b) => (b.onclick = () => { items.splice(+b.dataset.del, 1); renderItems(); }));
+            };
+            renderItems();
+            $('#add-item', page).onclick = () => { items.push({ name: '', price: '', description: '' }); renderItems(); };
+            bindSave(page, 'economy', (el) => {
+                const f = formVals(el);
+                return {
+                    currency: f.currency, startBalance: f.startBalance,
+                    dailyBase: f.dailyBase, dailyStreak: f.dailyStreak, dailyMaxStreak: f.dailyMaxStreak,
+                    shop: items.map((x, i) => ({ name: f[`sn_${i}`], price: +f[`sp_${i}`] || 0, description: f[`sd_${i}`] })),
+                };
+            });
+        },
+
+        async games(page) {
+            const g = CTX.settings.games;
+            page.innerHTML = `
+                <div><div class="page-title">Games</div><p class="page-desc">Prize amounts and wager limits for the games module.</p></div>
+                <div class="card"><h3>Flat prizes</h3><div class="grid2">
+                    ${fldHtml('Guess reward', numIn('guessReward', g.guessReward, 0, 10000000), 'number guess win')}
+                    ${fldHtml('Scramble reward', numIn('scrambleReward', g.scrambleReward, 0, 10000000), 'first correct answer')}
+                </div></div>
+                <div class="card"><h3>Wagers</h3><div class="grid2">
+                    ${fldHtml('Win multiplier', numIn('winMultiplier', g.winMultiplier, 0, 100), 'scales coinflip/rps/roll/hilo/slots wins — 1 = normal')}
+                    ${fldHtml('Max bet', numIn('maxBet', g.maxBet, 0, 100000000), 'wager cap — 0 = unlimited')}
+                </div></div>
+                ${saveBar('games')}`;
+            bindSave(page, 'games', (el) => {
+                const f = formVals(el);
+                return {
+                    guessReward: +f.guessReward || 0, scrambleReward: +f.scrambleReward || 0,
+                    winMultiplier: +f.winMultiplier || 0, maxBet: +f.maxBet || 0,
+                };
+            });
+        },
+
+        async boosting(page) {
+            const b = CTX.settings.boosts;
+            page.innerHTML = `
+                <div><div class="page-title">Boosting</div><p class="page-desc">Perks for members who boost the server.</p></div>
+                <div class="card"><h3>Announcement</h3>
+                    ${fldHtml('Channel', selSlot('bch'), 'empty = no announcement')}
+                    ${fldHtml('Message', txtArea('bmsg', b.message), '{user} {username} {server} {boosts}')}
+                </div>
+                <div class="card"><h3>Booster role</h3>
+                    ${fldHtml('Role granted on boost', selSlot('brole'), 'empty = none')}
+                </div>
+                ${saveBar('boosts')}`;
+            mountSelect(page, 'bch', { options: [{ value: '', label: 'Off' }, ...chOpts(DATA.channels)], value: b.channel || '', placeholder: 'Off' });
+            mountSelect(page, 'brole', { options: [{ value: '', label: 'None' }, ...roOpts(DATA.roles)], value: b.roleId || '', placeholder: 'None' });
+            bindSave(page, 'boosting', () => ({
+                channel: mounts.bch.get() || null,
+                message: $('[name=bmsg]', page).value,
+                roleId: mounts.brole.get() || null,
+            }));
+        },
+
+        async settings(page) {
+            const s = CTX.settings;
+            const overviewCards = ['members', 'commands', 'warns', 'tempbans', 'ping'];
+            page.innerHTML = `
+                <div><div class="page-title">Settings</div><p class="page-desc">Prefix, access, dashboard appearance and bot profile.</p></div>
+                <div class="card"><h3>General</h3>${fldHtml('Command prefix', txtIn('prefix', s.prefix || ''), 'empty = default')} ${saveBar('general')}</div>
+                <div class="card"><h3>Access roles</h3><p class="sub mb">Mod/admin role lists stored with this guild's config.</p>
+                    <div class="grid2">
+                        ${fldHtml('Mod roles', selSlot('modroles'))}
+                        ${fldHtml('Admin roles', selSlot('adminroles'))}
+                    </div>${saveBar('access')}</div>
+                <div class="card"><h3>Overview cards</h3><p class="sub mb">Which stats show on the Overview page.</p>
+                    <div class="flex">${overviewCards.map((c) => tgl(`oc_${c}`, c, (s.overview.cards || []).includes(c))).join('')}</div>
+                    ${saveBar('overview')}</div>
+                <div class="card"><h3>Dashboard appearance</h3><p class="sub mb">Only affects this server's dashboard — accent color and a background image behind the panel.</p>
+                    <div class="grid2">
+                        ${fldHtml('Accent color', `<input type="text" name="accent" value="${esc(s.appearance.accent || '')}" placeholder="#f0a050" maxlength="7">`, 'hex — empty = default')}
+                        ${fldHtml('Background image URL', txtIn('bgimg', s.appearance.background || '', 'https://…'), 'empty = none')}
+                    </div>${saveBar('appearance')}</div>
+                <div class="card"><h3>Bot profile</h3><p class="sub mb">Nickname applies to this server only; the avatar is global — it changes everywhere.</p>
+                    ${fldHtml('Nickname in this server', txtIn('nickname', s.branding.nickname || '', CTX.botname || 'Kotan'), 'empty = default name')}
+                    ${saveBar('branding')}
+                    <div class="flex mt">
+                        <input type="file" id="bavatar" accept="image/png,image/jpeg,image/webp" style="display:none">
+                        <button class="btn sm" id="pick-avatar">Change avatar…</button>
+                        <span class="muted small" id="avatar-status"></span>
+                    </div></div>`;
+
+            mountSelect(page, 'modroles', { multi: true, options: roOpts(DATA.roles), value: s.access.modRoles, placeholder: 'None' });
+            mountSelect(page, 'adminroles', { multi: true, options: roOpts(DATA.roles), value: s.access.adminRoles, placeholder: 'None' });
+
+            $('#pick-avatar', page).onclick = () => $('#bavatar', page).click();
+            $('#bavatar', page).onchange = async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                if (file.size > 3 * 1024 * 1024) return ($('#avatar-status', page).textContent = 'Too big — max ~3MB');
+                $('#avatar-status', page).textContent = 'Uploading…';
+                const dataUrl = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(file); });
+                const r = await api(`/api/guilds/${guildId}/branding/avatar`, { body: { avatar: dataUrl } });
+                $('#avatar-status', page).textContent = r.ok ? 'Avatar updated — may take a minute to show.' : (r.error || 'Failed');
+            };
+
+            bindSave(page, 'general', (el) => ({ prefix: formVals(el).prefix }));
             bindSave(page, 'access', () => ({ modRoles: mounts.modroles.get(), adminRoles: mounts.adminroles.get() }));
             bindSave(page, 'overview', (el) => {
                 const f = formVals(el);
                 return { cards: overviewCards.filter((c) => f[`oc_${c}`]) };
             });
+            bindSave(page, 'appearance', (el) => {
+                const f = formVals(el);
+                return { accent: f.accent, background: f.bgimg };
+            });
+            bindSave(page, 'branding', (el) => ({ nickname: formVals(el).nickname }));
         },
     };
 

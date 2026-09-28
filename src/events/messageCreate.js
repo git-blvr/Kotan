@@ -58,6 +58,13 @@ module.exports = {
             if (trigger) {
                 command = client.commands.get(trigger);
                 args = rest;
+            } else if (message.guild) {
+                // Custom triggers — tags flagged "trigger" fire without a prefix.
+                const tagContent = await db.useTag(message.guild.id, first.toLowerCase(), true).catch(() => null);
+                if (tagContent)
+                    return message
+                        .reply({ content: tagContent, allowedMentions: { parse: [] } })
+                        .catch(() => {});
             }
         }
 

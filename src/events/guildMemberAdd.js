@@ -3,15 +3,9 @@ const db = require('../utils/database');
 const logger = require('../utils/logger');
 const automod = require('../utils/automod');
 const { logEvent } = require('../utils/eventlog');
+const { memberPayload } = require('../utils/welcomeMsg');
 
 // On join: raid filter -> welcome message -> autorole -> event log.
-
-const fmt = (template, member) =>
-    template
-        .replaceAll('{user}', `${member}`) // mention
-        .replaceAll('{username}', member.user.username)
-        .replaceAll('{server}', member.guild.name)
-        .replaceAll('{members}', String(member.guild.memberCount));
 
 module.exports = {
     name: Events.GuildMemberAdd,
@@ -33,7 +27,9 @@ module.exports = {
                 member.guild.channels.cache.get(settings.welcome.channel) ||
                 (await member.guild.channels.fetch(settings.welcome.channel).catch(() => null));
             if (channel?.isTextBased())
-                await channel.send(fmt(settings.welcome.message || 'Welcome {user}!', member)).catch(() => {});
+                await channel
+                    .send(memberPayload(member, settings.welcome.embed, settings.welcome.message || 'Welcome {user}!'))
+                    .catch(() => {});
         }
 
         if (settings.roles?.autorole) {

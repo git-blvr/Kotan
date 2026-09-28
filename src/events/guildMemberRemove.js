@@ -1,6 +1,7 @@
 const { Events } = require('discord.js');
 const db = require('../utils/database');
 const { logEvent } = require('../utils/eventlog');
+const { memberPayload } = require('../utils/welcomeMsg');
 
 // On leave: goodbye message -> event log.
 
@@ -15,14 +16,10 @@ module.exports = {
             const channel =
                 member.guild.channels.cache.get(settings.welcome.goodbyeChannel) ||
                 (await member.guild.channels.fetch(settings.welcome.goodbyeChannel).catch(() => null));
-            if (channel?.isTextBased()) {
-                const msg = (settings.welcome.goodbyeMessage || '**{username}** left.')
-                    .replaceAll('{user}', `${member.user.tag}`)
-                    .replaceAll('{username}', member.user.username)
-                    .replaceAll('{server}', member.guild.name)
-                    .replaceAll('{members}', String(member.guild.memberCount));
-                await channel.send(msg).catch(() => {});
-            }
+            if (channel?.isTextBased())
+                await channel
+                    .send(memberPayload(member, settings.welcome.goodbyeEmbed, settings.welcome.goodbyeMessage || '**{username}** left.'))
+                    .catch(() => {});
         }
 
         logEvent(client, member.guild.id, 'memberLeave', [

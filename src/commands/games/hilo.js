@@ -3,6 +3,7 @@ const { base, sendError, cv2 } = require('../../helpers/embeds');
 const { awaitReply } = require('../../helpers/collect');
 const { formatCoins, parseAmount } = require('../../helpers/format');
 const { fromMessage, fromInteraction } = require('../../helpers/ctx');
+const { betCapped, scaled } = require('../../helpers/gamecfg');
 const db = require('../../utils/database');
 const config = require('../../config');
 
@@ -20,6 +21,7 @@ async function run(ctx, betInput) {
     if (!bet) return sendError(ctx, `How much? Usage: \`${ctx.prefix}hilo <bet>\``);
     if (bet > profile.wallet)
         return sendError(ctx, `You only have ${formatCoins(profile.wallet, cur)} in your wallet.`);
+    if (betCapped(ctx, bet, cur)) return;
 
     const first = draw();
     await ctx.reply(
@@ -45,7 +47,7 @@ async function run(ctx, betInput) {
     const second = draw();
     const outcome = second === first ? 'push' : second > first === guessHigh ? 'win' : 'lose';
 
-    profile.wallet += outcome === 'win' ? bet : outcome === 'lose' ? -bet : 0;
+    profile.wallet += outcome === 'win' ? scaled(ctx.settings, bet) : outcome === 'lose' ? -bet : 0;
     await db.saveProfile(ctx.guild.id, ctx.user.id, profile);
 
     return ctx.channel.send(

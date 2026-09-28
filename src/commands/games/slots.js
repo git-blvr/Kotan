@@ -2,6 +2,7 @@ const { ApplicationCommandOptionType: Opt } = require('discord.js');
 const { base, sendError, cv2 } = require('../../helpers/embeds');
 const { formatCoins, parseAmount } = require('../../helpers/format');
 const { fromMessage, fromInteraction } = require('../../helpers/ctx');
+const { betCapped, gameCfg } = require('../../helpers/gamecfg');
 const db = require('../../utils/database');
 const config = require('../../config');
 
@@ -17,14 +18,16 @@ async function run(ctx, betInput) {
     if (!bet) return sendError(ctx, `How much? Usage: \`${ctx.prefix}slots <bet>\``);
     if (bet > profile.wallet)
         return sendError(ctx, `You only have ${formatCoins(profile.wallet, cur)} in your wallet.`);
+    if (betCapped(ctx, bet, cur)) return;
 
     const reels = [0, 0, 0].map(() => REELS[Math.floor(Math.random() * REELS.length)]);
     const [a, b, c] = reels;
 
+    const mult = gameCfg(ctx.settings).winMultiplier;
     let winnings;
     let note;
     if (a === b && b === c) {
-        winnings = bet * (TRIPLE[a] ?? 4);
+        winnings = Math.floor(bet * (TRIPLE[a] ?? 4) * mult);
         note = `Triple ${a} — **x${TRIPLE[a] ?? 4}**!`;
     } else if (a === b || b === c || a === c) {
         winnings = Math.floor(bet / 2);

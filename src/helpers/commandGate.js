@@ -55,6 +55,14 @@ async function gateCommand(message, command, client) {
                 message,
                 `The \`${command.category}\` module requires one of these roles: ${need.map((r) => `<@&${r}>`).join(', ')}`
             ), true;
+        // Per-module channel gate — configured on the Modules page.
+        // Threads pass if their parent channel is allowed.
+        const chans = settings.moduleChannels?.[command.category];
+        if (chans?.length && ![message.channel.id, message.channel.parentId].some((c) => chans.includes(c)))
+            return sendError(
+                message,
+                `The \`${command.category}\` module only works in ${chans.map((c) => `<#${c}>`).join(', ')}`
+            ), true;
         // Scoped rules — channel and/or daily time-window disables.
         const hit = settings.commandRules?.find((r) => ruleBlocks(r, command.name, message.channel));
         if (hit) {

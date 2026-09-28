@@ -5,15 +5,18 @@ const { fromMessage, fromInteraction } = require('../../helpers/ctx');
 const db = require('../../utils/database');
 const config = require('../../config');
 
-function findItem(query) {
+function findItem(items, query) {
     const q = query.toLowerCase();
-    return config.shop.find(
+    return items.find(
         (item) => item.id === q || item.name.toLowerCase() === q || item.name.toLowerCase().startsWith(q)
     );
 }
 
 async function run(ctx, itemQuery) {
     const cur = ctx.settings?.economy?.currency || config.economy.currency;
+    // A guild can define its own shop in the dashboard — it fully replaces
+    // the default catalog when at least one item is configured.
+    const items = ctx.settings?.economy?.shop?.length ? ctx.settings.economy.shop : config.shop;
 
     // no item — list everything
     if (!itemQuery) {
@@ -23,7 +26,7 @@ async function run(ctx, itemQuery) {
             description:
                 `Your wallet: ${formatCoins(profile.wallet, cur)}\n` +
                 `Buy with \`${ctx.prefix}shop buy <item>\``,
-            fields: config.shop.map((item) => {
+            fields: items.map((item) => {
                 const owned = profile.inventory[item.id] || 0;
                 return {
                     name: `${item.name} — ${formatNumber(item.price)} ${cur}`,
@@ -34,7 +37,7 @@ async function run(ctx, itemQuery) {
         return ctx.reply(cv2(embed));
     }
 
-    const item = findItem(itemQuery);
+    const item = findItem(items, itemQuery);
     if (!item)
         return sendError(
             ctx,
