@@ -21,7 +21,7 @@ async function run(ctx, betInput) {
     if (!bet) return sendError(ctx, `How much? Usage: \`${ctx.prefix}hilo <bet>\``);
     if (bet > profile.wallet)
         return sendError(ctx, `You only have ${formatCoins(profile.wallet, cur)} in your wallet.`);
-    if (betCapped(ctx, bet, cur)) return;
+    if (betCapped(ctx, bet, cur, 'hilo')) return;
 
     const first = draw();
     await ctx.reply(
@@ -47,7 +47,7 @@ async function run(ctx, betInput) {
     const second = draw();
     const outcome = second === first ? 'push' : second > first === guessHigh ? 'win' : 'lose';
 
-    profile.wallet += outcome === 'win' ? scaled(ctx.settings, bet) : outcome === 'lose' ? -bet : 0;
+    profile.wallet += outcome === 'win' ? scaled(ctx.settings, bet, 'hilo') : outcome === 'lose' ? -bet : 0;
     await db.saveProfile(ctx.guild.id, ctx.user.id, profile);
 
     return ctx.channel.send(

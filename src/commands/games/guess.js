@@ -12,7 +12,7 @@ const TRIES = 4;
 async function run(ctx) {
     const target = 1 + Math.floor(Math.random() * MAX_NUMBER);
     const cur = ctx.settings?.economy?.currency;
-    const reward = gameCfg(ctx.settings).guessReward;
+    const reward = gameCfg(ctx.settings, 'guess').reward;
     const filter = (m) => m.author.id === ctx.user.id && /^\d+$/.test(m.content.trim());
 
     await ctx.reply(

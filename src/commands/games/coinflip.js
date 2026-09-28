@@ -36,10 +36,10 @@ async function run(ctx, guess, betInput, pvpTarget) {
     const cur = ctx.settings?.economy?.currency;
     if (bet > profile.wallet)
         return sendError(ctx, `You only have ${formatCoins(profile.wallet, cur)} in your wallet.`);
-    if (betCapped(ctx, bet, cur)) return;
+    if (betCapped(ctx, bet, cur, 'coinflip')) return;
 
     const won = guess === result;
-    const delta = won ? scaled(ctx.settings, bet) : -bet;
+    const delta = won ? scaled(ctx.settings, bet, 'coinflip') : -bet;
     profile.wallet += delta;
     await db.saveProfile(ctx.guild.id, ctx.user.id, profile);
 
@@ -68,7 +68,7 @@ async function pvp(ctx, target, betInput, guess) {
         return sendError(ctx, `How much? Usage: \`${ctx.prefix}cf @member <bet> [heads|tails]\``);
     if (bet > meProfile.wallet)
         return sendError(ctx, `You only have ${formatCoins(meProfile.wallet, cur)} in your wallet.`);
-    if (betCapped(ctx, bet, cur)) return;
+    if (betCapped(ctx, bet, cur, 'coinflip')) return;
 
     const theirProfile = await db.getProfile(ctx.guild.id, target.id);
     if (bet > theirProfile.wallet)

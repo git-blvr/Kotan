@@ -18,12 +18,12 @@ async function run(ctx, betInput) {
     if (!bet) return sendError(ctx, `How much? Usage: \`${ctx.prefix}slots <bet>\``);
     if (bet > profile.wallet)
         return sendError(ctx, `You only have ${formatCoins(profile.wallet, cur)} in your wallet.`);
-    if (betCapped(ctx, bet, cur)) return;
+    if (betCapped(ctx, bet, cur, 'slots')) return;
 
     const reels = [0, 0, 0].map(() => REELS[Math.floor(Math.random() * REELS.length)]);
     const [a, b, c] = reels;
 
-    const mult = gameCfg(ctx.settings).winMultiplier;
+    const mult = gameCfg(ctx.settings, 'slots').winMultiplier;
     let winnings;
     let note;
     if (a === b && b === c) {

@@ -1,24 +1,29 @@
 const { sendError } = require('./embeds');
 const { formatCoins } = require('./format');
 
-// Game tuning — the Games dashboard page writes settings.games; these values
-// apply to flat rewards (guess, scramble) and wager games (maxBet + the
-// win multiplier applied to house payouts). PvP pots stay 2x — the pot is
-// loser-funded, so a multiplier would just inflate one side.
+// Game tuning — the Games dashboard page writes settings.games: global
+// defaults plus optional per-game overrides in settings.games.per[game]
+// (each field falls back to the global when null/undefined).
+// Per-game keys: { reward, maxBet, winMultiplier } — reward applies to the
+// flat-prize games (guess, scramble), the others to wager games.
+// PvP pots stay 2x — the pot is loser-funded, so a multiplier would just
+// inflate one side.
 
-function gameCfg(settings) {
+function gameCfg(settings, game) {
     const g = settings?.games || {};
+    const p = (game && g.per?.[game]) || {};
     return {
-        maxBet: g.maxBet ?? 0, // 0 = no cap
-        winMultiplier: g.winMultiplier ?? 1,
-        guessReward: g.guessReward ?? 150,
-        scrambleReward: g.scrambleReward ?? 200,
+        reward:
+            p.reward ??
+            (game === 'guess' ? g.guessReward ?? 150 : game === 'scramble' ? g.scrambleReward ?? 200 : 0),
+        maxBet: p.maxBet ?? g.maxBet ?? 0, // 0 = no cap
+        winMultiplier: p.winMultiplier ?? g.winMultiplier ?? 1,
     };
 }
 
 // Rejects a wager above the configured cap. Returns true when blocked.
-function betCapped(ctx, bet, cur) {
-    const cap = gameCfg(ctx.settings).maxBet;
+function betCapped(ctx, bet, cur, game) {
+    const cap = gameCfg(ctx.settings, game).maxBet;
     if (cap && bet > cap) {
         sendError(ctx, `Bets are capped at ${formatCoins(cap, cur)} in this server.`);
         return true;
@@ -27,6 +32,6 @@ function betCapped(ctx, bet, cur) {
 }
 
 // Scaled payout for a house win — 1 returns the wager (net +bet).
-const scaled = (settings, bet) => Math.floor(bet * gameCfg(settings).winMultiplier);
+const scaled = (settings, bet, game) => Math.floor(bet * gameCfg(settings, game).winMultiplier);
 
 module.exports = { gameCfg, betCapped, scaled };

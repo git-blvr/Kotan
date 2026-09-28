@@ -36,9 +36,9 @@ async function run(ctx, move, betInput) {
     if (!bet) return sendError(ctx, 'Invalid bet. Examples: `100`, `1k`, `all`, `half`.');
     if (bet > profile.wallet)
         return sendError(ctx, `You only have ${formatCoins(profile.wallet, cur)} in your wallet.`);
-    if (betCapped(ctx, bet, cur)) return;
+    if (betCapped(ctx, bet, cur, 'rps')) return;
 
-    profile.wallet += outcome === 'win' ? scaled(ctx.settings, bet) : outcome === 'lose' ? -bet : 0;
+    profile.wallet += outcome === 'win' ? scaled(ctx.settings, bet, 'rps') : outcome === 'lose' ? -bet : 0;
     await db.saveProfile(ctx.guild.id, ctx.user.id, profile);
 
     return ctx.reply(

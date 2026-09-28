@@ -468,3 +468,17 @@
 .comprow .cbtn:hover { color: var(--text); border-color: var(--border); }
 .comprow .cbtn.danger:hover { color: var(--danger); border-color: var(--danger); }
 .compadd { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* In-page subnav — generated from section headings, sits above the title */
+.subnav{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px;position:sticky;top:12px;z-index:40;background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-filter:blur(10px);padding:6px;border:1px solid var(--border);border-radius:12px}
+.snv{appearance:none;border:1px solid transparent;background:transparent;color:var(--text-2);font:inherit;font-size:12.5px;font-weight:600;padding:6px 11px;border-radius:8px;cursor:pointer;transition:all .18s ease;white-space:nowrap}
+.snv:hover{background:var(--panel-2);color:var(--text)}
+.snv.on{background:var(--panel-2);color:var(--text);border-color:var(--border);box-shadow:inset 0 -2px 0 var(--accent)}
+@media (max-width:720px){.subnav{top:8px;overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none}.subnav::-webkit-scrollbar{display:none}}
+
+/* Logging event rows — toggle left, channel select right */
+.evrow{display:flex;align-items:center;gap:14px;padding:9px 0;border-bottom:1px solid color-mix(in srgb,var(--border) 55%,transparent)}
+.evrow:last-child{border-bottom:0;padding-bottom:2px}
+.evrow .evl{flex:1;min-width:0}
+.evrow .evc{width:220px;flex:none}
+@media (max-width:720px){.evrow{flex-wrap:wrap}.evrow .evc{width:100%}}

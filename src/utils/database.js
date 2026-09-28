@@ -77,6 +77,7 @@ const DEFAULT_SETTINGS = {
     logging: {
         channel: null,          // null = logging off
         channels: {},           // event type -> channelId override (log-per-channel)
+        events: {},             // event type -> bool; {} falls back to the legacy flags
         messageDelete: false,
         messageEdit: false,
         joinLeave: false,
@@ -110,6 +111,7 @@ const DEFAULT_SETTINGS = {
         scrambleReward: 200,// flat payout for .scramble
         winMultiplier: 1,   // scales wager wins (1 = bet back x2 net, standard)
         maxBet: 0,          // cap on wagers; 0 = unlimited
+        per: {},            // game name -> {reward,maxBet,winMultiplier} overrides
     },
     // Server-boost perks — fires on premium_since appearing.
     boosts: {

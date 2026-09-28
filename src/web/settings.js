@@ -1,4 +1,5 @@
 const db = require('../utils/database');
+const { TYPES: LOG_TYPES } = require('../utils/eventlog');
 
 // Mirrors DEFAULT_SETTINGS in src/utils/database.js — merged key-by-key so
 // docs written before a sub-key existed keep their defaults.
@@ -13,7 +14,7 @@ const DEFAULTS = {
         raidMax: 0, raidWindow: 10, raidAction: 'alert',
         exemptRoles: [], exemptChannels: [],
     },
-    logging: { channel: null, channels: {}, messageDelete: false, messageEdit: false, joinLeave: false, channelEvents: false },
+    logging: { channel: null, channels: {}, events: {}, messageDelete: false, messageEdit: false, joinLeave: false, channelEvents: false },
     welcome: {
         channel: null,
         message: 'Welcome {user} to {server}! You are member #{members}.',
@@ -24,7 +25,7 @@ const DEFAULTS = {
     },
     roles: { autorole: null, reactionRoles: [] },
     economy: { currency: null, dailyBase: null, dailyStreak: null, dailyMaxStreak: null, startBalance: null, shop: [] },
-    games: { guessReward: 150, scrambleReward: 200, winMultiplier: 1, maxBet: 0 },
+    games: { guessReward: 150, scrambleReward: 200, winMultiplier: 1, maxBet: 0, per: {} },
     boosts: { channel: null, message: '{user} just boosted {server}! 🚀', roleId: null },
     appearance: { accent: '', background: '' },
     branding: { nickname: '' },
@@ -149,14 +150,27 @@ const SECTIONS = {
         const ch = optSnowflake(f.channel);
         if (ch === undefined) return 'Invalid channel';
         s.logging.channel = ch;
-        s.logging.messageDelete = bool(f.messageDelete);
-        s.logging.messageEdit = bool(f.messageEdit);
-        s.logging.joinLeave = bool(f.joinLeave);
-        s.logging.channelEvents = bool(f.channelEvents);
+        // Per-event flags — submitted as a complete map; legacy grouped
+        // flags are kept roughly in sync for docs read by older builds.
+        if (f.events && typeof f.events === 'object') {
+            for (const k of Object.keys(LOG_TYPES))
+                if (f.events[k] !== undefined) s.logging.events[k] = bool(f.events[k]);
+            s.logging.messageDelete = !!s.logging.events.messageDelete;
+            s.logging.messageEdit = !!s.logging.events.messageEdit;
+            s.logging.joinLeave = !!(s.logging.events.memberJoin || s.logging.events.memberLeave);
+            s.logging.channelEvents = !!(
+                s.logging.events.channelCreate || s.logging.events.channelDelete || s.logging.events.channelUpdate
+            );
+        } else {
+            s.logging.messageDelete = bool(f.messageDelete);
+            s.logging.messageEdit = bool(f.messageEdit);
+            s.logging.joinLeave = bool(f.joinLeave);
+            s.logging.channelEvents = bool(f.channelEvents);
+        }
         // Log-per-channel: per-event overrides, fall back to the main channel.
         if (f.channels && typeof f.channels === 'object') {
-            const valid = ['messageDelete', 'messageEdit', 'memberJoin', 'memberLeave', 'channelCreate', 'channelDelete'];
-            for (const k of valid) {
+            for (const k of Object.keys(LOG_TYPES)) {
+                if (f.channels[k] === undefined) continue;
                 const v = optSnowflake(f.channels[k]);
                 if (v === undefined) return `Invalid channel for ${k}`;
                 if (v) s.logging.channels[k] = v;
@@ -236,10 +250,25 @@ const SECTIONS = {
         }
     },
     games(s, f) {
-        s.games.guessReward = num(f.guessReward, 0, 10_000_000, 150);
-        s.games.scrambleReward = num(f.scrambleReward, 0, 10_000_000, 200);
-        s.games.winMultiplier = num(f.winMultiplier, 0, 100, 1);
-        s.games.maxBet = num(f.maxBet, 0, 100_000_000, 0);
+        if (f.guessReward !== undefined) s.games.guessReward = num(f.guessReward, 0, 10_000_000, 150);
+        if (f.scrambleReward !== undefined) s.games.scrambleReward = num(f.scrambleReward, 0, 10_000_000, 200);
+        if (f.winMultiplier !== undefined) s.games.winMultiplier = num(f.winMultiplier, 0, 100, 1);
+        if (f.maxBet !== undefined) s.games.maxBet = num(f.maxBet, 0, 100_000_000, 0);
+        // Per-game overrides — null/empty fields inherit the globals.
+        if (f.per && typeof f.per === 'object') {
+            const known = ['coinflip', 'slots', 'rps', 'roll', 'hilo', 'guess', 'scramble'];
+            for (const k of known) {
+                const p = f.per[k];
+                if (!p || typeof p !== 'object') continue;
+                const entry = {
+                    reward: p.reward === '' || p.reward === null || p.reward === undefined ? null : num(p.reward, 0, 10_000_000),
+                    maxBet: p.maxBet === '' || p.maxBet === null || p.maxBet === undefined ? null : num(p.maxBet, 0, 100_000_000),
+                    winMultiplier: p.winMultiplier === '' || p.winMultiplier === null || p.winMultiplier === undefined ? null : num(p.winMultiplier, 0, 100),
+                };
+                if (Object.values(entry).every((v) => v === null)) delete s.games.per[k];
+                else s.games.per[k] = entry;
+            }
+        }
     },
     boosts(s, f) {
         const ch = optSnowflake(f.channel);

@@ -22,7 +22,7 @@ function scramble(word) {
 async function run(ctx) {
     const word = WORDS[Math.floor(Math.random() * WORDS.length)];
     const cur = ctx.settings?.economy?.currency;
-    const reward = gameCfg(ctx.settings).scrambleReward;
+    const reward = gameCfg(ctx.settings, 'scramble').reward;
 
     await ctx.reply(
         cv2(

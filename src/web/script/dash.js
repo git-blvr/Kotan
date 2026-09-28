@@ -367,6 +367,41 @@
 
     const saveBar = (section) => `<div class="flex mt"><button class="btn primary" data-save="${section}">Save changes</button></div>`;
 
+    // In-page subnav — built automatically from each page's section headings.
+    // Sits above the title, jump-scrolls to a section, and tracks scroll.
+    let scrollSpy = null;
+    function bindSubnav(page) {
+        const heads = $$('.card h3', page);
+        if (heads.length < 3) return;
+        const seen = new Map();
+        heads.forEach((h, i) => {
+            const base = h.textContent.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || `sec-${i}`;
+            const slug = seen.has(base) ? `${base}-${seen.get(base)}` : base;
+            seen.set(base, (seen.get(base) || 0) + 1);
+            h.closest('.card').dataset.sec = slug;
+            h.dataset.secLabel = h.textContent.trim();
+        });
+        const nav = document.createElement('div');
+        nav.className = 'subnav';
+        nav.innerHTML = heads.map((h) => `<button class="snv" data-sec="${h.closest('.card').dataset.sec}">${esc(h.dataset.secLabel)}</button>`).join('');
+        page.insertBefore(nav, page.firstChild);
+        $$('.snv', nav).forEach((b) => (b.onclick = () => {
+            const t = $(`.card[data-sec="${b.dataset.sec}"]`, page);
+            if (t) window.scrollTo({ top: t.getBoundingClientRect().top + window.scrollY - 76, behavior: 'smooth' });
+        }));
+        if (scrollSpy) window.removeEventListener('scroll', scrollSpy);
+        scrollSpy = () => {
+            let cur = heads[0]?.closest('.card')?.dataset.sec;
+            for (const h of heads) {
+                const card = h.closest('.card');
+                if (card.getBoundingClientRect().top < 160) cur = card.dataset.sec;
+            }
+            $$('.snv', nav).forEach((b) => b.classList.toggle('on', b.dataset.sec === cur));
+        };
+        window.addEventListener('scroll', scrollSpy, { passive: true });
+        scrollSpy();
+    }
+
     function bindSave(container, section, collect) {
         container.querySelector(`[data-save="${section}"]`)?.addEventListener('click', async (e) => {
             for (const k in mounts) delete mounts[k];
@@ -614,45 +649,65 @@
         async logging(page) {
             const s = CTX.settings;
             const l = s.logging;
-            const overrides = [
-                ['messageDelete', 'Message deletions'],
-                ['messageEdit', 'Message edits'],
-                ['memberJoin', 'Member joins'],
-                ['memberLeave', 'Member leaves'],
-                ['channelCreate', 'Channel created'],
-                ['channelDelete', 'Channel deleted'],
+            // Every loggable event, grouped — each row has a toggle and a
+            // per-event channel override (empty = default channel).
+            const LOG_GROUPS = [
+                ['Messages', [
+                    ['messageDelete', 'Message deletions'], ['messageEdit', 'Message edits'], ['bulkDelete', 'Bulk purges'],
+                ]],
+                ['Members', [
+                    ['memberJoin', 'Member joins'], ['memberLeave', 'Member leaves'],
+                    ['memberUpdate', 'Role/nickname changes'], ['banAdd', 'Bans'], ['banRemove', 'Unbans'],
+                ]],
+                ['Channels', [
+                    ['channelCreate', 'Channel created'], ['channelDelete', 'Channel deleted'], ['channelUpdate', 'Channel updated'],
+                    ['threadCreate', 'Thread created'], ['threadDelete', 'Thread deleted'],
+                ]],
+                ['Roles & server', [
+                    ['roleCreate', 'Role created'], ['roleDelete', 'Role deleted'], ['roleUpdate', 'Role updated'],
+                    ['emojiCreate', 'Emoji added'], ['emojiDelete', 'Emoji removed'],
+                    ['inviteCreate', 'Invite created'], ['inviteDelete', 'Invite deleted'], ['voiceState', 'Voice join/leave/move'],
+                ]],
             ];
+            const ALL_EVENTS = LOG_GROUPS.flatMap(([, es]) => es);
+            // Per-event flags, falling back to the old grouped toggles.
+            const legacy = {
+                messageDelete: l.messageDelete, messageEdit: l.messageEdit, bulkDelete: l.messageDelete,
+                memberJoin: l.joinLeave, memberLeave: l.joinLeave,
+                channelCreate: l.channelEvents, channelDelete: l.channelEvents,
+            };
+            const isOn = (k) => l.events?.[k] ?? legacy[k] ?? false;
             page.innerHTML = `
-                <div><div class="page-title">Logging</div><p class="page-desc">Event and moderation logs — a default channel plus per-event overrides.</p></div>
+                <div><div class="page-title">Logging</div><p class="page-desc">Every event can be toggled and routed to its own channel.</p></div>
                 <div class="card"><h3>Channels</h3><div class="grid2">
                     ${fldHtml('Default log channel', selSlot('logch'), 'events without an override post here — empty = off')}
                     ${fldHtml('Mod-log channel', selSlot('modlog'), 'warns, bans and automod alerts post here')}
                 </div></div>
-                <div class="card"><h3>Events</h3><div class="grid2">
-                    ${tgl('messageDelete', 'Message deletions', l.messageDelete)}
-                    ${tgl('messageEdit', 'Message edits', l.messageEdit)}
-                    ${tgl('joinLeave', 'Member joins & leaves', l.joinLeave)}
-                    ${tgl('channelEvents', 'Channel create/delete', l.channelEvents)}
-                </div></div>
-                <div class="card"><h3>Log per channel</h3><p class="sub mb">Route an event to its own channel — empty uses the default log channel.</p>
-                    <div class="grid2">
-                        ${overrides.map(([k, label]) => fldHtml(label, selSlot(`lc_${k}`))).join('')}
-                    </div></div>
+                ${LOG_GROUPS.map(([group, events]) => `
+                <div class="card"><h3>${group}</h3>
+                    ${events.map(([k, label]) => `
+                        <div class="evrow">
+                            <div class="evl">${tgl(`ev_${k}`, label, isOn(k))}</div>
+                            <div class="evc">${selSlot(`lc_${k}`)}</div>
+                        </div>`).join('')}
+                </div>`).join('')}
                 ${saveBar('logging')}`;
             mountSelect(page, 'logch', { options: [{ value: '', label: 'Off' }, ...chOpts(DATA.channels)], value: l.channel || '', placeholder: 'Off' });
             mountSelect(page, 'modlog', { options: [{ value: '', label: 'Disabled' }, ...chOpts(DATA.channels)], value: s.modlogChannel || '', placeholder: 'Disabled' });
-            overrides.forEach(([k]) =>
-                mountSelect(page, `lc_${k}`, { options: [{ value: '', label: 'Default channel' }, ...chOpts(DATA.channels)], value: l.channels?.[k] || '', placeholder: 'Default channel' }));
+            ALL_EVENTS.forEach(([k]) =>
+                mountSelect(page, `lc_${k}`, { options: [{ value: '', label: 'Default' }, ...chOpts(DATA.channels)], value: l.channels?.[k] || '', placeholder: 'Default' }));
             bindSave(page, 'logging', (el) => {
                 const f = formVals(el);
-                const channels = {};
-                overrides.forEach(([k]) => { const v = mounts[`lc_${k}`].get(); if (v) channels[k] = v; });
+                const events = {}, channels = {};
+                ALL_EVENTS.forEach(([k]) => {
+                    events[k] = !!f[`ev_${k}`];
+                    const v = mounts[`lc_${k}`].get();
+                    if (v) channels[k] = v;
+                });
                 return {
                     channel: mounts.logch.get() || null,
                     modlogChannel: mounts.modlog.get() || null,
-                    messageDelete: !!f.messageDelete, messageEdit: !!f.messageEdit,
-                    joinLeave: !!f.joinLeave, channelEvents: !!f.channelEvents,
-                    channels,
+                    events, channels,
                 };
             });
         },
@@ -946,22 +1001,49 @@
 
         async games(page) {
             const g = CTX.settings.games;
+            const per = g.per || {};
+            // Wager games take a bet and pay scaled by a multiplier; reward
+            // games pay a flat prize. Empty per-game fields inherit defaults.
+            const WAGER = [
+                ['coinflip', 'Coinflip'], ['slots', 'Slots'], ['rps', 'Rock Paper Scissors'],
+                ['roll', 'Dice Duel'], ['hilo', 'Higher or Lower'],
+            ];
+            const REWARD = [
+                ['guess', 'Number Guess'], ['scramble', 'Word Scramble'],
+            ];
+            const perIn = (game, key) => `<input type="number" name="gp_${game}_${key}" value="${per[game]?.[key] ?? ''}" min="0" placeholder="default">`;
             page.innerHTML = `
-                <div><div class="page-title">Games</div><p class="page-desc">Prize amounts and wager limits for the games module.</p></div>
-                <div class="card"><h3>Flat prizes</h3><div class="grid2">
+                <div><div class="page-title">Games</div><p class="page-desc">Wagers and rewards — global defaults, plus a per-game override below.</p></div>
+                <div class="card"><h3>Defaults</h3><p class="sub mb">Applied to every game unless it has an override below.</p><div class="grid2">
                     ${fldHtml('Guess reward', numIn('guessReward', g.guessReward, 0, 10000000), 'number guess win')}
                     ${fldHtml('Scramble reward', numIn('scrambleReward', g.scrambleReward, 0, 10000000), 'first correct answer')}
-                </div></div>
-                <div class="card"><h3>Wagers</h3><div class="grid2">
-                    ${fldHtml('Win multiplier', numIn('winMultiplier', g.winMultiplier, 0, 100), 'scales coinflip/rps/roll/hilo/slots wins — 1 = normal')}
+                    ${fldHtml('Win multiplier', numIn('winMultiplier', g.winMultiplier, 0, 100), 'scales wager wins — 1 = normal')}
                     ${fldHtml('Max bet', numIn('maxBet', g.maxBet, 0, 100000000), 'wager cap — 0 = unlimited')}
                 </div></div>
+                ${WAGER.map(([k, label]) => `
+                <div class="card"><h3>${label}</h3><div class="grid2">
+                    ${fldHtml('Max bet', perIn(k, 'maxBet'), 'wager cap — empty = use default')}
+                    ${fldHtml('Win multiplier', perIn(k, 'winMultiplier'), 'payout scale — empty = use default')}
+                </div></div>`).join('')}
+                ${REWARD.map(([k, label]) => `
+                <div class="card"><h3>${label}</h3><div class="grid2">
+                    ${fldHtml('Reward', perIn(k, 'reward'), 'coins per win — empty = use default')}
+                </div></div>`).join('')}
                 ${saveBar('games')}`;
             bindSave(page, 'games', (el) => {
                 const f = formVals(el);
+                const perOut = {};
+                [...WAGER, ...REWARD].forEach(([k]) => {
+                    const entry = {};
+                    if (f[`gp_${k}_reward`] !== '' && f[`gp_${k}_reward`] !== undefined) entry.reward = +f[`gp_${k}_reward`];
+                    if (f[`gp_${k}_maxBet`] !== '' && f[`gp_${k}_maxBet`] !== undefined) entry.maxBet = +f[`gp_${k}_maxBet`];
+                    if (f[`gp_${k}_winMultiplier`] !== '' && f[`gp_${k}_winMultiplier`] !== undefined) entry.winMultiplier = +f[`gp_${k}_winMultiplier`];
+                    if (Object.keys(entry).length) perOut[k] = entry;
+                });
                 return {
                     guessReward: +f.guessReward || 0, scrambleReward: +f.scrambleReward || 0,
                     winMultiplier: +f.winMultiplier || 0, maxBet: +f.maxBet || 0,
+                    per: perOut,
                 };
             });
         },
@@ -1060,7 +1142,10 @@
         shell(slug);
         const page = $('#page');
         const render = PAGES[slug] || PAGES.overview;
-        try { await render(page); } catch (e) {
+        try {
+            await render(page);
+            bindSubnav(page);
+        } catch (e) {
             page.innerHTML = `<div class="card"><h3>Something went wrong</h3><p class="sub">${esc(e.message)}</p></div>`;
         }
     };
