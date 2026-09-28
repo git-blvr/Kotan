@@ -4,7 +4,8 @@ const { formatCoins, parseAmount } = require('../../helpers/format');
 const { resolveMember } = require('../../helpers/resolve');
 const { awaitReply } = require('../../helpers/collect');
 const { fromMessage, fromInteraction } = require('../../helpers/ctx');
-const { betCapped, scaled } = require('../../helpers/gamecfg');
+const { betCapped, scaled } = require('../../helpers/gamecfg')
+const { withCoinMult } = require('../../helpers/inv');
 const db = require('../../utils/database');
 const config = require('../../config');
 
@@ -40,7 +41,7 @@ async function run(ctx, guess, betInput, pvpTarget) {
 
     const won = guess === result;
     const delta = won ? scaled(ctx.settings, bet, 'coinflip') : -bet;
-    profile.wallet += delta;
+    profile.wallet += delta > 0 ? withCoinMult(profile, delta) : delta;
     await db.saveProfile(ctx.guild.id, ctx.user.id, profile);
 
     return ctx.reply(
@@ -109,7 +110,7 @@ async function pvp(ctx, target, betInput, guess) {
     const winner = iWon ? ctx.user : target.user;
     a.wallet -= bet;
     b.wallet -= bet;
-    (iWon ? a : b).wallet += bet * 2;
+    const w = iWon ? a : b; w.wallet += withCoinMult(w, bet * 2);
     await Promise.all([
         db.saveProfile(ctx.guild.id, ctx.user.id, a),
         db.saveProfile(ctx.guild.id, target.id, b),

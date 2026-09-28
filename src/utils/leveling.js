@@ -1,5 +1,6 @@
 const db = require('./database');
 const logger = require('./logger');
+const { multOf } = require('../helpers/inv');
 
 // XP engine — called fire-and-forget from messageCreate for every message that
 // survives automod. Per-guild config comes from settings.leveling:
@@ -17,7 +18,7 @@ async function awardXp(message, leveling) {
 
     const min = Math.max(1, leveling.xpMin ?? 15);
     const max = Math.max(min, leveling.xpMax ?? 25);
-    const gain = Math.round((min + Math.random() * (max - min)) * (leveling.multiplier || 1));
+    const gain = Math.round((min + Math.random() * (max - min)) * (leveling.multiplier || 1) * multOf(profile, 'xp'));
     if (gain <= 0) return;
 
     profile.xp += gain;

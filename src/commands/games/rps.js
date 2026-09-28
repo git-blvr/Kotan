@@ -2,7 +2,8 @@ const { ApplicationCommandOptionType: Opt } = require('discord.js');
 const { base, sendError, cv2 } = require('../../helpers/embeds');
 const { formatCoins, parseAmount } = require('../../helpers/format');
 const { fromMessage, fromInteraction } = require('../../helpers/ctx');
-const { betCapped, scaled } = require('../../helpers/gamecfg');
+const { betCapped, scaled } = require('../../helpers/gamecfg')
+const { withCoinMult } = require('../../helpers/inv');
 const db = require('../../utils/database');
 const config = require('../../config');
 
@@ -38,7 +39,7 @@ async function run(ctx, move, betInput) {
         return sendError(ctx, `You only have ${formatCoins(profile.wallet, cur)} in your wallet.`);
     if (betCapped(ctx, bet, cur, 'rps')) return;
 
-    profile.wallet += outcome === 'win' ? scaled(ctx.settings, bet, 'rps') : outcome === 'lose' ? -bet : 0;
+    profile.wallet += outcome === 'win' ? withCoinMult(profile, scaled(ctx.settings, bet, 'rps')) : outcome === 'lose' ? -bet : 0;
     await db.saveProfile(ctx.guild.id, ctx.user.id, profile);
 
     return ctx.reply(

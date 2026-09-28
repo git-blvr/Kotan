@@ -34,21 +34,22 @@ const imgUrl = (v, member) =>
 
 const isHttp = (u) => /^https?:\/\//i.test(u);
 
-// Builds the CV2 container from the dragged-together component list.
-// Unknown/broken pieces are skipped rather than failing the whole send.
-function cv2Card(member, embed, color) {
+// Builds a CV2 container from the dragged-together component list.
+// fmtFn/imgFn resolve placeholders per context (member join/leave vs
+// guild-level panels like tickets). Broken pieces are skipped.
+function cardContainer(components, color, fmtFn, imgFn) {
     const container = base({ color });
-    for (const c of embed.components) {
+    for (const c of components || []) {
         try {
             switch (c.type) {
                 case 'text':
                     container.addTextDisplayComponents(
-                        new TextDisplayBuilder().setContent(fmt(c.text, member) || ' ')
+                        new TextDisplayBuilder().setContent(fmtFn(c.text) || ' ')
                     );
                     break;
                 case 'heading':
                     container.addTextDisplayComponents(
-                        new TextDisplayBuilder().setContent(`# ${fmt(c.text, member)}`)
+                        new TextDisplayBuilder().setContent(`# ${fmtFn(c.text)}`)
                     );
                     break;
                 case 'separator':
@@ -59,7 +60,7 @@ function cv2Card(member, embed, color) {
                     );
                     break;
                 case 'image': {
-                    const url = imgUrl(c.url, member);
+                    const url = imgFn(c.url);
                     if (isHttp(url))
                         container.addMediaGalleryComponents(
                             new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(url))
@@ -68,21 +69,21 @@ function cv2Card(member, embed, color) {
                 }
                 case 'section': {
                     const sec = new SectionBuilder().addTextDisplayComponents(
-                        new TextDisplayBuilder().setContent(fmt(c.text, member) || ' ')
+                        new TextDisplayBuilder().setContent(fmtFn(c.text) || ' ')
                     );
-                    const img = imgUrl(c.image, member);
+                    const img = imgFn(c.image);
                     if (isHttp(img)) sec.setThumbnailAccessory(new ThumbnailBuilder().setURL(img));
                     container.addSectionComponents(sec);
                     break;
                 }
                 case 'link': {
-                    const url = imgUrl(c.url, member);
+                    const url = imgFn(c.url);
                     if (!isHttp(url)) break; // link buttons need a real URL
                     container.addActionRowComponents(
                         new ActionRowBuilder().addComponents(
                             new ButtonBuilder()
                                 .setStyle(ButtonStyle.Link)
-                                .setLabel(fmt(c.label, member).slice(0, 80) || 'Open')
+                                .setLabel(fmtFn(c.label).slice(0, 80) || 'Open')
                                 .setURL(url)
                         )
                     );
@@ -92,6 +93,10 @@ function cv2Card(member, embed, color) {
         } catch { /* skip broken component */ }
     }
     return container;
+}
+
+function cv2Card(member, embed, color) {
+    return cardContainer(embed.components, color, (s) => fmt(s, member), (u) => imgUrl(u, member));
 }
 
 // Returns a send()-ready payload for one side (join or leave).
@@ -123,4 +128,4 @@ function memberPayload(member, embed, fallback) {
     return fmt(fallback, member);
 }
 
-module.exports = { fmt, memberPayload };
+module.exports = { fmt, memberPayload, cardContainer };

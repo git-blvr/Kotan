@@ -561,3 +561,8 @@ html { scroll-behavior: smooth; }
 .clrrow input[type=color]::-webkit-color-swatch-wrapper{padding:2px}
 .clrrow input[type=color]::-webkit-color-swatch{border:0;border-radius:5px}
 .clrrow .btn{flex:none;white-space:nowrap}
+
+/* shop editor rows carry 4-6 fields — let them wrap cleanly */
+.shoprow { flex-wrap: wrap; }
+.shoprow [class^="rr_"], .shoprow [class^="rc_"], .shoprow [class*=" rr_"], .shoprow [class*=" rc_"] { display: inline-flex; gap: 6px; align-items: center; }
+.shoprow .dsel { min-width: 110px; }

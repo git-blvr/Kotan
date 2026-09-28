@@ -13,6 +13,13 @@ function guildChannels(guild) {
         .sort((a, b) => a.name.localeCompare(b.name));
 }
 
+function guildCategories(guild) {
+    return guild.channels.cache
+        .filter((c) => c.type === ChannelType.GuildCategory)
+        .map((c) => ({ id: c.id, name: c.name }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+}
+
 function guildRoles(guild) {
     return guild.roles.cache
         .filter((r) => r.id !== guild.id && !r.managed)
@@ -40,4 +47,4 @@ async function guildMessages(guild, channelId) {
     }
 }
 
-module.exports = { guildChannels, guildRoles, guildMessages };
+module.exports = { guildChannels, guildRoles, guildMessages, guildCategories };

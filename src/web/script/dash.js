@@ -310,12 +310,14 @@
         { group: 'Safety', items: [
             ['automod', svg('<path d="M12 3l8 3v6c0 4.5-3.2 7.6-8 9-4.8-1.4-8-4.5-8-9V6l8-3z"/><path d="M9 12l2 2 4-4"/>'), 'Automod'],
             ['logging', svg('<path d="M4 5h16M4 12h16M4 19h10"/>'), 'Logging'],
+            ['tickets', svg('<path d="M3 9V7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4z"/><path d="M13 5v2M13 11v2M13 17v2"/>'), 'Tickets'],
         ] },
         { group: 'Engagement', items: [
             ['welcome', svg('<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>'), 'Welcome'],
             ['roles', svg('<path d="M3 12V4h8l9 9-8 8-9-9z"/><circle cx="7.5" cy="8.5" r="1.2" fill="currentColor" stroke="none"/>'), 'Roles'],
             ['leveling', svg('<path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/>'), 'Leveling'],
             ['economy', svg('<circle cx="12" cy="12" r="8.5"/><path d="M12 7v10M15 9.2c-.6-1-1.7-1.4-3-1.4-1.7 0-3 .9-3 2.4 0 3.2 6 1.7 6 4.9 0 1.5-1.3 2.4-3 2.4-1.3 0-2.4-.5-3-1.5"/>'), 'Economy'],
+            ['shop', svg('<path d="M4 7l1.5-3h13L20 7"/><path d="M4 7h16v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7z"/><path d="M9 10a3 3 0 0 0 6 0"/>'), 'Shop'],
             ['games', svg('<rect x="2.5" y="7.5" width="19" height="11" rx="5.5"/><path d="M8 11v4M6 13h4"/><circle cx="15.5" cy="12" r="0.8" fill="currentColor" stroke="none"/><circle cx="18" cy="14" r="0.8" fill="currentColor" stroke="none"/>'), 'Games'],
             ['boosting', svg('<path d="M5 15c-1.5 1.3-2 5-2 5s3.7-.5 5-2"/><path d="M9 15l-2-2c.5-2.6 1.6-5.2 3.4-7C12.7 3.7 15.5 2.5 21 3c.5 5.5-.7 8.3-3 10.6-1.8 1.8-4.4 2.9-7 3.4z"/><circle cx="15" cy="9" r="1.6"/>'), 'Boosting'],
         ] },
@@ -606,6 +608,157 @@
         for (const [k, v] of f) o[k] === undefined ? (o[k] = v) : (Array.isArray(o[k]) ? o[k].push(v) : (o[k] = [o[k], v]));
         return o;
     };
+
+    // ---------- shared rich-card editor (welcome / tickets panel) ----------
+    const COMP_DEFS = [
+        ['text', 'Text'], ['heading', 'Heading'], ['separator', 'Divider'],
+        ['image', 'Image'], ['section', 'Section'], ['link', 'Link button'],
+    ];
+
+    // Markup for one card editor — prefix `p` namespaces every field/id so
+    // several editors can coexist on a page. Live component list is stored
+    // on `e.__list`.
+    function cardEditorHtml(p, e) {
+        return `
+            <h4 class="mt mb">Card ${tgl(`${p}e_on`, 'enabled', e.enabled)}</h4>
+            <div id="${p}ecard">
+                <div class="grid2">
+                    ${fldHtml('Style', `<select name="${p}e_style"><option value="embed" ${e.style !== 'cv2' ? 'selected' : ''}>Embed</option><option value="cv2" ${e.style === 'cv2' ? 'selected' : ''}>CV2 container</option></select>`)}
+                    ${fldHtml('Accent color', `<input type="text" name="${p}e_color" value="${esc(e.color ? `#${e.color}` : '')}" placeholder="#5865f2" maxlength="7">`, 'hex — empty = brand color')}
+                </div>
+                <div id="${p}e_embed">
+                    <div class="grid2">
+                        ${fldHtml('Title', txtIn(`${p}e_title`, e.title || '', 'e.g. Welcome to {server}!'))}
+                        ${fldHtml('Footer', txtIn(`${p}e_footer`, e.footer || ''))}
+                    </div>
+                    ${fldHtml('Description', txtArea(`${p}e_desc`, e.description || ''), 'supports the same placeholders')}
+                    ${tgl(`${p}e_thumb`, 'Show member avatar', e.thumbnail)}
+                </div>
+                <div id="${p}e_cv2">
+                    <p class="sub mb">Drag components to reorder — <code class="mono">{avatar}</code> and <code class="mono">{icon}</code> also work in image fields.</p>
+                    <div id="${p}comps"></div>
+                    <div class="compadd mt">${COMP_DEFS.map(([t, l]) => `<button class="btn sm" data-add="${t}">+ ${l}</button>`).join('')}</div>
+                </div>
+                <div class="dprev" id="${p}dprev"></div>
+            </div>`;
+    }
+
+    const cardCompFields = (c) => {
+        switch (c.type) {
+            case 'text':
+                return `<textarea data-k="text" rows="2" placeholder="Markdown text — placeholders allowed">${esc(c.text || '')}</textarea>`;
+            case 'heading':
+                return `<input type="text" data-k="text" value="${esc(c.text || '')}" placeholder="Big heading text">`;
+            case 'separator':
+                return `<select data-k="size"><option value="small" ${c.size !== 'large' ? 'selected' : ''}>Small gap</option><option value="large" ${c.size === 'large' ? 'selected' : ''}>Large gap</option></select>`;
+            case 'image':
+                return `<input type="text" data-k="url" value="${esc(c.url || '')}" placeholder="https://… or {avatar} / {icon}">`;
+            case 'section':
+                return `<input type="text" data-k="text" value="${esc(c.text || '')}" placeholder="Text beside the thumbnail" class="grow">
+                        <input type="text" data-k="image" value="${esc(c.image || '')}" placeholder="{avatar} or URL" style="flex:0 0 160px">`;
+            case 'link':
+                return `<input type="text" data-k="label" value="${esc(c.label || '')}" placeholder="Button label" style="flex:0 0 140px">
+                        <input type="text" data-k="url" value="${esc(c.url || '')}" placeholder="https://…" class="grow">`;
+            default: return '';
+        }
+    };
+
+    // Wires one card editor already rendered into `page`. Returns a
+    // collector producing the saved embed/card object.
+    function setupCardEditor(page, p, e) {
+        e.__list ||= [...(e.components || [])];
+        const list = e.__list;
+
+        const memberAv = dcdnAv(CTX.user.id, CTX.user.avatar);
+        const guildIcon = dcdnIcon(CTX.guild.id, CTX.guild.icon);
+        const botAv = CTX.bot ? dcdnAv(CTX.bot.id, CTX.bot.avatar) : '';
+        const botName = CTX.settings.branding?.nickname || CTX.bot?.username || 'Kotan';
+        const sampleFill = (s) => String(s ?? '')
+            .replaceAll('{user}', `@${CTX.user.username}`)
+            .replaceAll('{username}', CTX.user.username)
+            .replaceAll('{server}', CTX.guild.name)
+            .replaceAll('{members}', String(CTX.guild.memberCount))
+            .replaceAll('{avatar}', memberAv || 'avatar')
+            .replaceAll('{icon}', guildIcon || 'icon');
+        const updPrev = () => {
+            const el = $(`#${p}dprev`, page);
+            if (!el) return;
+            const f = formVals(page);
+            if (!f[`${p}e_on`]) { el.innerHTML = ''; return; }
+            const b = { avatar: botAv, name: botName };
+            if (f[`${p}e_style`] === 'cv2') {
+                const comps = list.map((c) => ({ ...c, text: sampleFill(c.text), url: sampleFill(c.url), image: sampleFill(c.image), label: sampleFill(c.label) }));
+                el.innerHTML = comps.length ? svgMessage({ ...b, container: comps }) : '<p class="muted small">Add components to preview the card.</p>';
+            } else {
+                el.innerHTML = svgMessage({ ...b, embed: {
+                    title: sampleFill(f[`${p}e_title`]), description: sampleFill(f[`${p}e_desc`]),
+                    footer: sampleFill(f[`${p}e_footer`]), color: f[`${p}e_color`],
+                    thumbUrl: f[`${p}e_thumb`] ? memberAv : '',
+                } });
+            }
+        };
+
+        const renderComps = () => {
+            const el = $(`#${p}comps`, page);
+            el.innerHTML = list.map((c, i) => `
+                <div class="comprow" draggable="true" data-i="${i}">
+                    <span class="drag" title="Drag to reorder">⠿</span>
+                    <span class="ctype">${COMP_DEFS.find(([t]) => t === c.type)?.[1] || c.type}</span>
+                    ${cardCompFields(c)}
+                    <span class="cbtns"><button class="cbtn" data-up="${i}" title="Move up">↑</button><button class="cbtn" data-dn="${i}" title="Move down">↓</button><button class="cbtn danger" data-del="${i}" title="Remove">✕</button></span>
+                </div>`).join('') || '<p class="muted small">No components — add some below.</p>';
+            $$('.comprow [data-k]', el).forEach((inp) => {
+                const row = inp.closest('.comprow');
+                inp.oninput = () => { list[+row.dataset.i][inp.dataset.k] = inp.value; };
+            });
+            $$('.comprow [data-up]', el).forEach((b) => (b.onclick = () => { const i = +b.dataset.up; if (i > 0) { [list[i - 1], list[i]] = [list[i], list[i - 1]]; renderComps(); } }));
+            $$('.comprow [data-dn]', el).forEach((b) => (b.onclick = () => { const i = +b.dataset.dn; if (i < list.length - 1) { [list[i + 1], list[i]] = [list[i], list[i + 1]]; renderComps(); } }));
+            $$('.comprow [data-del]', el).forEach((b) => (b.onclick = () => { list.splice(+b.dataset.del, 1); renderComps(); }));
+            let dragIdx = null;
+            $$('.comprow', el).forEach((row) => {
+                row.ondragstart = (ev) => { dragIdx = +row.dataset.i; ev.dataTransfer.effectAllowed = 'move'; row.classList.add('dragging'); };
+                row.ondragend = () => row.classList.remove('dragging');
+                row.ondragover = (ev) => ev.preventDefault();
+                row.ondrop = (ev) => {
+                    ev.preventDefault();
+                    const to = +row.dataset.i;
+                    if (dragIdx === null || dragIdx === to) return;
+                    list.splice(to, 0, list.splice(dragIdx, 1)[0]);
+                    renderComps();
+                };
+            });
+            updPrev();
+        };
+
+        // Card editor collapses when disabled; embed vs CV2 fields follow the style select.
+        const on = $(`[name=${p}e_on]`, page);
+        const styleSel = $(`[name=${p}e_style]`, page);
+        const sync = () => {
+            $(`#${p}ecard`, page).style.display = on.checked ? '' : 'none';
+            const cv2Mode = styleSel.value === 'cv2';
+            $(`#${p}e_embed`, page).style.display = cv2Mode ? 'none' : '';
+            $(`#${p}e_cv2`, page).style.display = cv2Mode ? '' : 'none';
+        };
+        on.onchange = sync; styleSel.onchange = sync; sync();
+        $(`#${p}ecard`, page).addEventListener('input', updPrev);
+        $(`#${p}ecard`, page).addEventListener('change', updPrev);
+        renderComps();
+        $$(`.compadd [data-add]`, $(`#${p}e_cv2`, page)).forEach((b) => (b.onclick = () => {
+            list.push({ type: b.dataset.add });
+            renderComps();
+        }));
+
+        return {
+            collect: (f) => ({
+                enabled: !!f[`${p}e_on`],
+                style: f[`${p}e_style`],
+                title: f[`${p}e_title`], description: f[`${p}e_desc`],
+                color: f[`${p}e_color`], footer: f[`${p}e_footer`],
+                thumbnail: !!f[`${p}e_thumb`],
+                components: f[`${p}e_style`] === 'cv2' ? list : [],
+            }),
+        };
+    }
 
     // ---------- pages ----------
     const PAGES = {
@@ -911,42 +1064,7 @@
 
         async welcome(page) {
             const w = CTX.settings.welcome;
-            // Per-side CV2 component lists — the dragged-together card body.
-            const compLists = { w: [...(w.embed.components || [])], g: [...(w.goodbyeEmbed.components || [])] };
-
-            const COMP_DEFS = [
-                ['text', 'Text'],
-                ['heading', 'Heading'],
-                ['separator', 'Divider'],
-                ['image', 'Image'],
-                ['section', 'Section'],
-                ['link', 'Link button'],
-            ];
-
-            // One embed/card editor per side — on = the rich card replaces the plain message.
-            // Style switches between classic embed fields and the CV2 component builder.
-            const embedEditor = (p, e) => `
-                <h4 class="mt mb">Card ${tgl(`${p}e_on`, 'enabled', e.enabled)}</h4>
-                <div id="${p}ecard">
-                    <div class="grid2">
-                        ${fldHtml('Style', `<select name="${p}e_style"><option value="embed" ${e.style !== 'cv2' ? 'selected' : ''}>Embed</option><option value="cv2" ${e.style === 'cv2' ? 'selected' : ''}>CV2 container</option></select>`)}
-                        ${fldHtml('Accent color', `<input type="text" name="${p}e_color" value="${esc(e.color ? `#${e.color}` : '')}" placeholder="#5865f2" maxlength="7">`, 'hex — empty = brand color')}
-                    </div>
-                    <div id="${p}e_embed">
-                        <div class="grid2">
-                            ${fldHtml('Title', txtIn(`${p}e_title`, e.title || '', 'e.g. Welcome to {server}!'))}
-                            ${fldHtml('Footer', txtIn(`${p}e_footer`, e.footer || ''))}
-                        </div>
-                        ${fldHtml('Description', txtArea(`${p}e_desc`, e.description || ''), 'supports the same placeholders')}
-                        ${tgl(`${p}e_thumb`, 'Show member avatar', e.thumbnail)}
-                    </div>
-                    <div id="${p}e_cv2">
-                        <p class="sub mb">Drag components to reorder — <code class="mono">{avatar}</code> and <code class="mono">{icon}</code> also work in image fields.</p>
-                        <div id="${p}comps"></div>
-                        <div class="compadd mt">${COMP_DEFS.map(([t, l]) => `<button class="btn sm" data-add="${t}">+ ${l}</button>`).join('')}</div>
-                    </div>
-                    <div class="dprev" id="${p}dprev"></div>
-                </div>`;
+            const embedEditor = cardEditorHtml;
 
             page.innerHTML = `
                 <div><div class="page-title">Welcome &amp; Goodbye</div><p class="page-desc">Greet new members and note departures. Placeholders: <code class="mono">{user}</code> <code class="mono">{username}</code> <code class="mono">{server}</code> <code class="mono">{members}</code></p></div>
@@ -971,132 +1089,19 @@
             const upd = () => { $('#wprev', page).innerHTML = fill($('[name=wmsg]', page).value); $('#gprev', page).innerHTML = fill($('[name=gmsg]', page).value); };
             $$('[name=wmsg],[name=gmsg]', page).forEach((t) => (t.oninput = upd)); upd();
 
-            // ---- CV2 component builder (per side) ----
-            const compFields = (c, i) => {
-                switch (c.type) {
-                    case 'text':
-                        return `<textarea data-k="text" rows="2" placeholder="Markdown text — placeholders allowed">${esc(c.text || '')}</textarea>`;
-                    case 'heading':
-                        return `<input type="text" data-k="text" value="${esc(c.text || '')}" placeholder="Big heading text">`;
-                    case 'separator':
-                        return `<select data-k="size"><option value="small" ${c.size !== 'large' ? 'selected' : ''}>Small gap</option><option value="large" ${c.size === 'large' ? 'selected' : ''}>Large gap</option></select>`;
-                    case 'image':
-                        return `<input type="text" data-k="url" value="${esc(c.url || '')}" placeholder="https://… or {avatar} / {icon}">`;
-                    case 'section':
-                        return `<input type="text" data-k="text" value="${esc(c.text || '')}" placeholder="Text beside the thumbnail" class="grow">
-                                <input type="text" data-k="image" value="${esc(c.image || '')}" placeholder="{avatar} or URL" style="flex:0 0 160px">`;
-                    case 'link':
-                        return `<input type="text" data-k="label" value="${esc(c.label || '')}" placeholder="Button label" style="flex:0 0 140px">
-                                <input type="text" data-k="url" value="${esc(c.url || '')}" placeholder="https://…" class="grow">`;
-                    default: return '';
-                }
-            };
-
-            const renderComps = (p) => {
-                const list = compLists[p];
-                const el = $(`#${p}comps`, page);
-                el.innerHTML = list.map((c, i) => `
-                    <div class="comprow" draggable="true" data-i="${i}">
-                        <span class="drag" title="Drag to reorder">⠿</span>
-                        <span class="ctype">${COMP_DEFS.find(([t]) => t === c.type)?.[1] || c.type}</span>
-                        ${compFields(c, i)}
-                        <span class="cbtns"><button class="cbtn" data-up="${i}" title="Move up">↑</button><button class="cbtn" data-dn="${i}" title="Move down">↓</button><button class="cbtn danger" data-del="${i}" title="Remove">✕</button></span>
-                    </div>`).join('') || '<p class="muted small">No components — add some below.</p>';
-
-                // Field edits write straight into the component objects.
-                $$('.comprow [data-k]', el).forEach((inp) => {
-                    const row = inp.closest('.comprow');
-                    inp.oninput = () => { list[+row.dataset.i][inp.dataset.k] = inp.value; };
-                });
-                // Click reorder + delete.
-                $$('.comprow [data-up]', el).forEach((b) => (b.onclick = () => { const i = +b.dataset.up; if (i > 0) { [list[i - 1], list[i]] = [list[i], list[i - 1]]; renderComps(p); } }));
-                $$('.comprow [data-dn]', el).forEach((b) => (b.onclick = () => { const i = +b.dataset.dn; if (i < list.length - 1) { [list[i + 1], list[i]] = [list[i], list[i + 1]]; renderComps(p); } }));
-                $$('.comprow [data-del]', el).forEach((b) => (b.onclick = () => { list.splice(+b.dataset.del, 1); renderComps(p); }));
-                // Drag reorder.
-                let dragIdx = null;
-                $$('.comprow', el).forEach((row) => {
-                    row.ondragstart = (e) => { dragIdx = +row.dataset.i; e.dataTransfer.effectAllowed = 'move'; row.classList.add('dragging'); };
-                    row.ondragend = () => row.classList.remove('dragging');
-                    row.ondragover = (e) => e.preventDefault();
-                    row.ondrop = (e) => {
-                        e.preventDefault();
-                        const to = +row.dataset.i;
-                        if (dragIdx === null || dragIdx === to) return;
-                        list.splice(to, 0, list.splice(dragIdx, 1)[0]);
-                        renderComps(p);
-                    };
-                });
-                updPrev(p);
-            };
-
-            // Live Discord-mock preview — plain placeholder substitution
-            // ({avatar}/{icon} resolve to CDN URLs inside image fields).
-            const memberAv = dcdnAv(CTX.user.id, CTX.user.avatar);
-            const guildIcon = dcdnIcon(CTX.guild.id, CTX.guild.icon);
-            const botAv = CTX.bot ? dcdnAv(CTX.bot.id, CTX.bot.avatar) : '';
-            const botName = CTX.settings.branding?.nickname || CTX.bot?.username || 'Kotan';
-            const sampleFill = (s) => String(s ?? '')
-                .replaceAll('{user}', `@${CTX.user.username}`)
-                .replaceAll('{username}', CTX.user.username)
-                .replaceAll('{server}', CTX.guild.name)
-                .replaceAll('{members}', String(CTX.guild.memberCount))
-                .replaceAll('{avatar}', memberAv || 'avatar')
-                .replaceAll('{icon}', guildIcon || 'icon');
-            const updPrev = (p) => {
-                const el = $(`#${p}dprev`, page);
-                if (!el) return;
-                const f = formVals(page);
-                if (!f[`${p}e_on`]) { el.innerHTML = ''; return; }
-                const base = { avatar: botAv, name: botName };
-                if (f[`${p}e_style`] === 'cv2') {
-                    const comps = compLists[p].map((c) => ({ ...c, text: sampleFill(c.text), url: sampleFill(c.url), image: sampleFill(c.image), label: sampleFill(c.label) }));
-                    el.innerHTML = comps.length ? svgMessage({ ...base, container: comps }) : '<p class="muted small">Add components to preview the card.</p>';
-                } else {
-                    el.innerHTML = svgMessage({ ...base, embed: {
-                        title: sampleFill(f[`${p}e_title`]), description: sampleFill(f[`${p}e_desc`]),
-                        footer: sampleFill(f[`${p}e_footer`]), color: f[`${p}e_color`],
-                        thumbUrl: f[`${p}e_thumb`] ? memberAv : '',
-                    } });
-                }
-            };
-
-            ['w', 'g'].forEach((p) => {
-                // Card editor collapses when disabled; embed vs CV2 fields follow the style select.
-                const on = $(`[name=${p}e_on]`, page);
-                const styleSel = $(`[name=${p}e_style]`, page);
-                const sync = () => {
-                    $(`#${p}ecard`, page).style.display = on.checked ? '' : 'none';
-                    const cv2Mode = styleSel.value === 'cv2';
-                    $(`#${p}e_embed`, page).style.display = cv2Mode ? 'none' : '';
-                    $(`#${p}e_cv2`, page).style.display = cv2Mode ? '' : 'none';
-                };
-                on.onchange = sync; styleSel.onchange = sync; sync();
-                $(`#${p}ecard`, page).addEventListener('input', () => updPrev(p));
-                $(`#${p}ecard`, page).addEventListener('change', () => updPrev(p));
-                renderComps(p);
-                $$(`.compadd [data-add]`, $(`#${p}e_cv2`, page)).forEach((b) => (b.onclick = () => {
-                    compLists[p].push({ type: b.dataset.add });
-                    renderComps(p);
-                }));
-            });
-
-            const embedVals = (f, p) => ({
-                enabled: !!f[`${p}e_on`],
-                style: f[`${p}e_style`],
-                title: f[`${p}e_title`], description: f[`${p}e_desc`],
-                color: f[`${p}e_color`], footer: f[`${p}e_footer`],
-                thumbnail: !!f[`${p}e_thumb`],
-                components: f[`${p}e_style`] === 'cv2' ? compLists[p] : [],
-            });
+            const cardW = setupCardEditor(page, 'w', w.embed);
+            const cardG = setupCardEditor(page, 'g', w.goodbyeEmbed);
             bindSave(page, 'welcome', (el) => {
                 const f = formVals(el);
                 return {
                     channel: mounts.wch.get() || null, goodbyeChannel: mounts.gch.get() || null,
                     message: f.wmsg, goodbyeMessage: f.gmsg,
-                    embed: embedVals(f, 'w'), goodbyeEmbed: embedVals(f, 'g'),
+                    embed: cardW.collect(f), goodbyeEmbed: cardG.collect(f),
                 };
             });
         },
+
+
 
         async roles(page) {
             const r = CTX.settings.roles;
@@ -1231,6 +1236,121 @@
             });
         },
 
+        async shop(page) {
+            const s = CTX.settings.shop || {};
+            const cats = s.categories || {};
+            const PFX = { dynamic: 'd', multipliers: 'm', roles: 'r' };
+            const state = {
+                dynamic: { name: cats.dynamic?.name || '', items: [...(cats.dynamic?.items || [])] },
+                multipliers: { name: cats.multipliers?.name || '', items: [...(cats.multipliers?.items || [])] },
+                roles: { name: cats.roles?.name || '', items: [...(cats.roles?.items || [])] },
+            };
+            page.innerHTML = `
+                <div><div class="page-title">Shop</div><p class="page-desc">The CV2 store — homepage text, categories, and what each item does.</p></div>
+                <div class="card"><h3>Homepage</h3>
+                    <div class="mb">${tgl('shop_on', 'Enable the shop', s.enabled !== false)}</div>
+                    <div class="grid2">
+                        ${fldHtml('Title', txtIn('shop_title', s.title, 'Shop'))}
+                        ${fldHtml('Accent color', `<div class="clrrow"><input type="color" name="shop_pick" value="${esc(s.color || '#5865f2')}"><input type="text" name="shop_color" value="${esc(s.color || '')}" placeholder="#5865f2 — empty = default"></div>`)}
+                    </div>
+                    ${fldHtml('Description', txtIn('shop_desc', s.description), 'shown under the title when /shop opens')}
+                </div>
+                <div class="card"><h3>Dynamic Items</h3><p class="sub mb">Collectibles that land in the buyer's inventory — effects come later.</p>
+                    ${fldHtml('Category name', txtIn('catn_dynamic', state.dynamic.name, 'Items'))}
+                    <div id="si-dynamic"></div><button class="btn sm mt" id="add-dynamic">+ Add item</button></div>
+                <div class="card"><h3>Coin / Level Boosters</h3><p class="sub mb">Temporary multipliers — activated instantly on purchase, duration stacks.</p>
+                    ${fldHtml('Category name', txtIn('catn_multipliers', state.multipliers.name, 'Boosters'))}
+                    <div id="si-multipliers"></div><button class="btn sm mt" id="add-multipliers">+ Add booster</button></div>
+                <div class="card"><h3>Roles &amp; Crates</h3><p class="sub mb">Roles grant instantly on buy; crates pay out random coins.</p>
+                    ${fldHtml('Category name', txtIn('catn_roles', state.roles.name, 'Roles & Crates'))}
+                    <div id="si-roles"></div><button class="btn sm mt" id="add-roles">+ Add entry</button></div>
+                ${saveBar('shop')}`;
+
+            // color picker sync
+            const pick = $('[name=shop_pick]', page), hex = $('[name=shop_color]', page);
+            pick.oninput = () => (hex.value = pick.value);
+            hex.oninput = () => { if (/^#[0-9a-fA-F]{6}$/.test(hex.value)) pick.value = hex.value; };
+
+            const baseRow = (cat, x, i, extra) => `
+                <div class="modrow shoprow">
+                    <input type="text" name="${PFX[cat]}n_${i}" value="${esc(x.name || '')}" placeholder="Item name" style="flex:0 0 150px">
+                    <input type="number" name="${PFX[cat]}p_${i}" value="${x.price ?? ''}" placeholder="Price" min="0" style="flex:0 0 90px">
+                    <input type="text" name="${PFX[cat]}d_${i}" value="${esc(x.desc || x.description || '')}" placeholder="Description" class="grow">
+                    ${extra}
+                    <button class="btn sm danger" data-del="${i}">✕</button></div>`;
+
+            const renders = {
+                dynamic: () => {
+                    const el = $('#si-dynamic', page);
+                    el.innerHTML = state.dynamic.items.map((x, i) => baseRow('dynamic', x, i, '')).join('')
+                        || '<p class="muted small">No items.</p>';
+                },
+                multipliers: () => {
+                    const el = $('#si-multipliers', page);
+                    el.innerHTML = state.multipliers.items.map((x, i) => baseRow('multipliers', x, i, `
+                        ${selSlot(`mk_${i}`)}
+                        <input type="number" name="mm_${i}" value="${x.mult ?? ''}" placeholder="×2" min="1" step="0.1" style="flex:0 0 70px">
+                        <input type="number" name="mt_${i}" value="${x.mins ?? ''}" placeholder="mins" min="1" style="flex:0 0 80px">`)).join('')
+                        || '<p class="muted small">No boosters.</p>';
+                    state.multipliers.items.forEach((x, i) =>
+                        mountSelect(page, `mk_${i}`, { options: [{ value: 'coins', label: 'Coins' }, { value: 'xp', label: 'XP/Levels' }], value: x.kind || 'coins' }));
+                },
+                roles: () => {
+                    const el = $('#si-roles', page);
+                    el.innerHTML = state.roles.items.map((x, i) => baseRow('roles', x, i, `
+                        ${selSlot(`rt_${i}`)}
+                        <span class="rr_${i}" ${x.type === 'crate' ? 'style="display:none"' : ''}>${selSlot(`rr_${i}`)}</span>
+                        <span class="rc_${i}" ${x.type === 'crate' ? '' : 'style="display:none"'}>
+                            <input type="number" name="rmin_${i}" value="${x.min ?? ''}" placeholder="Min" min="0" style="width:80px">
+                            <input type="number" name="rmax_${i}" value="${x.max ?? ''}" placeholder="Max" min="0" style="width:80px">
+                        </span>`)).join('')
+                        || '<p class="muted small">No entries.</p>';
+                    state.roles.items.forEach((x, i) => {
+                        mountSelect(page, `rt_${i}`, { options: [{ value: 'role', label: 'Role' }, { value: 'crate', label: 'Crate' }], value: x.type || 'role' });
+                        mountSelect(page, `rr_${i}`, { options: roOpts(DATA.roles), value: x.roleId, placeholder: 'Role…' });
+                        mounts[`rt_${i}`].addEventListener('change', () => {
+                            const isCrate = mounts[`rt_${i}`].get() === 'crate';
+                            $(`.rr_${i}`, page).style.display = isCrate ? 'none' : '';
+                            $(`.rc_${i}`, page).style.display = isCrate ? '' : 'none';
+                        });
+                    });
+                },
+            };
+
+            for (const cat of Object.keys(renders)) {
+                const rebind = () => {
+                    renders[cat]();
+                    $$(`#si-${cat} [data-del]`, page).forEach((b) =>
+                        (b.onclick = () => { state[cat].items.splice(+b.dataset.del, 1); rebind(); }));
+                };
+                rebind();
+                $(`#add-${cat}`, page).onclick = () => {
+                    if (state[cat].items.length >= 7) return; // CV2 container cap
+                    state[cat].items.push(cat === 'multipliers' ? { kind: 'coins', mult: 2, mins: 60 } : cat === 'roles' ? { type: 'role' } : {});
+                    rebind();
+                };
+            }
+
+            bindSave(page, 'shop', (el) => {
+                const f = formVals(el);
+                const base = (cat, i) => ({ name: f[`${PFX[cat]}n_${i}`], price: +f[`${PFX[cat]}p_${i}`] || 0, desc: f[`${PFX[cat]}d_${i}`] });
+                return {
+                    enabled: !!f.shop_on, title: f.shop_title, description: f.shop_desc, color: f.shop_color,
+                    categories: {
+                        dynamic: { name: f.catn_dynamic, items: state.dynamic.items.map((x, i) => base('dynamic', i)) },
+                        multipliers: { name: f.catn_multipliers, items: state.multipliers.items.map((x, i) => ({ ...base('multipliers', i), kind: mounts[`mk_${i}`]?.get() || 'coins', mult: +f[`mm_${i}`] || 2, mins: +f[`mt_${i}`] || 60 })) },
+                        roles: { name: f.catn_roles, items: state.roles.items.map((x, i) => {
+                            const t = mounts[`rt_${i}`]?.get() || 'role';
+                            const it = { ...base('roles', i), type: t };
+                            if (t === 'role') it.roleId = mounts[`rr_${i}`]?.get();
+                            else { it.min = +f[`rmin_${i}`] || 0; it.max = +f[`rmax_${i}`] || 0; }
+                            return it;
+                        }) },
+                    },
+                };
+            });
+        },
+
         async games(page) {
             const g = CTX.settings.games;
             const per = g.per || {};
@@ -1276,6 +1396,76 @@
                     guessReward: +f.guessReward || 0, scrambleReward: +f.scrambleReward || 0,
                     winMultiplier: +f.winMultiplier || 0, maxBet: +f.maxBet || 0,
                     per: perOut,
+                };
+            });
+        },
+
+        async tickets(page) {
+            const t = CTX.settings.tickets || {};
+            const topics = [...(t.topics || [])];
+            page.innerHTML = `
+                <div><div class="page-title">Tickets</div><p class="page-desc">Members pick a topic on the panel — a private channel opens under your category.</p></div>
+                <div class="card"><h3>Setup</h3>
+                    <div class="mb">${tgl('tk_on', 'Enable tickets', t.enabled)}</div>
+                    <div class="grid2">
+                        ${fldHtml('Ticket category', selSlot('tkcat'), 'new ticket channels land here')}
+                        ${fldHtml('Log channel', selSlot('tklog'), 'open/close announcements — empty = silent')}
+                    </div>
+                    <div class="grid2">
+                        ${fldHtml('Support roles', selSlot('tkroles'), 'can see, claim and close tickets')}
+                        ${fldHtml('Max open per member', numIn('tkmax', t.maxOpen, 1, 10))}
+                    </div>
+                    ${fldHtml('Channel naming', txtIn('tkname', t.naming, 'ticket-{user}'), 'placeholders: {user} {count}')}
+                </div>
+                <div class="card"><h3>Topics</h3><p class="sub mb">The panel dropdown — up to 10. With none, the panel shows a single "Open a ticket" button.</p>
+                    <div id="topics"></div><button class="btn sm mt" id="add-topic">+ Add topic</button></div>
+                <div class="card"><h3>Panel card</h3><p class="sub mb">The message people see — CV2 container, classic embed, or plain text when the card is off. The topic dropdown is attached automatically.</p>
+                    ${cardEditorHtml('tp', t.panel || {})}</div>
+                <div class="card"><h3>Post panel</h3>
+                    ${fldHtml('Channel', selSlot('tkpost'), 'sends the panel immediately — uses saved settings')}
+                    <div class="mt"><button class="btn" id="post-panel">Post panel</button> <span class="hint" id="post-status"></span></div></div>
+                ${saveBar('tickets')}`;
+
+            mountSelect(page, 'tkcat', { options: [{ value: '', label: 'No category' }, ...(DATA.categories || []).map((c) => ({ value: c.id, label: c.name, icon: '▤' }))], value: t.categoryId || '', placeholder: 'No category' });
+            mountSelect(page, 'tklog', { options: [{ value: '', label: 'Off' }, ...chOpts(DATA.channels)], value: t.logChannel || '', placeholder: 'Off' });
+            mountSelect(page, 'tkroles', { multi: true, options: roOpts(DATA.roles), value: t.supportRoles || [], placeholder: 'Support roles…' });
+            mountSelect(page, 'tkpost', { options: chOpts(DATA.channels), placeholder: 'Pick a channel…' });
+            const card = setupCardEditor(page, 'tp', t.panel || {});
+
+            const tpEl = $('#topics', page);
+            const renderTopics = () => {
+                tpEl.innerHTML = topics.map((x, i) => `
+                    <div class="modrow">
+                        <input type="text" name="tn_${i}" value="${esc(x.name || '')}" placeholder="Topic — e.g. General support" style="flex:0 0 200px">
+                        <input type="text" name="td_${i}" value="${esc(x.desc || '')}" placeholder="Dropdown description" class="grow">
+                        <button class="btn sm danger" data-del="${i}">✕</button></div>`).join('')
+                    || '<p class="muted small">No topics — the panel falls back to a single open button.</p>';
+                $$('#topics [data-del]', page).forEach((b) => (b.onclick = () => { topics.splice(+b.dataset.del, 1); renderTopics(); }));
+            };
+            renderTopics();
+            $('#add-topic', page).onclick = () => { if (topics.length < 10) { topics.push({ name: '', desc: '' }); renderTopics(); } };
+
+            $('#post-panel', page).onclick = async (e) => {
+                const status = $('#post-status', page);
+                const channel = mounts.tkpost.get();
+                if (!channel) { status.textContent = '— pick a channel first'; return; }
+                e.target.disabled = true;
+                const r = await api(`/api/guilds/${guildId}/tickets/panel`, { body: { channel } }).catch(() => null);
+                e.target.disabled = false;
+                status.textContent = r?.ok ? '— posted!' : `— ${r?.error || 'failed (save your settings first)'}`;
+            };
+
+            bindSave(page, 'tickets', (el) => {
+                const f = formVals(el);
+                return {
+                    enabled: !!f.tk_on,
+                    categoryId: mounts.tkcat.get() || null,
+                    logChannel: mounts.tklog.get() || null,
+                    supportRoles: mounts.tkroles.get() || [],
+                    maxOpen: +f.tkmax || 1,
+                    naming: f.tkname,
+                    topics: topics.map((x, i) => ({ name: f[`tn_${i}`], desc: f[`td_${i}`] })),
+                    panel: card.collect(f),
                 };
             });
         },
@@ -1430,6 +1620,7 @@
             CTX = { ...ctx, user: me.user };
             const [ch, ro] = await Promise.all([api(`/api/guilds/${guildId}/channels`), api(`/api/guilds/${guildId}/roles`)]);
             DATA.channels = ch.channels || [];
+            DATA.categories = ch.categories || [];
             DATA.roles = ro.roles || [];
         }
         shell(slug);

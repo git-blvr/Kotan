@@ -1,6 +1,7 @@
 const { success, sendError, cv2 } = require('../../helpers/embeds');
 const { formatCoins, formatDuration, timestamp } = require('../../helpers/format');
 const { fromMessage, fromInteraction } = require('../../helpers/ctx');
+const { withCoinMult } = require('../../helpers/inv');
 const db = require('../../utils/database');
 const config = require('../../config');
 
@@ -27,7 +28,7 @@ async function run(ctx) {
     const bonus = Math.min(streak * streakBonus, maxBonus);
     const reward = base + bonus;
 
-    profile.wallet += reward;
+    profile.wallet += withCoinMult(profile, reward);
     profile.lastDaily = now;
     profile.dailyStreak = streak;
     await db.saveProfile(ctx.guild.id, ctx.user.id, profile);

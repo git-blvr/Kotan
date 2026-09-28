@@ -2,7 +2,8 @@ const { ApplicationCommandOptionType: Opt } = require('discord.js');
 const { base, sendError, cv2 } = require('../../helpers/embeds');
 const { formatCoins, parseAmount } = require('../../helpers/format');
 const { fromMessage, fromInteraction } = require('../../helpers/ctx');
-const { betCapped, gameCfg } = require('../../helpers/gamecfg');
+const { betCapped, gameCfg } = require('../../helpers/gamecfg')
+const { withCoinMult } = require('../../helpers/inv');
 const db = require('../../utils/database');
 const config = require('../../config');
 
@@ -37,7 +38,7 @@ async function run(ctx, betInput) {
         note = 'No match — better luck next spin.';
     }
 
-    profile.wallet += winnings - bet;
+    profile.wallet += withCoinMult(profile, winnings) - bet;
     await db.saveProfile(ctx.guild.id, ctx.user.id, profile);
 
     const net = winnings - bet;

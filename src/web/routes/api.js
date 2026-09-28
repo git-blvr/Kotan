@@ -10,6 +10,7 @@ const { manageableGuilds, checkGuildAccess, isDeveloper } = require('../permissi
 const blacklist = require('../blacklist');
 const settings = require('../settings');
 const guildData = require('../guildData');
+const tickets = require('../../utils/tickets');
 const commands = require('../config/commands');
 const modules = require('../config/modules');
 
@@ -116,7 +117,19 @@ module.exports = async (app) => {
             commands,
         }));
 
-        gg.get('/channels', (req, reply) => reply.send({ channels: guildData.guildChannels(req.guild) }));
+        gg.get('/channels', (req, reply) =>
+            reply.send({ channels: guildData.guildChannels(req.guild), categories: guildData.guildCategories(req.guild) }));
+
+        // Posts the ticket panel into a channel — used by the dashboard's
+        // "Post panel" button so setup is fully web-side.
+        gg.post('/tickets/panel', async (req, reply) => {
+            const ch = req.guild.channels.cache.get(String(req.body?.channel || ''));
+            if (!ch || !ch.isTextBased()) return reply.code(400).send({ error: 'Unknown channel' });
+            const t = (await settings.getSettings(req.guild.id)).tickets;
+            if (!t?.enabled) return reply.code(400).send({ error: 'Tickets are disabled — enable and save first' });
+            await ch.send(tickets.panelPayload(req.guild, t)).catch(() => {});
+            return reply.send({ ok: true });
+        });
         gg.get('/roles', (req, reply) => reply.send({ roles: guildData.guildRoles(req.guild) }));
 
         gg.get('/messages', async (req, reply) => {

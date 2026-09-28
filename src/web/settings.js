@@ -38,9 +38,23 @@ const DEFAULTS = {
     moduleChannels: {},
     commandRules: [],
     overview: { cards: ['members', 'commands', 'warns', 'tempbans'] },
+    shop: {
+        enabled: true, title: 'Shop',
+        description: 'Spend your coins on boosts and goodies.', color: '',
+        categories: {
+            dynamic: { name: 'Items', items: [] },
+            multipliers: { name: 'Boosters', items: [] },
+            roles: { name: 'Roles & Crates', items: [] },
+        },
+    },
+    tickets: {
+        enabled: false, categoryId: null, logChannel: null, supportRoles: [],
+        maxOpen: 1, naming: 'ticket-{user}', topics: [],
+        panel: { enabled: true, style: 'cv2', title: 'Support', description: 'Pick a topic below to open a ticket.', color: '', footer: '', thumbnail: false, components: [] },
+    },
 };
 
-const NESTED = ['automod', 'logging', 'welcome', 'roles', 'economy', 'leveling', 'access', 'overview', 'games', 'boosts', 'appearance', 'branding'];
+const NESTED = ['automod', 'logging', 'welcome', 'roles', 'economy', 'leveling', 'access', 'overview', 'games', 'boosts', 'appearance', 'branding', 'shop', 'tickets'];
 
 async function getSettings(guildId) {
     const s = await db.getGuildSettings(guildId);
@@ -249,6 +263,46 @@ const SECTIONS = {
                 .filter((i) => i.id);
         }
     },
+    shop(s, f) {
+        if (f.enabled !== undefined) s.shop.enabled = bool(f.enabled);
+        if (f.title !== undefined) s.shop.title = str(f.title, 80) || 'Shop';
+        if (f.description !== undefined) s.shop.description = str(f.description, 500) ?? '';
+        if (f.color !== undefined) s.shop.color = str(f.color, 20) ?? '';
+        const cats = f.categories;
+        if (!cats || typeof cats !== 'object') return;
+        const itemBase = (i) => ({
+            name: str(i.name, 40) || '',
+            desc: str(i.desc ?? i.description, 140) || '',
+            price: num(i.price, 0, 100_000_000, 0) ?? 0,
+        });
+        const out = {};
+        for (const id of ['dynamic', 'multipliers', 'roles']) {
+            const c = cats[id] || {};
+            const items = arr(c.items).filter((i) => i && typeof i === 'object').slice(0, 7)
+                .map((i) => {
+                    const it = itemBase(i);
+                    if (!it.name) return null;
+                    if (id === 'multipliers') {
+                        it.kind = i.kind === 'xp' ? 'xp' : 'coins';
+                        it.mult = num(i.mult, 1.1, 25, 2);
+                        it.mins = num(i.mins, 1, 43200, 60);
+                    } else if (id === 'roles') {
+                        it.type = i.type === 'crate' ? 'crate' : 'role';
+                        if (it.type === 'role') {
+                            it.roleId = optSnowflake(i.roleId);
+                            if (!it.roleId) return null; // role items need a valid role
+                        } else {
+                            it.min = num(i.min, 0, 100_000_000, 100) ?? 100;
+                            it.max = Math.max(it.min, num(i.max, 0, 100_000_000, 500) ?? 500);
+                        }
+                    }
+                    return it;
+                })
+                .filter(Boolean);
+            out[id] = { name: str(c.name, 40) || null, items };
+        }
+        s.shop.categories = out;
+    },
     games(s, f) {
         if (f.guessReward !== undefined) s.games.guessReward = num(f.guessReward, 0, 10_000_000, 150);
         if (f.scrambleReward !== undefined) s.games.scrambleReward = num(f.scrambleReward, 0, 10_000_000, 200);
@@ -268,6 +322,32 @@ const SECTIONS = {
                 if (Object.values(entry).every((v) => v === null)) delete s.games.per[k];
                 else s.games.per[k] = entry;
             }
+        }
+    },
+    tickets(s, f) {
+        if (f.enabled !== undefined) s.tickets.enabled = bool(f.enabled);
+        if (f.categoryId !== undefined) {
+            const v = optSnowflake(f.categoryId);
+            if (v === undefined) return 'Invalid category';
+            s.tickets.categoryId = v;
+        }
+        if (f.logChannel !== undefined) {
+            const v = optSnowflake(f.logChannel);
+            if (v === undefined) return 'Invalid channel';
+            s.tickets.logChannel = v;
+        }
+        if (f.supportRoles !== undefined) s.tickets.supportRoles = idArr(f.supportRoles).slice(0, 10);
+        if (f.maxOpen !== undefined) s.tickets.maxOpen = num(f.maxOpen, 1, 10, 1) ?? 1;
+        if (f.naming !== undefined) s.tickets.naming = str(f.naming, 60) || 'ticket-{user}';
+        if (f.topics !== undefined)
+            s.tickets.topics = arr(f.topics)
+                .filter((t) => t && typeof t === 'object')
+                .slice(0, 10)
+                .map((t) => ({ name: str(t.name, 80), desc: str(t.desc, 100) || '' }))
+                .filter((t) => t.name);
+        if (f.panel) {
+            const err = SECTIONS.welcomeEmbed(s.tickets.panel, f.panel);
+            if (err) return err;
         }
     },
     boosts(s, f) {

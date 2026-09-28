@@ -2,7 +2,8 @@ const { ApplicationCommandOptionType: Opt } = require('discord.js');
 const { base, sendError, cv2 } = require('../../helpers/embeds');
 const { formatCoins, parseAmount } = require('../../helpers/format');
 const { fromMessage, fromInteraction } = require('../../helpers/ctx');
-const { betCapped, scaled } = require('../../helpers/gamecfg');
+const { betCapped, scaled } = require('../../helpers/gamecfg')
+const { withCoinMult } = require('../../helpers/inv');
 const db = require('../../utils/database');
 const config = require('../../config');
 
@@ -28,7 +29,7 @@ async function run(ctx, sides, betInput) {
 
     const botRoll = 1 + Math.floor(Math.random() * sides);
     const outcome = you === botRoll ? 'tie' : you > botRoll ? 'win' : 'lose';
-    profile.wallet += outcome === 'win' ? scaled(ctx.settings, bet, 'roll') : outcome === 'lose' ? -bet : 0;
+    profile.wallet += outcome === 'win' ? withCoinMult(profile, scaled(ctx.settings, bet, 'roll')) : outcome === 'lose' ? -bet : 0;
     await db.saveProfile(ctx.guild.id, ctx.user.id, profile);
 
     return ctx.reply(

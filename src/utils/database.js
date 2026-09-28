@@ -38,10 +38,11 @@ const tags = createStore('tags');
 const audit = createStore('audit');
 const meta = createStore('meta'); // process heartbeat for the website's status page
 const sessions = createStore('sessions'); // website login sessions
+const tickets = createStore('tickets');   // open ticket channels per guild
 
 // A store error (Redis disconnect, disk failure) must never crash the process.
 // @keyv/redis reconnects automatically; SQLite is in-process and won't drop.
-for (const store of [profiles, warns, tempbans, guilds, usage, tags, audit, meta, sessions]) {
+for (const store of [profiles, warns, tempbans, guilds, usage, tags, audit, meta, sessions, tickets]) {
     store.on('error', (err) => logger.error(`Storage error in "${store.namespace}":`, err));
 }
 if (sharedRedis) sharedRedis.on('error', (err) => logger.error('Redis error:', err));
@@ -128,6 +129,18 @@ const DEFAULT_SETTINGS = {
     branding: {
         nickname: '',       // bot nickname here; '' = default name
     },
+    // Ticket system — CV2 panel posted anywhere, topic dropdown opens a
+    // private channel under the configured category.
+    tickets: {
+        enabled: false,
+        categoryId: null,       // parent category for ticket channels
+        logChannel: null,       // open/close announcements; null = silent
+        supportRoles: [],       // roles that see and manage tickets
+        maxOpen: 1,             // open tickets per member
+        naming: 'ticket-{user}',// channel name template — {user} {count}
+        topics: [],             // [{name, desc}] — the panel dropdown (max 10)
+        panel: { enabled: true, style: 'cv2', title: 'Support', description: 'Pick a topic below to open a ticket.', color: '', footer: '', thumbnail: false, components: [] },
+    },
     leveling: {
         enabled: false,
         xpMin: 15,          // xp granted per message, random between min/max
@@ -147,6 +160,18 @@ const DEFAULT_SETTINGS = {
         // (current behavior: only Discord-manageable users reach pages).
         sections: {},
     },
+    // CV2 item shop — homepage text plus three fixed-effect categories.
+    shop: {
+        enabled: true,
+        title: 'Shop',
+        description: 'Spend your coins on boosts and goodies.',
+        color: '',              // accent hex; '' = brand color
+        categories: {
+            dynamic:     { name: 'Items',          items: [] }, // [{name,desc,price}]
+            multipliers: { name: 'Boosters',       items: [] }, // [{name,desc,price,kind:'coins'|'xp',mult,mins}]
+            roles:       { name: 'Roles & Crates', items: [] }, // [{name,desc,price,type:'role'|'crate',roleId|min,max}]
+        },
+    },
     // Discord roles allowed to use each command module. Empty = everyone.
     moduleRoles: {},        // category -> [roleIds]
     // Channels a module may be used in. Empty = anywhere.
@@ -162,7 +187,7 @@ const DEFAULT_SETTINGS = {
 
 // Nested sections must merge key-by-key — a saved doc written before a new
 // sub-key existed shouldn't lose the defaults.
-const NESTED = ['automod', 'logging', 'welcome', 'roles', 'economy', 'leveling', 'access', 'overview', 'games', 'boosts', 'appearance', 'branding'];
+const NESTED = ['automod', 'logging', 'welcome', 'roles', 'economy', 'leveling', 'access', 'overview', 'games', 'boosts', 'appearance', 'branding', 'shop', 'tickets'];
 
 async function getGuildSettings(guildId) {
     const hit = settingsCache.get(guildId);
@@ -334,7 +359,8 @@ const DEFAULT_PROFILE = {
     wallet: 0,
     lastDaily: 0,
     dailyStreak: 0,
-    inventory: {},
+    inventory: {},  // itemId -> qty owned
+    mults: {},      // 'coins'|'xp' -> { mult, until } timed boosters
     xp: 0,      // progress toward the next level
     level: 0,
     lastXp: 0,  // timestamp of last xp gain (cooldown)
@@ -575,6 +601,19 @@ async function useTag(guildId, name, triggerOnly = false) {
     return tag.content;
 }
 
+// ---------- tickets ----------
+
+// Open ticket state per guild: counter, channel records and a user->channel
+// index so the per-member cap is cheap to enforce.
+async function getTickets(guildId) {
+    return (await tickets.get(guildId)) || { count: 0, byUser: {}, channels: {} };
+}
+
+async function saveTickets(guildId, data) {
+    await tickets.set(guildId, data);
+    return data;
+}
+
 // Flushes and closes the storage backends — called on graceful shutdown so
 // no writes are lost (WAL checkpoint) and Redis disconnects cleanly.
 async function closeDatabase() {
@@ -617,6 +656,8 @@ module.exports = {
     addTag,
     deleteTag,
     useTag,
+    getTickets,
+    saveTickets,
     isGuildBlacklisted,
     blacklistGuild,
     unblacklistGuild,
