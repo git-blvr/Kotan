@@ -403,6 +403,162 @@
         scrollSpy();
     }
 
+    // ---------- Discord-style SVG previews ----------
+    // Inline SVG mocks of Discord UI: message rows, embeds, CV2 containers,
+    // and the profile popout. Text wraps by estimated width — it's a preview.
+    const DC = { bg: '#313338', panel: '#2b2d31', border: '#43444c', text: '#dbdee1', head: '#f2f3f5', muted: '#949ba4', brand: '#5865f2', green: '#23a55a' };
+    const DFONT = `'gg sans','Segoe UI','Helvetica Neue',Arial,sans-serif`;
+    let svgUid = 0;
+    const xesc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const normHex = (v, fb) => (/^#?[0-9a-f]{6}$/i.test(String(v || '').trim()) ? `#${String(v).trim().replace(/^#/, '')}` : fb);
+    const dcdnAv = (id, hash) => (hash ? `https://cdn.discordapp.com/avatars/${id}/${hash}.png?size=128` : '');
+    const dcdnIcon = (id, hash) => (hash ? `https://cdn.discordapp.com/icons/${id}/${hash}.png?size=128` : '');
+
+    const wrapTxt = (str, maxChars) => {
+        const out = [];
+        for (const raw of String(str || '').split('\n')) {
+            let line = '';
+            for (const w of raw.split(/\s+/).filter(Boolean)) {
+                const cand = line ? `${line} ${w}` : w;
+                if (cand.length > maxChars && line) { out.push(line); line = w; }
+                else line = cand;
+            }
+            out.push(line);
+        }
+        return out.length ? out : [''];
+    };
+
+    const txtLines = (lines, x, y, { size = 14, fill = DC.text, weight = 400, lh = 1.4 } = {}) =>
+        lines.map((l, i) => `<text x="${x}" y="${y + i * size * lh}" font-family="${DFONT}" font-size="${size}" font-weight="${weight}" fill="${fill}">${xesc(l)}</text>`).join('');
+
+    // Circular avatar — CDN image when available, else a default silhouette.
+    const svgAv = (url, cx, cy, r) => {
+        const id = `av${++svgUid}`;
+        const inner = url
+            ? `<image href="${xesc(url)}" x="${cx - r}" y="${cy - r}" width="${r * 2}" height="${r * 2}" preserveAspectRatio="xMidYMid slice" clip-path="url(#${id})"/>`
+            : `<g clip-path="url(#${id})"><rect x="${cx - r}" y="${cy - r}" width="${r * 2}" height="${r * 2}" fill="${DC.brand}"/><circle cx="${cx}" cy="${cy - r * 0.35}" r="${r * 0.42}" fill="#fff"/><path d="M${cx - r * 0.75} ${cy + r} a${r * 0.75} ${r * 0.75} 0 0 1 ${r * 1.5} 0" fill="#fff"/></g>`;
+        return `<defs><clipPath id="${id}"><circle cx="${cx}" cy="${cy}" r="${r}"/></clipPath></defs>${inner}`;
+    };
+
+    // Rounded image — CDN URL or a dark placeholder with an icon glyph.
+    const svgImg = (url, x, y, w, h, rx = 8) => {
+        const id = `im${++svgUid}`;
+        const inner = /^https?:\/\//.test(url || '')
+            ? `<image href="${xesc(url)}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid slice" clip-path="url(#${id})"/>`
+            : `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#1e1f22" clip-path="url(#${id})"/><path d="M${x + w / 2 - 14} ${y + h / 2 + 10} l9 -12 7 8 9 -12 11 16z" fill="${DC.border}"/><circle cx="${x + w / 2 - 8}" cy="${y + h / 2 - 8}" r="4" fill="${DC.border}"/>`;
+        return `<defs><clipPath id="${id}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rx}"/></clipPath></defs>${inner}`;
+    };
+
+    // Classic embed — accent bar, title, wrapped description, thumbnail, footer.
+    const svgEmbed = (e, x, y, w) => {
+        const pad = 14, iw = w - 32;
+        const thumb = e.thumbUrl ? 80 : 0;
+        const tw = iw - (thumb ? 92 : 0);
+        const color = normHex(e.color, DC.brand);
+        let cy = y + pad, body = '';
+        if (e.title) {
+            const ls = wrapTxt(e.title, Math.floor(tw / 8.2));
+            body += txtLines(ls, x + 16, cy + 11, { size: 15, fill: DC.head, weight: 700 });
+            cy += ls.length * 21 + 4;
+        }
+        if (e.description) {
+            const ls = wrapTxt(e.description, Math.floor(tw / 6.9));
+            body += txtLines(ls, x + 16, cy + 10, { size: 14 });
+            cy += ls.length * 19.6 + 4;
+        }
+        if (e.footer) {
+            cy += 6;
+            const ls = wrapTxt(e.footer, Math.floor(iw / 6.4));
+            body += txtLines(ls, x + 16, cy + 8, { size: 12, fill: DC.muted });
+            cy += ls.length * 16.8;
+        }
+        const h = Math.max(cy - y + pad, thumb ? 108 : 44);
+        const img = thumb ? svgImg(e.thumbUrl, x + w - 96, y + pad, 80, 80) : '';
+        return { h, svg: `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="${DC.panel}"/><rect x="${x}" y="${y}" width="4" height="${h}" fill="${color}"/>${img}${body}` };
+    };
+
+    // CV2 container — stacked components, per-type rendering.
+    const svgContainer = (comps, x, y, w) => {
+        const pad = 16, iw = w - pad * 2;
+        let cy = y + pad, body = '';
+        for (const c of comps || []) {
+            if (c.type === 'text') {
+                const ls = wrapTxt(c.text || 'Text', Math.floor(iw / 6.9));
+                body += txtLines(ls, x + pad, cy + 10);
+                cy += ls.length * 19.6 + 6;
+            } else if (c.type === 'heading') {
+                const ls = wrapTxt(c.text || 'Heading', Math.floor(iw / 9));
+                body += txtLines(ls, x + pad, cy + 12, { size: 16, fill: DC.head, weight: 700 });
+                cy += ls.length * 22.4 + 6;
+            } else if (c.type === 'separator') {
+                const gap = c.size === 'large' ? 12 : 5;
+                cy += gap;
+                body += `<line x1="${x + pad}" y1="${cy}" x2="${x + w - pad}" y2="${cy}" stroke="${DC.border}" stroke-width="1"/>`;
+                cy += gap + 4;
+            } else if (c.type === 'image') {
+                const ih = Math.min(150, Math.floor(iw * 0.55));
+                body += svgImg(c.url, x + pad, cy, iw, ih);
+                cy += ih + 8;
+            } else if (c.type === 'section') {
+                const ls = wrapTxt(c.text || 'Section text', Math.floor((iw - 76) / 6.9));
+                const sh = Math.max(ls.length * 19.6, 64);
+                body += txtLines(ls, x + pad, cy + 10 + Math.max(0, (sh - ls.length * 19.6) / 2));
+                body += svgImg(c.image, x + w - pad - 64, cy, 64, 64);
+                cy += sh + 8;
+            } else if (c.type === 'link') {
+                body += `<rect x="${x + pad}" y="${cy}" width="120" height="34" rx="6" fill="${DC.brand}"/>
+                    <text x="${x + pad + 60}" y="${cy + 21.5}" text-anchor="middle" font-family="${DFONT}" font-size="14" font-weight="600" fill="#fff">${xesc((c.label || 'Link').slice(0, 16))}</text>
+                    <path d="M${x + pad + 106} ${cy + 11} h6 v6 M${x + pad + 112} ${cy + 11} l-7 7" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round"/>`;
+                cy += 42;
+            }
+        }
+        const h = Math.max(cy - y + pad - 4, 44);
+        return { h, svg: `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="12" fill="${DC.panel}" stroke="${DC.border}" stroke-opacity=".55"/>${body}` };
+    };
+
+    // A message row: avatar, name + BOT tag + timestamp, text, embed/container.
+    const svgMessage = ({ avatar, name, content, embed, container }) => {
+        const W = 440;
+        let body = svgAv(avatar, 38, 28, 20);
+        const nw = Math.min(String(name).length * 8.4, 180);
+        body += `<text x="72" y="32" font-family="${DFONT}" font-size="15" font-weight="600" fill="${DC.head}">${xesc(name)}</text>`;
+        body += `<rect x="${76 + nw}" y="20" width="38" height="15" rx="4" fill="${DC.brand}"/><text x="${95 + nw}" y="31" text-anchor="middle" font-family="${DFONT}" font-size="10" font-weight="700" fill="#fff">BOT</text>`;
+        const hh = String(new Date().getHours()).padStart(2, '0'), mm = String(new Date().getMinutes()).padStart(2, '0');
+        body += `<text x="${121 + nw}" y="31" font-family="${DFONT}" font-size="11" fill="${DC.muted}">Today at ${hh}:${mm}</text>`;
+        let cy = 44;
+        if (content) {
+            const ls = wrapTxt(content, 47);
+            body += txtLines(ls, 72, cy + 10);
+            cy += ls.length * 19.6 + 6;
+        }
+        if (embed) { const r = svgEmbed(embed, 72, cy, 344); body += r.svg; cy += r.h + 8; }
+        if (container) { const r = svgContainer(container, 72, cy, 344); body += r.svg; cy += r.h + 8; }
+        const h = Math.max(cy + 8, 52);
+        return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${h}" width="${W}" height="${h}" class="dsvg" role="img"><rect width="${W}" height="${h}" fill="${DC.bg}"/>${body}</svg>`;
+    };
+
+    // Discord profile popout — banner, avatar + status, name, meta.
+    const svgProfile = ({ name, username, avatar, banner }) => {
+        const W = 300, H = 238;
+        const bc = normHex(banner, DC.brand);
+        const id = `pf${++svgUid}`;
+        return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" class="dsvg" role="img">
+            <defs><clipPath id="${id}"><rect width="${W}" height="${H}" rx="10"/></clipPath></defs>
+            <g clip-path="url(#${id})">
+                <rect width="${W}" height="${H}" fill="#1e1f22"/>
+                <rect width="${W}" height="60" fill="${bc}"/>
+                <rect y="60" width="${W}" height="${H - 60}" fill="#111214"/>
+                <circle cx="52" cy="78" r="47" fill="#111214"/>
+                ${svgAv(avatar, 52, 78, 42)}
+                <circle cx="82" cy="106" r="12" fill="#111214"/><circle cx="82" cy="106" r="8" fill="${DC.green}"/>
+                <text x="16" y="150" font-family="${DFONT}" font-size="19" font-weight="700" fill="${DC.head}">${xesc(name)}</text>
+                <text x="16" y="170" font-family="${DFONT}" font-size="13" fill="${DC.muted}">${xesc(username)}</text>
+                <rect x="12" y="184" width="${W - 24}" height="${H - 196}" rx="8" fill="#1e1f22"/>
+                <text x="24" y="206" font-family="${DFONT}" font-size="11" font-weight="700" fill="${DC.muted}">ABOUT ME</text>
+                <text x="24" y="222" font-family="${DFONT}" font-size="12" fill="${DC.text}">Your friendly community bot.</text>
+            </g></svg>`;
+    };
+
     function bindSave(container, section, collect) {
         container.querySelector(`[data-save="${section}"]`)?.addEventListener('click', async (e) => {
             for (const k in mounts) delete mounts[k];
@@ -749,6 +905,7 @@
                         <div id="${p}comps"></div>
                         <div class="compadd mt">${COMP_DEFS.map(([t, l]) => `<button class="btn sm" data-add="${t}">+ ${l}</button>`).join('')}</div>
                     </div>
+                    <div class="dprev" id="${p}dprev"></div>
                 </div>`;
 
             page.innerHTML = `
@@ -829,6 +986,38 @@
                         renderComps(p);
                     };
                 });
+                updPrev(p);
+            };
+
+            // Live Discord-mock preview — plain placeholder substitution
+            // ({avatar}/{icon} resolve to CDN URLs inside image fields).
+            const memberAv = dcdnAv(CTX.user.id, CTX.user.avatar);
+            const guildIcon = dcdnIcon(CTX.guild.id, CTX.guild.icon);
+            const botAv = CTX.bot ? dcdnAv(CTX.bot.id, CTX.bot.avatar) : '';
+            const botName = CTX.settings.branding?.nickname || CTX.bot?.username || 'Kotan';
+            const sampleFill = (s) => String(s ?? '')
+                .replaceAll('{user}', `@${CTX.user.username}`)
+                .replaceAll('{username}', CTX.user.username)
+                .replaceAll('{server}', CTX.guild.name)
+                .replaceAll('{members}', String(CTX.guild.memberCount))
+                .replaceAll('{avatar}', memberAv || 'avatar')
+                .replaceAll('{icon}', guildIcon || 'icon');
+            const updPrev = (p) => {
+                const el = $(`#${p}dprev`, page);
+                if (!el) return;
+                const f = formVals(page);
+                if (!f[`${p}e_on`]) { el.innerHTML = ''; return; }
+                const base = { avatar: botAv, name: botName };
+                if (f[`${p}e_style`] === 'cv2') {
+                    const comps = compLists[p].map((c) => ({ ...c, text: sampleFill(c.text), url: sampleFill(c.url), image: sampleFill(c.image), label: sampleFill(c.label) }));
+                    el.innerHTML = comps.length ? svgMessage({ ...base, container: comps }) : '<p class="muted small">Add components to preview the card.</p>';
+                } else {
+                    el.innerHTML = svgMessage({ ...base, embed: {
+                        title: sampleFill(f[`${p}e_title`]), description: sampleFill(f[`${p}e_desc`]),
+                        footer: sampleFill(f[`${p}e_footer`]), color: f[`${p}e_color`],
+                        thumbUrl: f[`${p}e_thumb`] ? memberAv : '',
+                    } });
+                }
             };
 
             ['w', 'g'].forEach((p) => {
@@ -842,6 +1031,8 @@
                     $(`#${p}e_cv2`, page).style.display = cv2Mode ? '' : 'none';
                 };
                 on.onchange = sync; styleSel.onchange = sync; sync();
+                $(`#${p}ecard`, page).addEventListener('input', () => updPrev(p));
+                $(`#${p}ecard`, page).addEventListener('change', () => updPrev(p));
                 renderComps(p);
                 $$(`.compadd [data-add]`, $(`#${p}e_cv2`, page)).forEach((b) => (b.onclick = () => {
                     compLists[p].push({ type: b.dataset.add });
@@ -1090,7 +1281,10 @@
                         ${fldHtml('Background image URL', txtIn('bgimg', s.appearance.background || '', 'https://…'), 'empty = none')}
                     </div>${saveBar('appearance')}</div>
                 <div class="card"><h3>Bot profile</h3><p class="sub mb">Nickname applies to this server only; the avatar is global — it changes everywhere.</p>
-                    ${fldHtml('Nickname in this server', txtIn('nickname', s.branding.nickname || '', CTX.botname || 'Kotan'), 'empty = default name')}
+                    <div class="grid2">
+                        ${fldHtml('Nickname in this server', txtIn('nickname', s.branding.nickname || '', CTX.bot?.username || 'Kotan'), 'empty = default name')}
+                        <div class="dprev prof" id="profprev"></div>
+                    </div>
                     ${saveBar('branding')}
                     <div class="flex mt">
                         <input type="file" id="bavatar" accept="image/png,image/jpeg,image/webp" style="display:none">
@@ -1100,6 +1294,20 @@
 
             mountSelect(page, 'modroles', { multi: true, options: roOpts(DATA.roles), value: s.access.modRoles, placeholder: 'None' });
             mountSelect(page, 'adminroles', { multi: true, options: roOpts(DATA.roles), value: s.access.adminRoles, placeholder: 'None' });
+
+            // Live Discord profile popout — nickname + accent from the form.
+            const nickIn = $('[name=nickname]', page);
+            const updProf = () => {
+                const nick = nickIn.value.trim() || CTX.bot?.username || 'Kotan';
+                $('#profprev', page).innerHTML = svgProfile({
+                    name: nick, username: `@${CTX.bot?.username || 'kotan'}`,
+                    avatar: CTX.bot ? dcdnAv(CTX.bot.id, CTX.bot.avatar) : '',
+                    banner: $('[name=accent]', page)?.value || s.appearance.accent,
+                });
+            };
+            nickIn.oninput = updProf;
+            $('[name=accent]', page)?.addEventListener('input', updProf);
+            updProf();
 
             $('#pick-avatar', page).onclick = () => $('#bavatar', page).click();
             $('#bavatar', page).onchange = async (e) => {

@@ -103,6 +103,7 @@ module.exports = async (app) => {
 
         gg.get('/', async (req, reply) => reply.send({
             guild: { id: req.guild.id, name: req.guild.name, icon: req.guild.icon, memberCount: req.guild.memberCount },
+            bot: { id: req.client.user.id, username: req.client.user.username, avatar: req.client.user.avatar },
             settings: await settings.getSettings(req.guild.id),
             modules,
             commands,

@@ -483,3 +483,9 @@
 .evrow .evl{flex:1;min-width:0}
 .evrow .evc{width:220px;flex:none}
 @media (max-width:720px){.evrow{flex-wrap:wrap}.evrow .evc{width:100%}}
+
+/* Discord-mock SVG previews */
+.dprev{margin-top:14px}
+.dprev .dsvg{display:block;width:100%;max-width:460px;height:auto;border-radius:10px;box-shadow:0 1px 0 rgba(0,0,0,.2)}
+.dprev.prof{margin-top:0}
+.dprev.prof .dsvg{max-width:300px}
