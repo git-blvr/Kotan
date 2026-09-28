@@ -659,19 +659,42 @@
 
         async welcome(page) {
             const w = CTX.settings.welcome;
+            // Per-side CV2 component lists — the dragged-together card body.
+            const compLists = { w: [...(w.embed.components || [])], g: [...(w.goodbyeEmbed.components || [])] };
+
+            const COMP_DEFS = [
+                ['text', 'Text'],
+                ['heading', 'Heading'],
+                ['separator', 'Divider'],
+                ['image', 'Image'],
+                ['section', 'Section'],
+                ['link', 'Link button'],
+            ];
+
             // One embed/card editor per side — on = the rich card replaces the plain message.
+            // Style switches between classic embed fields and the CV2 component builder.
             const embedEditor = (p, e) => `
                 <h4 class="mt mb">Card ${tgl(`${p}e_on`, 'enabled', e.enabled)}</h4>
                 <div id="${p}ecard">
                     <div class="grid2">
                         ${fldHtml('Style', `<select name="${p}e_style"><option value="embed" ${e.style !== 'cv2' ? 'selected' : ''}>Embed</option><option value="cv2" ${e.style === 'cv2' ? 'selected' : ''}>CV2 container</option></select>`)}
                         ${fldHtml('Accent color', `<input type="text" name="${p}e_color" value="${esc(e.color ? `#${e.color}` : '')}" placeholder="#5865f2" maxlength="7">`, 'hex — empty = brand color')}
-                        ${fldHtml('Title', txtIn(`${p}e_title`, e.title || '', 'e.g. Welcome to {server}!'))}
-                        ${fldHtml('Footer', txtIn(`${p}e_footer`, e.footer || ''))}
                     </div>
-                    ${fldHtml('Description', txtArea(`${p}e_desc`, e.description || ''), 'supports the same placeholders')}
-                    ${tgl(`${p}e_thumb`, 'Show member avatar', e.thumbnail)}
+                    <div id="${p}e_embed">
+                        <div class="grid2">
+                            ${fldHtml('Title', txtIn(`${p}e_title`, e.title || '', 'e.g. Welcome to {server}!'))}
+                            ${fldHtml('Footer', txtIn(`${p}e_footer`, e.footer || ''))}
+                        </div>
+                        ${fldHtml('Description', txtArea(`${p}e_desc`, e.description || ''), 'supports the same placeholders')}
+                        ${tgl(`${p}e_thumb`, 'Show member avatar', e.thumbnail)}
+                    </div>
+                    <div id="${p}e_cv2">
+                        <p class="sub mb">Drag components to reorder — <code class="mono">{avatar}</code> and <code class="mono">{icon}</code> also work in image fields.</p>
+                        <div id="${p}comps"></div>
+                        <div class="compadd mt">${COMP_DEFS.map(([t, l]) => `<button class="btn sm" data-add="${t}">+ ${l}</button>`).join('')}</div>
+                    </div>
                 </div>`;
+
             page.innerHTML = `
                 <div><div class="page-title">Welcome &amp; Goodbye</div><p class="page-desc">Greet new members and note departures. Placeholders: <code class="mono">{user}</code> <code class="mono">{username}</code> <code class="mono">{server}</code> <code class="mono">{members}</code></p></div>
                 <div class="card"><h3>Welcome</h3>
@@ -687,23 +710,96 @@
                     ${embedEditor('g', w.goodbyeEmbed)}
                 </div>
                 ${saveBar('welcome')}`;
+
             mountSelect(page, 'wch', { options: [{ value: '', label: 'Off' }, ...chOpts(DATA.channels)], value: w.channel || '', placeholder: 'Off' });
             mountSelect(page, 'gch', { options: [{ value: '', label: 'Off' }, ...chOpts(DATA.channels)], value: w.goodbyeChannel || '', placeholder: 'Off' });
+
             const fill = (tpl) => esc(tpl).replaceAll('{user}', `<span class="puser">@${esc(CTX.user.username)}</span>`).replaceAll('{username}', esc(CTX.user.username)).replaceAll('{server}', esc(CTX.guild.name)).replaceAll('{members}', String(CTX.guild.memberCount));
             const upd = () => { $('#wprev', page).innerHTML = fill($('[name=wmsg]', page).value); $('#gprev', page).innerHTML = fill($('[name=gmsg]', page).value); };
             $$('[name=wmsg],[name=gmsg]', page).forEach((t) => (t.oninput = upd)); upd();
-            // Card editor collapses when its toggle is off
+
+            // ---- CV2 component builder (per side) ----
+            const compFields = (c, i) => {
+                switch (c.type) {
+                    case 'text':
+                        return `<textarea data-k="text" rows="2" placeholder="Markdown text — placeholders allowed">${esc(c.text || '')}</textarea>`;
+                    case 'heading':
+                        return `<input type="text" data-k="text" value="${esc(c.text || '')}" placeholder="Big heading text">`;
+                    case 'separator':
+                        return `<select data-k="size"><option value="small" ${c.size !== 'large' ? 'selected' : ''}>Small gap</option><option value="large" ${c.size === 'large' ? 'selected' : ''}>Large gap</option></select>`;
+                    case 'image':
+                        return `<input type="text" data-k="url" value="${esc(c.url || '')}" placeholder="https://… or {avatar} / {icon}">`;
+                    case 'section':
+                        return `<input type="text" data-k="text" value="${esc(c.text || '')}" placeholder="Text beside the thumbnail" class="grow">
+                                <input type="text" data-k="image" value="${esc(c.image || '')}" placeholder="{avatar} or URL" style="flex:0 0 160px">`;
+                    case 'link':
+                        return `<input type="text" data-k="label" value="${esc(c.label || '')}" placeholder="Button label" style="flex:0 0 140px">
+                                <input type="text" data-k="url" value="${esc(c.url || '')}" placeholder="https://…" class="grow">`;
+                    default: return '';
+                }
+            };
+
+            const renderComps = (p) => {
+                const list = compLists[p];
+                const el = $(`#${p}comps`, page);
+                el.innerHTML = list.map((c, i) => `
+                    <div class="comprow" draggable="true" data-i="${i}">
+                        <span class="drag" title="Drag to reorder">⠿</span>
+                        <span class="ctype">${COMP_DEFS.find(([t]) => t === c.type)?.[1] || c.type}</span>
+                        ${compFields(c, i)}
+                        <span class="cbtns"><button class="cbtn" data-up="${i}" title="Move up">↑</button><button class="cbtn" data-dn="${i}" title="Move down">↓</button><button class="cbtn danger" data-del="${i}" title="Remove">✕</button></span>
+                    </div>`).join('') || '<p class="muted small">No components — add some below.</p>';
+
+                // Field edits write straight into the component objects.
+                $$('.comprow [data-k]', el).forEach((inp) => {
+                    const row = inp.closest('.comprow');
+                    inp.oninput = () => { list[+row.dataset.i][inp.dataset.k] = inp.value; };
+                });
+                // Click reorder + delete.
+                $$('.comprow [data-up]', el).forEach((b) => (b.onclick = () => { const i = +b.dataset.up; if (i > 0) { [list[i - 1], list[i]] = [list[i], list[i - 1]]; renderComps(p); } }));
+                $$('.comprow [data-dn]', el).forEach((b) => (b.onclick = () => { const i = +b.dataset.dn; if (i < list.length - 1) { [list[i + 1], list[i]] = [list[i], list[i + 1]]; renderComps(p); } }));
+                $$('.comprow [data-del]', el).forEach((b) => (b.onclick = () => { list.splice(+b.dataset.del, 1); renderComps(p); }));
+                // Drag reorder.
+                let dragIdx = null;
+                $$('.comprow', el).forEach((row) => {
+                    row.ondragstart = (e) => { dragIdx = +row.dataset.i; e.dataTransfer.effectAllowed = 'move'; row.classList.add('dragging'); };
+                    row.ondragend = () => row.classList.remove('dragging');
+                    row.ondragover = (e) => e.preventDefault();
+                    row.ondrop = (e) => {
+                        e.preventDefault();
+                        const to = +row.dataset.i;
+                        if (dragIdx === null || dragIdx === to) return;
+                        list.splice(to, 0, list.splice(dragIdx, 1)[0]);
+                        renderComps(p);
+                    };
+                });
+            };
+
             ['w', 'g'].forEach((p) => {
+                // Card editor collapses when disabled; embed vs CV2 fields follow the style select.
                 const on = $(`[name=${p}e_on]`, page);
-                const sync = () => ($(`#${p}ecard`, page).style.display = on.checked ? '' : 'none');
-                on.onchange = sync; sync();
+                const styleSel = $(`[name=${p}e_style]`, page);
+                const sync = () => {
+                    $(`#${p}ecard`, page).style.display = on.checked ? '' : 'none';
+                    const cv2Mode = styleSel.value === 'cv2';
+                    $(`#${p}e_embed`, page).style.display = cv2Mode ? 'none' : '';
+                    $(`#${p}e_cv2`, page).style.display = cv2Mode ? '' : 'none';
+                };
+                on.onchange = sync; styleSel.onchange = sync; sync();
+                renderComps(p);
+                $$(`.compadd [data-add]`, $(`#${p}e_cv2`, page)).forEach((b) => (b.onclick = () => {
+                    compLists[p].push({ type: b.dataset.add });
+                    renderComps(p);
+                }));
             });
+
             const embedVals = (f, p) => ({
                 enabled: !!f[`${p}e_on`],
                 style: f[`${p}e_style`],
                 title: f[`${p}e_title`], description: f[`${p}e_desc`],
                 color: f[`${p}e_color`], footer: f[`${p}e_footer`],
                 thumbnail: !!f[`${p}e_thumb`],
+                components: f[`${p}e_style`] === 'cv2' ? compLists[p] : [],
             });
             bindSave(page, 'welcome', (el) => {
                 const f = formVals(el);

@@ -17,10 +17,10 @@ const DEFAULTS = {
     welcome: {
         channel: null,
         message: 'Welcome {user} to {server}! You are member #{members}.',
-        embed: { enabled: false, style: 'embed', title: '', description: '', color: '', footer: '', thumbnail: true },
+        embed: { enabled: false, style: 'embed', title: '', description: '', color: '', footer: '', thumbnail: true, components: [] },
         goodbyeChannel: null,
         goodbyeMessage: '**{username}** left {server}.',
-        goodbyeEmbed: { enabled: false, style: 'embed', title: '', description: '', color: '', footer: '', thumbnail: true },
+        goodbyeEmbed: { enabled: false, style: 'embed', title: '', description: '', color: '', footer: '', thumbnail: true, components: [] },
     },
     roles: { autorole: null, reactionRoles: [] },
     economy: { currency: null, dailyBase: null, dailyStreak: null, dailyMaxStreak: null, startBalance: null, shop: [] },
@@ -64,6 +64,36 @@ const bool = (v) => v === true || v === 'true' || v === 'on';
 const arr = (v) => (Array.isArray(v) ? v : v === undefined || v === null ? [] : [v]);
 const idArr = (v) => arr(v).map(String).filter(snowflake).slice(0, 50);
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+// CV2 card components — ordered building blocks the dashboard lets users
+// drag around. Validated per type; anything unrecognized is dropped.
+const COMP_TYPES = ['text', 'heading', 'separator', 'image', 'section', 'link'];
+function f_components(e) {
+    if (!Array.isArray(e.components)) return null;
+    const list = e.components.slice(0, 10).map((c) => {
+        if (!c || !COMP_TYPES.includes(c.type)) return null;
+        switch (c.type) {
+            case 'text': case 'heading':
+                return { type: c.type, text: str(c.text, 1000) || '' };
+            case 'separator':
+                return { type: 'separator', size: c.size === 'large' ? 'large' : 'small' };
+            case 'image':
+                return { type: 'image', url: str(c.url, 500) || '' };
+            case 'section':
+                return { type: 'section', text: str(c.text, 1000) || '', image: str(c.image, 500) || '' };
+            case 'link':
+                return { type: 'link', label: str(c.label, 80) || '', url: str(c.url, 500) || '' };
+            default: return null;
+        }
+    }).filter((c) =>
+        c &&
+        (c.type === 'separator' ||
+            (c.type === 'text' || c.type === 'heading' ? c.text :
+            c.type === 'section' ? c.text :
+            c.type === 'image' ? c.url :
+            c.type === 'link' ? c.label && c.url : false)));
+    return list;
+}
 
 // Section appliers — each validates the submitted fields and mutates the
 // settings object. Returns an error string or null.
@@ -151,7 +181,11 @@ const SECTIONS = {
         target.thumbnail = e.thumbnail === undefined ? true : bool(e.thumbnail);
         const c = String(e.color || '').trim();
         target.color = /^#?[0-9a-fA-F]{6}$/.test(c) ? c.replace('#', '') : '';
-        if (target.enabled && !target.title && !target.description) return 'Embed needs a title or description';
+        if (f_components(e)) target.components = f_components(e);
+        if (target.enabled && target.style === 'embed' && !target.title && !target.description)
+            return 'Embed needs a title or description';
+        if (target.enabled && target.style === 'cv2' && !target.components?.length)
+            return 'CV2 card needs at least one component';
     },
     welcome(s, f) {
         const ch = optSnowflake(f.channel);

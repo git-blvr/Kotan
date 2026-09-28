@@ -433,3 +433,38 @@
         transform: none !important;
     }
 }
+
+/* ---- CV2 component builder (welcome cards) ---- */
+.comprow {
+    display: flex; align-items: center; gap: var(--s2);
+    padding: var(--s2) var(--s3);
+    background: var(--bg-soft); border: 1px solid var(--border-soft);
+    border-radius: var(--r-md); margin-bottom: var(--s2);
+    transition: border-color var(--speed), opacity var(--speed);
+}
+.comprow:hover { border-color: var(--border); }
+.comprow.dragging { opacity: .4; border-style: dashed; }
+.comprow .drag { cursor: grab; color: var(--muted); font-size: 14px; padding: 0 2px; user-select: none; }
+.comprow .drag:active { cursor: grabbing; }
+.comprow .ctype {
+    flex-shrink: 0; font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .05em; color: var(--accent-2);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    border-radius: 6px; padding: 3px 7px; min-width: 62px; text-align: center;
+}
+.comprow input[type=text], .comprow textarea, .comprow select {
+    flex: 1; min-width: 0;
+    background: var(--panel-2); border: 1px solid var(--border-soft);
+    border-radius: var(--r-sm); color: var(--text);
+    padding: 6px 9px; font-size: 13px; font-family: inherit; resize: vertical;
+}
+.comprow input[type=text]:focus, .comprow textarea:focus, .comprow select:focus { outline: none; border-color: var(--accent); }
+.comprow .cbtns { display: flex; gap: 3px; flex-shrink: 0; }
+.comprow .cbtn {
+    width: 24px; height: 24px; display: grid; place-items: center;
+    border: 1px solid var(--border-soft); border-radius: 6px;
+    background: var(--panel-2); color: var(--muted); font-size: 11px; cursor: pointer;
+}
+.comprow .cbtn:hover { color: var(--text); border-color: var(--border); }
+.comprow .cbtn.danger:hover { color: var(--danger); border-color: var(--danger); }
+.compadd { display: flex; gap: 6px; flex-wrap: wrap; }

@@ -87,10 +87,10 @@ const DEFAULT_SETTINGS = {
         message: 'Welcome {user} to {server}! You are member #{members}.',
         // optional rich card — when enabled, replaces the plain message
         // style: 'embed' (classic embed) | 'cv2' (Kotan container)
-        embed: { enabled: false, style: 'embed', title: '', description: '', color: '', footer: '', thumbnail: true },
+        embed: { enabled: false, style: 'embed', title: '', description: '', color: '', footer: '', thumbnail: true, components: [] },
         goodbyeChannel: null,
         goodbyeMessage: '**{username}** left {server}.',
-        goodbyeEmbed: { enabled: false, style: 'embed', title: '', description: '', color: '', footer: '', thumbnail: true },
+        goodbyeEmbed: { enabled: false, style: 'embed', title: '', description: '', color: '', footer: '', thumbnail: true, components: [] },
     },
     roles: {
         autorole: null,     // role id granted on join
