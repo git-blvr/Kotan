@@ -380,3 +380,56 @@
     .grid2, .trio { grid-template-columns: 1fr; }
     .pk-search { width: 100%; }
 }
+
+/* ---- motion ---- */
+@keyframes page-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pop-in { from { opacity: 0; transform: scale(.96) translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes nav-in { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: none; } }
+
+/* Page sections stagger in � nodes are recreated on every navigation,
+   so this replays each time a page renders. */
+.dpage > * { animation: page-in .35s cubic-bezier(.2,.7,.3,1) backwards; }
+.dpage > *:nth-child(2) { animation-delay: .04s; }
+.dpage > *:nth-child(3) { animation-delay: .08s; }
+.dpage > *:nth-child(4) { animation-delay: .12s; }
+.dpage > *:nth-child(5) { animation-delay: .16s; }
+.dpage > *:nth-child(n+6) { animation-delay: .2s; }
+
+/* Sidebar nav: slide-in on shell mount + hover nudge. */
+.dnav-group > span { animation: fade-in .3s ease both; }
+.dnav a { animation: nav-in .3s cubic-bezier(.2,.7,.3,1) backwards; }
+.dnav a:nth-of-type(2) { animation-delay: .03s; }
+.dnav a:nth-of-type(3) { animation-delay: .06s; }
+.dnav a:nth-of-type(4) { animation-delay: .09s; }
+.dnav a:nth-of-type(n+5) { animation-delay: .12s; }
+.dnav a:hover { transform: translateX(3px); }
+.dnav a:active { transform: translateX(3px) scale(.98); }
+.dnav a.active:hover { transform: none; }
+
+/* Cards lift on hover. */
+.stat2, .modrow, .gsel { transition: transform var(--speed), border-color var(--speed), box-shadow var(--speed), background var(--speed); }
+.stat2:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+.modrow:hover { transform: translateY(-1px); }
+
+/* Server picker cards stagger in. */
+.srv { animation: page-in .35s cubic-bezier(.2,.7,.3,1) backwards; }
+.srv:nth-child(2) { animation-delay: .04s; }
+.srv:nth-child(3) { animation-delay: .08s; }
+.srv:nth-child(4) { animation-delay: .12s; }
+.srv:nth-child(n+5) { animation-delay: .16s; }
+.srv img, .srv .noicon { transition: transform var(--speed); }
+.srv:hover img, .srv:hover .noicon { transform: scale(1.06); }
+
+/* Overlay + modal entrance. */
+.overlay { animation: fade-in .15s ease both; }
+.overlay .modal { animation: pop-in .22s cubic-bezier(.2,.7,.3,1) both; }
+
+@media (prefers-reduced-motion: reduce) {
+    .dpage > *, .dnav a, .dnav-group > span, .srv, .srv img, .srv .noicon,
+    .overlay, .overlay .modal, .stat2, .modrow, .gsel {
+        animation: none !important;
+        transition: none !important;
+        transform: none !important;
+    }
+}
