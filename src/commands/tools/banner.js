@@ -39,6 +39,7 @@ module.exports = {
     aliases: ['bnr', 'profilebanner'],
     triggers: ['banner'],
     cooldown: 3,
+    guildOnly: false,
     slash: [
         { name: 'user', description: 'Whose banner to show (default: you)', type: Opt.User },
     ],

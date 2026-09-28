@@ -14,6 +14,7 @@ module.exports = {
     aliases: ['latency', 'pong'],
     triggers: ['net', 'ms'],
     cooldown: 5,
+    guildOnly: false,
     slash: [],
     execute: (message, args, client) =>
         run(fromMessage(message, { createdAt: message.createdTimestamp, client })),

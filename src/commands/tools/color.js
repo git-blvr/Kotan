@@ -44,6 +44,7 @@ module.exports = {
     aliases: ['dominantcolor', 'colour'],
     triggers: ['color'],
     cooldown: 5,
+    guildOnly: false,
     slash: [
         { name: 'user', description: 'Use this user\'s avatar', type: Opt.User },
         { name: 'image', description: 'Or attach an image to analyze', type: Opt.Attachment },

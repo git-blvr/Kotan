@@ -137,6 +137,7 @@ module.exports = {
     aliases: ['h', 'commands', 'cmds'],
     triggers: ['commands'],
     cooldown: 5,
+    guildOnly: false,
     slash: [
         { name: 'command', description: 'A command or category to inspect', type: Opt.String },
     ],

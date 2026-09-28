@@ -2,7 +2,7 @@ const path = require('node:path');
 const { AttachmentBuilder, ApplicationCommandOptionType: Opt } = require('discord.js');
 const { createCanvas, loadImage, GlobalFonts } = require('@napi-rs/canvas');
 const { base, sendError, cv2 } = require('../../helpers/embeds');
-const { resolveMember } = require('../../helpers/resolve');
+const { resolveMember, resolveUser } = require('../../helpers/resolve');
 const { fromMessage, fromInteraction } = require('../../helpers/ctx');
 const { fetchRetry } = require('../../utils/http');
 
@@ -161,11 +161,17 @@ module.exports = {
     usage: '<@member>',
     aliases: ['love', 'match'],
     cooldown: 5,
+    guildOnly: false,
     slash: [
         { name: 'member', description: 'Who to ship you with', type: Opt.User, required: true },
     ],
     execute: async (message, args) =>
-        run(fromMessage(message), (await resolveMember(message, args[0]))?.user ?? null),
+        run(
+            fromMessage(message),
+            message.guild
+                ? (await resolveMember(message, args[0]))?.user ?? null
+                : await resolveUser(message.client, args[0])
+        ),
     executeSlash: (interaction) =>
         run(fromInteraction(interaction), interaction.options.getUser('member')),
 };
