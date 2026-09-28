@@ -135,17 +135,20 @@ const shipLine = pct => {
     return `${pct}% | ${lines[Math.floor(Math.random() * lines.length)]}`;
 };
 
-async function run(ctx, user) {
-    if (!user)
-        return sendError(ctx, `Mention someone to ship you with. Usage: \`${ctx.prefix}ship @member\``);
+async function run(ctx, userA, userB) {
+    // One target ships them with the invoker; two targets ship each other.
+    const a = userB ? userA : ctx.user;
+    const b = userB || userA;
+    if (!b)
+        return sendError(ctx, `Mention who to ship. Usage: \`${ctx.prefix}ship @member [@member2]\``);
 
-    const pct = shipPercent(ctx.user.id, user.id);
-    const buf = await shipCard(ctx.user, user, pct).catch(() => null);
+    const pct = shipPercent(a.id, b.id);
+    const buf = await shipCard(a, b, pct).catch(() => null);
     if (!buf) return sendError(ctx, 'Could not render the ship card.');
 
     const container = base({
         color: pct >= 30 ? 0xff6b9d : 0x8a93a8,
-        title: `💞 ${ctx.user.username} × ${user.username}`,
+        title: `💞 ${a.username} × ${b.username}`,
         description: shipLine(pct),
         image: 'attachment://ship.png',
     });
@@ -157,22 +160,30 @@ async function run(ctx, user) {
 
 module.exports = {
     name: 'ship',
-    description: 'Ships you with another member — draws a card with both avatars and the match %.',
-    usage: '<@member>',
+    description: 'Ships two people (or you with someone) — draws a card with both avatars and the match %.',
+    usage: '<@member> [@member2]',
     aliases: ['love', 'match'],
     cooldown: 5,
     guildOnly: false,
     slash: [
-        { name: 'member', description: 'Who to ship you with', type: Opt.User, required: true },
+        { name: 'member', description: 'First person — ships them with you when member2 is empty', type: Opt.User, required: true },
+        { name: 'member2', description: 'Second person — ships member × member2 instead', type: Opt.User },
     ],
-    execute: async (message, args) =>
-        run(
-            fromMessage(message),
-            message.guild
-                ? (await resolveMember(message, args[0]))?.user ?? null
-                : await resolveUser(message.client, args[0])
-        ),
+    execute: async (message, args) => {
+        const resolve = message.guild
+            ? async (a) => (await resolveMember(message, a))?.user ?? null
+            : async (a) => resolveUser(message.client, a);
+        const userA = await resolve(args[0]);
+        const userB = args[1] ? await resolve(args[1]) : null;
+        if (args[1] && !userB)
+            return sendError(message, `Couldn't find "${args[1]}".`);
+        return run(fromMessage(message), userA, userB);
+    },
     executeSlash: (interaction) =>
-        run(fromInteraction(interaction), interaction.options.getUser('member')),
+        run(
+            fromInteraction(interaction),
+            interaction.options.getUser('member'),
+            interaction.options.getUser('member2')
+        ),
 };
 
