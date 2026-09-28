@@ -82,6 +82,17 @@ if (!config.token) {
 
 client.login(config.token);
 
+// Localhost dev REST API (restart/close/commands/guilds/…) — starts only
+// when DEV_API_KEY is set. Independent of the public dashboard listener.
+require('./utils/devrest').startDevApi(client, shutdown);
+
+// Interactive dev console — `kotan>` prompt in this terminal once the bot is
+// logged in (ready.js prints "Logged in as" first since it registered before
+// us). Skipped under pm2/devctl where stdin can't be typed into.
+client.once('ready', () => {
+    setTimeout(() => require('./utils/devcli').startDevConsole(client, { shutdown }), 500);
+});
+
 // ---------- crash resilience ----------
 
 process.on('unhandledRejection', (err) => {

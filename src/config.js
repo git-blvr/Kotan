@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ quiet: true });
 
 // Central configuration for Kotan. Everything tweakable lives here so the rest
 // of the code stays clean. Values come from .env first, then fall back to

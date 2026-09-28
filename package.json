@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node index.js",
     "dev": "node src/bot.js",
+    "cli": "node scripts/devctl.js",
     "createchannels": "node scripts/createChannels.js",
     "deploy": "node scripts/deploySlash.js",
     "smallify": "node scripts/smallify.js",

@@ -360,6 +360,17 @@
         </div>`;
         // Per-guild dashboard appearance — set in Settings > Dashboard appearance.
         applyAppearance();
+        // Default anchor nav (#/slug) would scroll .dnav to bring the
+        // clicked link to the top — route via pushState instead.
+        $('#dside').addEventListener('click', (e) => {
+            const a = e.target.closest('a[href^="#/"]');
+            if (!a) return;
+            e.preventDefault();
+            const href = a.getAttribute('href');
+            if (location.hash === href) return;
+            history.pushState(null, '', href);
+            router();
+        });
         $('#burger').onclick = () => $('#dside').classList.toggle('open');
         mountThemeFab();
     }
