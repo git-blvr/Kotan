@@ -89,10 +89,10 @@ const DEFAULT_SETTINGS = {
         message: 'Welcome {user} to {server}! You are member #{members}.',
         // optional rich card — when enabled, replaces the plain message
         // style: 'embed' (classic embed) | 'cv2' (Kotan container)
-        embed: { enabled: false, style: 'embed', title: '', description: '', color: '', footer: '', thumbnail: true, components: [] },
+        embed: { enabled: false, style: 'embed', title: '', description: '', color: '', footer: '', thumbnail: true, thumb: '', components: [] },
         goodbyeChannel: null,
         goodbyeMessage: '**{username}** left {server}.',
-        goodbyeEmbed: { enabled: false, style: 'embed', title: '', description: '', color: '', footer: '', thumbnail: true, components: [] },
+        goodbyeEmbed: { enabled: false, style: 'embed', title: '', description: '', color: '', footer: '', thumbnail: true, thumb: '', components: [] },
     },
     roles: {
         autorole: null,     // role id granted on join
@@ -139,7 +139,7 @@ const DEFAULT_SETTINGS = {
         maxOpen: 1,             // open tickets per member
         naming: 'ticket-{user}',// channel name template — {user} {count}
         topics: [],             // [{name, desc}] — the panel dropdown (max 10)
-        panel: { enabled: true, style: 'cv2', title: 'Support', description: 'Pick a topic below to open a ticket.', color: '', footer: '', thumbnail: false, components: [] },
+        panel: { enabled: true, style: 'cv2', title: 'Support', description: 'Pick a topic below to open a ticket.', color: '', footer: '', thumbnail: false, thumb: '', components: [] },
     },
     leveling: {
         enabled: false,

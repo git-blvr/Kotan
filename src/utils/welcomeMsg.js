@@ -104,7 +104,9 @@ function cv2Card(member, embed, color) {
 function memberPayload(member, embed, fallback) {
     if (embed?.enabled) {
         const color = embed.color ? parseInt(embed.color, 16) : config.colors.main;
-        const thumb = embed.thumbnail ? member.user.displayAvatarURL({ size: 128 }) : null;
+        // Thumbnail source: custom URL/placeholder wins over the member avatar.
+        const thumbSrc = embed.thumb ? imgUrl(embed.thumb, member) : member.user.displayAvatarURL({ size: 128 });
+        const thumb = embed.thumbnail && isHttp(thumbSrc) ? thumbSrc : null;
         if (embed.style === 'cv2') {
             // New-style cards: the dragged component list defines the body.
             // Cards saved before components existed fall back to title/desc.
@@ -113,7 +115,7 @@ function memberPayload(member, embed, fallback) {
                 : { ...embed, components: [
                     ...(embed.title ? [{ type: 'heading', text: embed.title }] : []),
                     ...(embed.description ? [{ type: 'text', text: embed.description }] : []),
-                    ...(thumb ? [{ type: 'image', url: '{avatar}' }] : []),
+                    ...(thumb ? [{ type: 'section', text: '\u200b', image: embed.thumb || '{avatar}' }] : []),
                     ...(embed.footer ? [{ type: 'separator', size: 'small' }, { type: 'text', text: embed.footer }] : []),
                 ] };
             return cv2(cv2Card(member, e, color));

@@ -632,7 +632,8 @@
                         ${fldHtml('Footer', txtIn(`${p}e_footer`, e.footer || ''))}
                     </div>
                     ${fldHtml('Description', txtArea(`${p}e_desc`, e.description || ''), 'supports the same placeholders')}
-                    ${tgl(`${p}e_thumb`, 'Show member avatar', e.thumbnail)}
+                    ${fldHtml('Thumbnail URL', txtIn(`${p}e_thumburl`, e.thumb || '', '{avatar} {icon} or https://'), 'empty = member avatar')}
+                    ${tgl(`${p}e_thumb`, 'Show thumbnail', e.thumbnail)}
                 </div>
                 <div id="${p}e_cv2">
                     <p class="sub mb">Drag components to reorder — <code class="mono">{avatar}</code> and <code class="mono">{icon}</code> also work in image fields.</p>
@@ -693,7 +694,7 @@
                 el.innerHTML = svgMessage({ ...b, embed: {
                     title: sampleFill(f[`${p}e_title`]), description: sampleFill(f[`${p}e_desc`]),
                     footer: sampleFill(f[`${p}e_footer`]), color: f[`${p}e_color`],
-                    thumbUrl: f[`${p}e_thumb`] ? memberAv : '',
+                    thumbUrl: f[`${p}e_thumb`] ? (sampleFill(f[`${p}e_thumburl`]) || memberAv) : '',
                 } });
             }
         };
@@ -754,7 +755,7 @@
                 style: f[`${p}e_style`],
                 title: f[`${p}e_title`], description: f[`${p}e_desc`],
                 color: f[`${p}e_color`], footer: f[`${p}e_footer`],
-                thumbnail: !!f[`${p}e_thumb`],
+                thumbnail: !!f[`${p}e_thumb`], thumb: f[`${p}e_thumburl`],
                 components: f[`${p}e_style`] === 'cv2' ? list : [],
             }),
         };

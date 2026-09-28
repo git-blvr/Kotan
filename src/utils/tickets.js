@@ -70,6 +70,10 @@ function panelPayload(guild, t) {
         if (p.title) e.setTitle(gfmt(p.title, guild));
         if (p.description) e.setDescription(gfmt(p.description, guild));
         if (p.footer) e.setFooter({ text: gfmt(p.footer, guild) });
+        if (p.thumbnail) {
+            const t = gimg(p.thumb || '{icon}', guild);
+            if (/^https?:\/\//i.test(t)) e.setThumbnail(t);
+        }
         return { embeds: [e], components: [row], allowedMentions: { users: [], roles: [], everyone: false } };
     }
     const comps = p.components?.length

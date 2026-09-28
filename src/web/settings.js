@@ -50,7 +50,7 @@ const DEFAULTS = {
     tickets: {
         enabled: false, categoryId: null, logChannel: null, supportRoles: [],
         maxOpen: 1, naming: 'ticket-{user}', topics: [],
-        panel: { enabled: true, style: 'cv2', title: 'Support', description: 'Pick a topic below to open a ticket.', color: '', footer: '', thumbnail: false, components: [] },
+        panel: { enabled: true, style: 'cv2', title: 'Support', description: 'Pick a topic below to open a ticket.', color: '', footer: '', thumbnail: false, thumb: '', components: [] },
     },
 };
 
@@ -199,7 +199,9 @@ const SECTIONS = {
         }
     },
     // Validates one embed payload object; returns an error string or null.
-    welcomeEmbed(target, e) {
+    // allowEmpty: the tickets panel has built-in fallback text, so a card
+    // with no components/description is valid there.
+    welcomeEmbed(target, e, allowEmpty) {
         if (!e || typeof e !== 'object') return;
         target.enabled = bool(e.enabled);
         target.style = ['embed', 'cv2'].includes(e.style) ? e.style : 'embed';
@@ -207,9 +209,11 @@ const SECTIONS = {
         target.description = str(e.description, 1000) ?? '';
         target.footer = str(e.footer, 256) ?? '';
         target.thumbnail = e.thumbnail === undefined ? true : bool(e.thumbnail);
+        target.thumb = str(e.thumb, 500) ?? ''; // custom thumbnail source — {avatar}/{icon}/URL
         const c = String(e.color || '').trim();
         target.color = /^#?[0-9a-fA-F]{6}$/.test(c) ? c.replace('#', '') : '';
         if (f_components(e)) target.components = f_components(e);
+        if (allowEmpty) return;
         if (target.enabled && target.style === 'embed' && !target.title && !target.description)
             return 'Embed needs a title or description';
         if (target.enabled && target.style === 'cv2' && !target.components?.length)
@@ -346,7 +350,7 @@ const SECTIONS = {
                 .map((t) => ({ name: str(t.name, 80), desc: str(t.desc, 100) || '' }))
                 .filter((t) => t.name);
         if (f.panel) {
-            const err = SECTIONS.welcomeEmbed(s.tickets.panel, f.panel);
+            const err = SECTIONS.welcomeEmbed(s.tickets.panel, f.panel, true);
             if (err) return err;
         }
     },
