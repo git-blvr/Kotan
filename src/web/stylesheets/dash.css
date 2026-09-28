@@ -47,7 +47,6 @@
     color: var(--text);
     background: var(--panel-2);
     border-color: var(--border);
-    box-shadow: inset 2.5px 0 0 var(--accent);
 }
 .dnav a .ic {
     width: 28px; height: 28px; flex-shrink: 0;
@@ -443,7 +442,7 @@
     transition: border-color var(--speed), opacity var(--speed);
 }
 .comprow:hover { border-color: var(--border); }
-.comprow.dragging { opacity: .4; border-style: dashed; }
+.comprow.dragging { opacity: .45; border-style: dashed; transform: scale(.99); }
 .comprow .drag { cursor: grab; color: var(--muted); font-size: 14px; padding: 0 2px; user-select: none; }
 .comprow .drag:active { cursor: grabbing; }
 .comprow .ctype {
@@ -489,3 +488,59 @@
 .dprev .dsvg{display:block;width:100%;max-width:460px;height:auto;border-radius:10px;box-shadow:0 1px 0 rgba(0,0,0,.2)}
 .dprev.prof{margin-top:0}
 .dprev.prof .dsvg{max-width:300px}
+
+/* ---- motion polish layer 2 ---- */
+html { scroll-behavior: smooth; }
+
+/* nav: accent edge grows in instead of appearing; icon tiles pop on hover */
+.dnav a { position: relative; }
+.dnav a::before {
+    content: ''; position: absolute; left: 0; top: 7px; bottom: 7px; width: 2.5px;
+    border-radius: 2px; background: var(--accent);
+    transform: scaleY(0); transform-origin: center; transition: transform .22s var(--ease-out);
+}
+.dnav a.active::before { transform: scaleY(1); }
+.dnav a:hover .ic { transform: scale(1.07); }
+.dnav a:active { transform: scale(.98); }
+.dnav a .ic { transition: all var(--speed), transform .18s var(--ease-out); }
+
+/* select popups drop in */
+.dsel .pop { animation: drop-in .16s var(--ease-out) backwards; }
+@keyframes drop-in { from { opacity: 0; transform: translateY(-6px) scale(.98); } }
+
+/* cards glow on hover; rows sweep */
+.card { transition: border-color var(--speed); }
+.card:hover { border-color: var(--border); }
+.evrow, .comprow { transition: background var(--speed), transform var(--speed), opacity var(--speed); }
+.evrow:hover { background: color-mix(in srgb, var(--panel-2) 45%, transparent); border-radius: 8px; }
+
+/* subnav pills press */
+.snv:active { transform: scale(.94); }
+
+/* stat cards stagger inside their row */
+.statrow > * { animation: page-in .35s cubic-bezier(.2,.7,.3,1) backwards; }
+.statrow > *:nth-child(2) { animation-delay: .05s; }
+.statrow > *:nth-child(3) { animation-delay: .1s; }
+.statrow > *:nth-child(4) { animation-delay: .15s; }
+.statrow > *:nth-child(n+5) { animation-delay: .2s; }
+
+/* previews breathe in on update; topbar fades on shell mount */
+.dprev .dsvg { animation: fade-in .3s ease backwards; }
+.dtop { animation: fade-in .25s ease backwards; }
+
+/* toggle knob stretches under press; avatars scale on hover */
+.tgl input:active + .trk::after { width: 21px; }
+.tgl input:checked:active + .trk::after { left: 15px; }
+.duser img, .ov-av, .gsel img, .gsel .gnoicon { transition: transform .2s var(--ease-out); }
+.duser:hover img, .ov-hi:hover .ov-av, .gsel:hover img, .gsel:hover .gnoicon { transform: scale(1.06); }
+
+/* Bot profile card — fields left, live profile preview right */
+.bpgrid{display:grid;grid-template-columns:1fr 300px;gap:28px;align-items:start}
+@media (max-width:860px){.bpgrid{grid-template-columns:1fr}.bpgrid .dprev{order:-1}}
+
+/* clickable preview zones — hover dims + pencil badge */
+.pfpzone{cursor:pointer}
+.pfdim{opacity:0;transition:opacity .18s ease}
+.pfbadge{opacity:0;transition:opacity .18s ease}
+.pfpzone:hover .pfdim{opacity:.45}
+.pfpzone:hover .pfbadge{opacity:1}

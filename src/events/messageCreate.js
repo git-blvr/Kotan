@@ -59,12 +59,20 @@ module.exports = {
                 command = client.commands.get(trigger);
                 args = rest;
             } else if (message.guild) {
-                // Custom triggers — tags flagged "trigger" fire without a prefix.
+                // Bare-word triggers — the tag's content is a command line:
+                // "balance @user" runs .balance. Words after the trigger word
+                // append to the stored args, so "mycf 500" can expand a stored
+                // "coinflip heads" into "coinflip heads 500".
                 const tagContent = await db.useTag(message.guild.id, first.toLowerCase(), true).catch(() => null);
-                if (tagContent)
-                    return message
-                        .reply({ content: tagContent, allowedMentions: { parse: [] } })
-                        .catch(() => {});
+                if (tagContent) {
+                    const [cname, ...cargs] = tagContent.split(/\s+/);
+                    command = client.commands.get(cname.toLowerCase()) ?? client.commands.get(client.aliases.get(cname.toLowerCase()));
+                    if (command) args = [...cargs, ...rest];
+                    else
+                        return message
+                            .reply({ content: tagContent, allowedMentions: { parse: [] } }) // text trigger fallback
+                            .catch(() => {});
+                }
             }
         }
 

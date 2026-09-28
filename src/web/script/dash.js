@@ -537,20 +537,39 @@
         return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${h}" width="${W}" height="${h}" class="dsvg" role="img"><rect width="${W}" height="${h}" fill="${DC.bg}"/>${body}</svg>`;
     };
 
-    // Discord profile popout — banner, avatar + status, name, meta.
-    const svgProfile = ({ name, username, avatar, banner }) => {
+    // Discord profile popout — banner (image or accent), avatar + status,
+    // name, meta. Clickable zones carry data-pick for the upload pickers.
+    const svgProfile = ({ name, username, avatar, banner, bannerImg }) => {
         const W = 300, H = 238;
         const bc = normHex(banner, DC.brand);
         const id = `pf${++svgUid}`;
+        const bid = `pb${++svgUid}`;
+        const bannerArt = /^https?:\/\//.test(bannerImg || '')
+            ? `<defs><clipPath id="${bid}"><rect width="${W}" height="60"/></clipPath></defs>
+               <image href="${xesc(bannerImg)}" width="${W}" height="60" preserveAspectRatio="xMidYMid slice" clip-path="url(#${bid})"/>`
+            : `<rect width="${W}" height="60" fill="${bc}"/>`;
+        const badge = (cx, cy) => `
+            <g class="pfbadge">
+                <circle cx="${cx}" cy="${cy}" r="11" fill="#111214" stroke="#3a3c42"/>
+                <path d="M${cx - 4.5} ${cy + 4.5} l1.5 -1.5 4.5 4.5 -1.5 1.5z M${cx + 0.5} ${cy - 0.5} l2 -2 a1.6 1.6 0 0 1 2.2 0 l-1.2 3.2 -3 -1z" fill="#dbdee1" transform="translate(-1,-1)"/>
+            </g>`;
         return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" class="dsvg" role="img">
             <defs><clipPath id="${id}"><rect width="${W}" height="${H}" rx="10"/></clipPath></defs>
             <g clip-path="url(#${id})">
                 <rect width="${W}" height="${H}" fill="#1e1f22"/>
-                <rect width="${W}" height="60" fill="${bc}"/>
+                <g class="pfpzone" data-pick="banner">
+                    ${bannerArt}
+                    <rect width="${W}" height="60" fill="#000" class="pfdim"/>
+                    ${badge(W - 24, 30)}
+                </g>
                 <rect y="60" width="${W}" height="${H - 60}" fill="#111214"/>
-                <circle cx="52" cy="78" r="47" fill="#111214"/>
-                ${svgAv(avatar, 52, 78, 42)}
-                <circle cx="82" cy="106" r="12" fill="#111214"/><circle cx="82" cy="106" r="8" fill="${DC.green}"/>
+                <g class="pfpzone" data-pick="avatar">
+                    <circle cx="52" cy="78" r="47" fill="#111214"/>
+                    ${svgAv(avatar, 52, 78, 42)}
+                    <circle cx="52" cy="78" r="42" fill="#000" class="pfdim"/>
+                    <circle cx="82" cy="106" r="12" fill="#111214"/><circle cx="82" cy="106" r="8" fill="${DC.green}"/>
+                    ${badge(52, 78)}
+                </g>
                 <text x="16" y="150" font-family="${DFONT}" font-size="19" font-weight="700" fill="${DC.head}">${xesc(name)}</text>
                 <text x="16" y="170" font-family="${DFONT}" font-size="13" fill="${DC.muted}">${xesc(username)}</text>
                 <rect x="12" y="184" width="${W - 24}" height="${H - 196}" rx="8" fill="#1e1f22"/>
@@ -734,33 +753,44 @@
         },
 
         async triggers(page) {
+            const known = new Set(CTX.commands.map((c) => c.name));
             page.innerHTML = `
-                <div><div class="page-title">Triggers</div><p class="page-desc">Custom text responses — run with the prefix, or as a bare trigger word.</p></div>
+                <div><div class="page-title">Triggers</div><p class="page-desc">Bare words that run a command — no prefix needed. Typing <code class="mono">balance</code> can run <code class="mono">.balance</code>.</p></div>
                 <div class="card"><h3>New trigger</h3>
-                    <div class="grid2">${fldHtml('Name', txtIn('tname', '', 'e.g. rules'), 'a-z 0-9 _ -, max 32')}${fldHtml('Content', txtIn('tcontent', '', 'Response text…'), 'max 1000 chars')}</div>
-                    ${tgl('ttrigger', 'Bare trigger — fires on this word alone, no prefix needed', false)}
+                    <div class="grid2">
+                        ${fldHtml('Trigger word', txtIn('tname', '', 'e.g. balance'), 'a-z 0-9 _ -, max 32 — fires on this exact first word')}
+                        ${fldHtml('Command', selSlot('tcmd'), 'the command it runs')}
+                    </div>
+                    ${fldHtml('Arguments', txtIn('targs', '', 'optional — e.g. @user 100'), 'fixed args passed before whatever the sender types next')}
                     <div class="mt"><button class="btn primary sm" id="add-tag">Create trigger</button></div></div>
                 <div class="card"><h3>Triggers</h3><div id="taglist"><div class="skeleton" style="height:60px"></div></div></div>`;
+            mountSelect(page, 'tcmd', { options: CTX.commands.map((c) => ({ value: c.name, label: `${c.name} — ${(c.description || '').slice(0, 40)}` })), placeholder: 'Pick a command' });
             const load = async () => {
                 const d = await api(`/api/guilds/${guildId}/tags`);
                 const tags = Object.entries(d.tags || {});
-                $('#taglist', page).innerHTML = tags.length ? tags.map(([n, t]) => `
-                    <div class="qitem"><div class="grow"><b class="mono">${esc(n)}</b><div class="muted">${esc(String(t.content).slice(0, 90))}</div></div>
-                    <span class="chip ${t.trigger ? 'ok' : ''}">${t.trigger ? 'bare word' : 'prefix'}</span>
-                    <span class="chip">${t.uses || 0} uses</span><button class="btn sm danger" data-del="${esc(n)}">Delete</button></div>`).join('')
-                    : '<p class="muted small">No triggers yet.</p>';
+                $('#taglist', page).innerHTML = tags.length ? tags.map(([n, t]) => {
+                    const [cname, ...cargs] = String(t.content).split(/\s+/);
+                    const isCmd = t.trigger && known.has(cname?.toLowerCase());
+                    const desc = t.trigger
+                        ? (isCmd ? `runs <b class="mono">${esc(cname)}</b>${cargs.length ? ` ${esc(cargs.join(' '))}` : ''}` : `replies: ${esc(String(t.content).slice(0, 80))}`)
+                        : esc(String(t.content).slice(0, 80));
+                    return `<div class="qitem"><div class="grow"><b class="mono">${esc(n)}</b><div class="muted">${desc}</div></div>
+                        <span class="chip ${t.trigger ? 'ok' : ''}">${t.trigger ? 'bare word' : 'prefix'}</span>
+                        <span class="chip">${t.uses || 0} uses</span><button class="btn sm danger" data-del="${esc(n)}">Delete</button></div>`;
+                }).join('') : '<p class="muted small">No triggers yet.</p>';
                 $$('#taglist [data-del]', page).forEach((b) => (b.onclick = async () => {
-                    if (!(await confirmModal('Delete tag', `Remove "${b.dataset.del}"?`))) return;
+                    if (!(await confirmModal('Delete trigger', `Remove "${b.dataset.del}"?`))) return;
                     const r = await api(`/api/guilds/${guildId}/tags/${encodeURIComponent(b.dataset.del)}`, { method: 'DELETE' });
-                    r.ok ? (toast('Tag deleted'), load()) : toast('Delete failed', 'err');
+                    r.ok ? (toast('Trigger deleted'), load()) : toast('Delete failed', 'err');
                 }));
             };
             $('#add-tag', page).onclick = async () => {
                 const name = $('[name=tname]', page).value.trim();
-                const content = $('[name=tcontent]', page).value;
-                const trigger = $('[name=ttrigger]', page).checked;
-                const r = await api(`/api/guilds/${guildId}/tags`, { body: { name, content, trigger } });
-                if (r.ok) { toast('Trigger created'); $('[name=tname]', page).value = ''; $('[name=tcontent]', page).value = ''; $('[name=ttrigger]', page).checked = false; load(); }
+                const cmd = mounts.tcmd.get();
+                const args = $('[name=targs]', page).value.trim();
+                if (!cmd) return toast('Pick a command', 'err');
+                const r = await api(`/api/guilds/${guildId}/tags`, { body: { name, content: `${cmd} ${args}`.trim(), trigger: true } });
+                if (r.ok) { toast('Trigger created'); $('[name=tname]', page).value = ''; $('[name=targs]', page).value = ''; mounts.tcmd.set(''); load(); }
                 else toast(r.error || 'Failed', 'err');
             };
             load();
@@ -1280,22 +1310,26 @@
                         ${fldHtml('Accent color', `<input type="text" name="accent" value="${esc(s.appearance.accent || '')}" placeholder="#f0a050" maxlength="7">`, 'hex — empty = default')}
                         ${fldHtml('Background image URL', txtIn('bgimg', s.appearance.background || '', 'https://…'), 'empty = none')}
                     </div>${saveBar('appearance')}</div>
-                <div class="card"><h3>Bot profile</h3><p class="sub mb">Nickname applies to this server only; the avatar is global — it changes everywhere.</p>
-                    <div class="grid2">
-                        ${fldHtml('Nickname in this server', txtIn('nickname', s.branding.nickname || '', CTX.bot?.username || 'Kotan'), 'empty = default name')}
+                <div class="card"><h3>Bot profile</h3><p class="sub mb">Nickname applies to this server only; avatar and banner are global — they change everywhere. Click the preview to change them.</p>
+                    <div class="bpgrid">
+                        <div>
+                            ${fldHtml('Nickname in this server', txtIn('nickname', s.branding.nickname || '', CTX.bot?.username || 'Kotan'), 'empty = default name')}
+                            <input type="file" id="bavatar" accept="image/png,image/jpeg,image/webp" style="display:none">
+                            <input type="file" id="bbanner" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none">
+                            <div class="flex">
+                                <button class="btn sm" id="pick-avatar">Change avatar…</button>
+                                <button class="btn sm" id="pick-banner">Add banner…</button>
+                            </div>
+                            <span class="muted small" id="avatar-status"></span>
+                            ${saveBar('branding')}
+                        </div>
                         <div class="dprev prof" id="profprev"></div>
-                    </div>
-                    ${saveBar('branding')}
-                    <div class="flex mt">
-                        <input type="file" id="bavatar" accept="image/png,image/jpeg,image/webp" style="display:none">
-                        <button class="btn sm" id="pick-avatar">Change avatar…</button>
-                        <span class="muted small" id="avatar-status"></span>
                     </div></div>`;
 
             mountSelect(page, 'modroles', { multi: true, options: roOpts(DATA.roles), value: s.access.modRoles, placeholder: 'None' });
             mountSelect(page, 'adminroles', { multi: true, options: roOpts(DATA.roles), value: s.access.adminRoles, placeholder: 'None' });
 
-            // Live Discord profile popout — nickname + accent from the form.
+            // Live Discord profile popout — nickname + accent/banner from the form.
             const nickIn = $('[name=nickname]', page);
             const updProf = () => {
                 const nick = nickIn.value.trim() || CTX.bot?.username || 'Kotan';
@@ -1303,22 +1337,37 @@
                     name: nick, username: `@${CTX.bot?.username || 'kotan'}`,
                     avatar: CTX.bot ? dcdnAv(CTX.bot.id, CTX.bot.avatar) : '',
                     banner: $('[name=accent]', page)?.value || s.appearance.accent,
+                    bannerImg: CTX.bot?.bannerUrl,
                 });
             };
             nickIn.oninput = updProf;
             $('[name=accent]', page)?.addEventListener('input', updProf);
             updProf();
 
-            $('#pick-avatar', page).onclick = () => $('#bavatar', page).click();
-            $('#bavatar', page).onchange = async (e) => {
-                const file = e.target.files?.[0];
-                if (!file) return;
-                if (file.size > 3 * 1024 * 1024) return ($('#avatar-status', page).textContent = 'Too big — max ~3MB');
-                $('#avatar-status', page).textContent = 'Uploading…';
-                const dataUrl = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(file); });
-                const r = await api(`/api/guilds/${guildId}/branding/avatar`, { body: { avatar: dataUrl } });
-                $('#avatar-status', page).textContent = r.ok ? 'Avatar updated — may take a minute to show.' : (r.error || 'Failed');
+            // Click the preview's avatar/banner zones or the buttons to upload.
+            const status = $('#avatar-status', page);
+            const wirePick = (inputSel, key, done) => {
+                $(inputSel, page).onchange = async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    if (file.size > 3 * 1024 * 1024) return (status.textContent = 'Too big — max ~3MB');
+                    status.textContent = 'Uploading…';
+                    const dataUrl = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(file); });
+                    const r = await api(`/api/guilds/${guildId}/branding/${key}`, { body: { [key]: dataUrl } });
+                    if (r.ok) { done(r); updProf(); status.textContent = 'Updated — may take a minute to show in Discord.'; }
+                    else status.textContent = r.error || 'Failed';
+                    e.target.value = '';
+                };
             };
+            wirePick('#bavatar', 'avatar', (r) => { if (r.avatar && CTX.bot) CTX.bot.avatar = r.avatar; });
+            wirePick('#bbanner', 'banner', (r) => { if (CTX.bot) CTX.bot.bannerUrl = r.bannerUrl || null; });
+            $('#pick-avatar', page).onclick = () => $('#bavatar', page).click();
+            $('#pick-banner', page).onclick = () => $('#bbanner', page).click();
+            $('#profprev', page).addEventListener('click', (e) => {
+                const z = e.target.closest('[data-pick]')?.dataset.pick;
+                if (z === 'avatar') $('#bavatar', page).click();
+                if (z === 'banner') $('#bbanner', page).click();
+            });
 
             bindSave(page, 'general', (el) => ({ prefix: formVals(el).prefix }));
             bindSave(page, 'access', () => ({ modRoles: mounts.modroles.get(), adminRoles: mounts.adminroles.get() }));

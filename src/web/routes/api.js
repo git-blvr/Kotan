@@ -103,7 +103,12 @@ module.exports = async (app) => {
 
         gg.get('/', async (req, reply) => reply.send({
             guild: { id: req.guild.id, name: req.guild.name, icon: req.guild.icon, memberCount: req.guild.memberCount },
-            bot: { id: req.client.user.id, username: req.client.user.username, avatar: req.client.user.avatar },
+            bot: {
+                id: req.client.user.id,
+                username: req.client.user.username,
+                avatar: req.client.user.avatar,
+                bannerUrl: req.client.user.bannerURL?.({ size: 512 }) || null,
+            },
             settings: await settings.getSettings(req.guild.id),
             modules,
             commands,
@@ -144,18 +149,20 @@ module.exports = async (app) => {
             return reply.send({ ok: true, settings: result.settings });
         });
 
-        // Global avatar change — affects the bot everywhere, not just this guild.
-        gg.post('/branding/avatar', async (req, reply) => {
-            const dataUrl = String(req.body?.avatar || '');
-            if (!/^data:image\/(png|jpe?g|webp);base64,[a-z0-9+/=\s]+$/i.test(dataUrl) || dataUrl.length > 4_000_000)
+        // Global avatar/banner changes — affect the bot everywhere, not just this guild.
+        const brandUpload = (key, apply, out) => async (req, reply) => {
+            const dataUrl = String(req.body?.[key] || '');
+            if (!/^data:image\/(png|jpe?g|webp|gif);base64,[a-z0-9+/=\s]+$/i.test(dataUrl) || dataUrl.length > 4_500_000)
                 return reply.code(400).send({ ok: false, error: 'Send a PNG/JPEG/WebP image under ~3MB' });
             try {
-                await req.client.user.setAvatar(dataUrl);
-                return reply.send({ ok: true });
+                await apply(req.client, dataUrl);
+                return reply.send({ ok: true, ...out(req.client) });
             } catch (e) {
                 return reply.code(500).send({ ok: false, error: e.message });
             }
-        });
+        };
+        gg.post('/branding/avatar', brandUpload('avatar', (c, d) => c.user.setAvatar(d), (c) => ({ avatar: c.user.avatar })));
+        gg.post('/branding/banner', brandUpload('banner', (c, d) => c.user.setBanner(d), (c) => ({ bannerUrl: c.user.bannerURL?.({ size: 512 }) || null })));
 
         gg.get('/tags', async (req, reply) =>
             reply.send({ tags: await db.getTags(req.guild.id) }));
