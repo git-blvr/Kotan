@@ -16,9 +16,11 @@ const FONT = (() => {
 
 const IMG_DIR = path.join(__dirname, '../../assets/img');
 
-// Same pair always ships the same score — hash of the sorted id pair.
+// The same pair gets a stable score per UTC day — the day index seeds the
+// hash, so compatibility rerolls at midnight rather than being fixed forever.
 function shipPercent(idA, idB) {
-    const key = [String(idA), String(idB)].sort().join(':');
+    const day = Math.floor(Date.now() / 86_400_000);
+    const key = [String(idA), String(idB)].sort().join(':') + `:${day}`;
     let h = 5381;
     for (const ch of key) h = ((h << 5) + h + ch.charCodeAt(0)) >>> 0;
     return h % 101;
@@ -86,7 +88,7 @@ async function shipCard(userA, userB, pct) {
     ctx.fillText(`${pct}%`, W / 2, 76);
     ctx.font = `600 14px ${FONT}`;
     ctx.fillStyle = happy ? '#a0718a' : '#5f6878';
-    ctx.fillText('C O M P A T I B I L I T Y', W / 2, 100);
+    ctx.fillText('D A I L Y   C O M P A T I B I L I T Y', W / 2, 100);
 
     // kotan in the middle — happy for >=30%, sad below
     const kh = 168, kw = kh * (1145 / 1374);

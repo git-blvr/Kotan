@@ -3,6 +3,17 @@ const { REST, Routes, Collection } = require('discord.js');
 const loadCommands = require('../src/handlers/commandHandler');
 const { toSlashJSON, isSlashReady } = require('../src/helpers/slash');
 const logger = require('../src/utils/logger');
+const db = require('../src/utils/database');
+
+// Graceful shutdown: process.exit() fired synchronously here races pending
+// socket/handle closes and trips libuv's UV_HANDLE_CLOSING assert on
+// Windows. Set the exit code, close storage, let the loop drain on its own,
+// and keep a failsafe in case a socket keeps the loop alive.
+async function finish(code) {
+    process.exitCode = code;
+    await db.closeDatabase().catch(() => {});
+    setTimeout(() => process.exit(code), 15_000).unref();
+}
 
 // Registers every prefix command as a global slash command. Usage:
 //   node scripts/deploySlash.js          -> deploy
@@ -18,7 +29,7 @@ async function main() {
     const clientId = process.env.CLIENT_ID;
     if (!token || !clientId) {
         logger.error('BOT_MAIN_TOKEN and CLIENT_ID must be set in .env');
-        process.exit(1);
+        return finish(1);
     }
 
     // Reuse the real loader so registrations always match what's loaded.
@@ -41,7 +52,7 @@ async function main() {
 
     if (process.argv.includes('--dry')) {
         console.log(JSON.stringify(body, null, 2));
-        process.exit(0);
+        return finish(0);
     }
 
     const rest = new REST({ version: '10' }).setToken(token);
@@ -50,10 +61,10 @@ async function main() {
     const data = await rest.put(route, { body: payload });
     logger.info(`${process.argv.includes('--clear') ? 'Cleared' : 'Deployed'} ${data.length} global slash command(s)`);
     for (const c of data) logger.info(`  /${c.name}`);
-    process.exit(0); // sqlite stays in WAL mode — abrupt exit is safe
+    await finish(0);
 }
 
 main().catch((err) => {
     logger.error('Deploy failed:', err?.rawError?.errors ? JSON.stringify(err.rawError.errors, null, 2) : err);
-    process.exit(1);
+    finish(1);
 });
