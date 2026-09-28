@@ -594,7 +594,6 @@
 
     function bindSave(container, section, collect) {
         container.querySelector(`[data-save="${section}"]`)?.addEventListener('click', async (e) => {
-            for (const k in mounts) delete mounts[k];
             const fields = collect(container);
             await save(section, fields, e.target);
         });
@@ -1626,7 +1625,7 @@
             });
             bindSave(page, 'appearance', (el) => {
                 const f = formVals(el);
-                return { accent: f.accent, background: f.bgimg, theme: f.theme };
+                return { accent: f.accent, background: f.bgimg, theme: mounts.theme?.get() || '' };
             });
             bindSave(page, 'branding', (el) => ({ nickname: formVals(el).nickname }));
         },
@@ -1650,6 +1649,9 @@
         shell(slug);
         const page = $('#page');
         const render = PAGES[slug] || PAGES.overview;
+        // Drop select mounts from the previous page — stale elements would
+        // otherwise leak into the next page's collects.
+        for (const k in mounts) delete mounts[k];
         try {
             await render(page);
             bindSubnav(page);
