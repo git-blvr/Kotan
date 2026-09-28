@@ -29,7 +29,7 @@
 }
 .dside .nav-logo { padding: var(--s2) var(--s2) 0; }
 /* Nav list scrolls within the sidebar; the footer stays put below it */
-.dnav { display: flex; flex-direction: column; gap: var(--s5); flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; padding-bottom: 2px; }
+.dnav { display: flex; flex-direction: column; gap: var(--s5); flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; padding-bottom: 2px; }
 .dnav::-webkit-scrollbar { width: 5px; }
 .dnav::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 /* Pinned sidebar footer — Settings link + user chip */
