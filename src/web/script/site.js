@@ -226,12 +226,16 @@
             if (e.deltaY > 0 && idx === secs.length - 1) { sweep(PAGE_CHAIN[location.pathname]); return; }
             show(idx + (e.deltaY > 0 ? 1 : -1));
         }, { passive: false });
-        let ty = null;
-        fp.addEventListener('touchstart', (e) => { ty = e.touches[0].clientY; }, { passive: true });
+        let ty = null, tscroll = 0;
+        fp.addEventListener('touchstart', (e) => {
+            ty = e.touches[0].clientY;
+            tscroll = secs[idx]?.scrollTop ?? 0; // remember inner scroll so section panning doesn't flip slides
+        }, { passive: true });
         fp.addEventListener('touchend', (e) => {
             if (ty == null || busy || !armed()) return;
             const d = ty - e.changedTouches[0].clientY;
-            if (Math.abs(d) > 48) show(idx + (d > 0 ? 1 : -1));
+            const innerScrolled = Math.abs((secs[idx]?.scrollTop ?? 0) - tscroll) > 4;
+            if (Math.abs(d) > 48 && !innerScrolled) show(idx + (d > 0 ? 1 : -1));
             ty = null;
         }, { passive: true });
         window.addEventListener('keydown', (e) => {

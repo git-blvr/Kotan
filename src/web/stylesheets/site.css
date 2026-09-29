@@ -353,8 +353,8 @@ label.fld .hint { font-weight: 400; color: var(--muted); font-size: 12px; }
     .sda-x { animation: sda-out 1s linear both; animation-timeline: view(); animation-range: exit 0% exit 100%; }
 }
 /* ---- stage slider (index only: body.fppage > .fp) ---- */
-body.fppage { height: 100vh; overflow: hidden; }
-.fp { height: 100vh; overflow: hidden; position: relative; }
+body.fppage { height: 100vh; height: 100dvh; overflow: hidden; }
+.fp { height: 100vh; height: 100dvh; overflow: hidden; position: relative; }
 .fp > .nav-wrap { position: fixed; top: 14px; left: 0; right: 0; z-index: 50; }
 .fpsec { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; justify-content: safe center; padding: 96px 24px 72px; overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none; opacity: 0; transform: scale(.985); filter: blur(14px); visibility: hidden; pointer-events: none; transition: opacity .55s ease, transform .75s cubic-bezier(.2,.7,.3,1), filter .55s ease, visibility 0s .75s; }
 .fpsec::-webkit-scrollbar { display: none; }
