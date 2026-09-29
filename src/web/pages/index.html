@@ -233,6 +233,7 @@
     .fpsec {
         position: absolute; inset: 0;
         display: flex; flex-direction: column; justify-content: center;
+        padding-bottom: 72px; /* clearance for the footer bar */
         opacity: 0; transform: scale(.985); filter: blur(14px);
         visibility: hidden; pointer-events: none;
         transition: opacity .55s ease, transform .75s cubic-bezier(.2,.7,.3,1), filter .55s ease, visibility 0s .75s;
@@ -242,6 +243,22 @@
         visibility: visible; pointer-events: auto;
         transition-delay: 0s;
     }
+    /* compact footer bar pinned to the stage bottom (not its own screen) */
+    .fppage .fbar {
+        position: absolute; left: 0; right: 0; bottom: 0; z-index: 40;
+        padding: 10px 0;
+        background: color-mix(in srgb, var(--bg) 55%, transparent);
+        backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    }
+    /* page-sweep veil: blurs the screen, then navigates */
+    .sweep {
+        position: fixed; inset: -2%; z-index: 999; pointer-events: all;
+        background: color-mix(in srgb, var(--bg) 78%, transparent);
+        backdrop-filter: blur(0px) saturate(1); -webkit-backdrop-filter: blur(0px) saturate(1);
+        opacity: 0; transform: scale(1.04);
+        transition: opacity .5s ease, transform .55s cubic-bezier(.2,.7,.3,1), backdrop-filter .5s ease;
+    }
+    .sweep.go { opacity: 1; backdrop-filter: blur(22px) saturate(1.3); -webkit-backdrop-filter: blur(22px) saturate(1.3); transform: none; }
     /* children cascade in once their section is active */
     .sdi {
         opacity: 0; transform: translateY(26px); filter: blur(9px);
@@ -258,6 +275,7 @@
         .fp { height: auto; overflow: visible; }
         .fpsec { position: static; min-height: 0; padding: 40px 0; opacity: 1; transform: none; filter: none; visibility: visible; pointer-events: auto; }
         .fpsec .sdi, .sdi { opacity: 1; transform: none; filter: none; }
+        .fppage .fbar { position: static; }
     }
 </style>
 </head>
@@ -335,7 +353,7 @@
     </div>
 </main>
 
-<footer class="fpsec">
+<footer class="fbar">
     <div class="wrap foot">
         <span>© <span id="yr">2025</span> Kotan</span>
         <div class="links">
@@ -348,6 +366,6 @@
 </footer>
 </div>
 
-<script src="/script/site.js?v=14" defer></script>
+<script src="/script/site.js?v=15" defer></script>
 </body>
 </html>

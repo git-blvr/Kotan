@@ -30,7 +30,7 @@
     const REDUCED = theme.motion === 'off' || matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (SLD && !REDUCED) {
         // slider mode: tag items .sdi — they cascade in when their .fpsec gets .on
-        const RV_SEL = '.hero-img, .hero-copy > h1, .hero-copy > p, .hero-actions, .bstat, .features > h2, .features > p, .feature, .foot';
+        const RV_SEL = '.hero-img, .hero-copy > h1, .hero-copy > p, .hero-actions, .bstat, .features > h2, .features > p, .feature';
         window.reveal = (scope = document) => {
             $$(RV_SEL, scope).forEach((el) => {
                 if (el.classList.contains('sdi')) return;
@@ -194,6 +194,17 @@
     }
 
 
+    // --- page sweep: blur-veil transition into the next page of the chain ---
+    const PAGE_CHAIN = { '/': '/doc', '/doc': '/uptime', '/uptime': '/dashboard' };
+    const sweep = (url) => {
+        if (!url || $('.sweep')) return;
+        const v = document.createElement('div');
+        v.className = 'sweep';
+        document.body.appendChild(v);
+        requestAnimationFrame(() => v.classList.add('go'));
+        setTimeout(() => { location.href = url; }, REDUCED ? 80 : 520);
+    };
+
     // --- stage machine: wheel/keys cross-fade sections; the page itself never moves ---
     if (SLD) {
         const secs = $$('.fpsec', fp);
@@ -212,6 +223,7 @@
         fp.addEventListener('wheel', (e) => {
             if (!armed() || busy || Math.abs(e.deltaY) < 8) return;
             e.preventDefault();
+            if (e.deltaY > 0 && idx === secs.length - 1) { sweep(PAGE_CHAIN[location.pathname]); return; }
             show(idx + (e.deltaY > 0 ? 1 : -1));
         }, { passive: false });
         let ty = null;
@@ -229,6 +241,21 @@
             else if (e.key === 'Home') { e.preventDefault(); show(0); }
             else if (e.key === 'End') { e.preventDefault(); show(secs.length - 1); }
         });
+    }
+
+    // --- page-chain overscroll: wheeling past the bottom sweeps to the next page ---
+    const NEXT_PAGE = PAGE_CHAIN[location.pathname];
+    if (NEXT_PAGE && !SLD && !REDUCED) {
+        let acc = 0, decay;
+        window.addEventListener('wheel', (e) => {
+            if (e.deltaY <= 0) { acc = 0; return; }
+            const bottom = innerHeight + scrollY >= document.documentElement.scrollHeight - 4;
+            if (!bottom) { acc = 0; return; }
+            acc += e.deltaY;
+            clearTimeout(decay);
+            decay = setTimeout(() => { acc = 0; }, 450);
+            if (acc > 420) { acc = -1e9; sweep(NEXT_PAGE); }
+        }, { passive: true });
     }
 
     // --- login page ---

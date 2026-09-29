@@ -367,3 +367,7 @@ body.fppage { height: 100vh; overflow: hidden; }
     .fpsec { position: static; min-height: 0; padding: 40px 0; opacity: 1; transform: none; filter: none; visibility: visible; pointer-events: auto; }
     .sdi { opacity: 1; transform: none; filter: none; }
 }
+
+/* page-sweep veil (site.js): blurs the screen then navigates */
+.sweep { position: fixed; inset: -2%; z-index: 999; pointer-events: all; background: color-mix(in srgb, var(--bg) 78%, transparent); backdrop-filter: blur(0); -webkit-backdrop-filter: blur(0); opacity: 0; transform: scale(1.04); transition: opacity .5s ease, transform .55s cubic-bezier(.2,.7,.3,1), backdrop-filter .5s ease; }
+.sweep.go { opacity: 1; backdrop-filter: blur(22px) saturate(1.3); -webkit-backdrop-filter: blur(22px) saturate(1.3); transform: none; }
