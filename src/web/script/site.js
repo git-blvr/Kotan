@@ -249,7 +249,11 @@
         let acc = 0, decay;
         window.addEventListener('wheel', (e) => {
             if (e.deltaY <= 0) { acc = 0; return; }
-            const bottom = innerHeight + scrollY >= document.documentElement.scrollHeight - 4;
+            // short pages are permanently "at the bottom" — never sweep on those,
+            // otherwise the page bounces you home the moment you touch the wheel
+            const doc = document.documentElement;
+            if (doc.scrollHeight - innerHeight < 120) { acc = 0; return; }
+            const bottom = innerHeight + scrollY >= doc.scrollHeight - 4;
             if (!bottom) { acc = 0; return; }
             acc += e.deltaY;
             clearTimeout(decay);
