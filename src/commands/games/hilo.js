@@ -4,7 +4,7 @@ const { awaitReply } = require('../../helpers/collect');
 const { formatCoins, parseAmount } = require('../../helpers/format');
 const { fromMessage, fromInteraction } = require('../../helpers/ctx');
 const { betCapped, scaled } = require('../../helpers/gamecfg')
-const { withCoinMult } = require('../../helpers/inv');
+const { winAmount } = require('../../helpers/inv');
 const db = require('../../utils/database');
 const config = require('../../config');
 
@@ -48,7 +48,7 @@ async function run(ctx, betInput) {
     const second = draw();
     const outcome = second === first ? 'push' : second > first === guessHigh ? 'win' : 'lose';
 
-    profile.wallet += outcome === 'win' ? withCoinMult(profile, scaled(ctx.settings, bet, 'hilo')) : outcome === 'lose' ? -bet : 0;
+    profile.wallet += outcome === 'win' ? winAmount(ctx.member, ctx.settings, profile, scaled(ctx.settings, bet, 'hilo')) : outcome === 'lose' ? -bet : 0;
     await db.saveProfile(ctx.guild.id, ctx.user.id, profile);
 
     return ctx.channel.send(

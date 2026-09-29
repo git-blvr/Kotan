@@ -607,3 +607,33 @@ html { scroll-behavior: smooth; }
 /* keep dropdown pills on the frosted token so hover states stay translucent */
 [data-glass='1'] .dnav a:hover,
 [data-glass='1'] .dnav a.on { background: var(--panel-2); }
+
+/* ---- card editor: two-column modal layout (fields + live preview) ---- */
+.cedit{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:18px;align-items:start}
+.cedit-fields{min-width:0;display:flex;flex-direction:column;gap:var(--s3)}
+.cedit-prev{position:sticky;top:calc(var(--topbar-h) + 64px);border:1px solid var(--border-soft);border-radius:14px;padding:14px;background:var(--bg-soft)}
+.cedit-prev .cepv-t{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);display:block}
+.cedit-prev .dprev{margin-top:8px}
+.cedit-prev .dprev .dsvg{max-width:100%}
+.cesec{display:flex;gap:10px;align-items:flex-start;margin:6px 0 2px}
+.cesec .ceic{width:26px;height:26px;border-radius:8px;background:var(--panel-2);border:1px solid var(--border-soft);display:grid;place-items:center;color:var(--accent-2);flex-shrink:0}
+.cesec .ceic svg{width:14px;height:14px}
+.cesec b{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-2)}
+.cesec .sub{margin:2px 0 0}
+.inschips{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.inschips>span{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.chip{border:1px solid var(--border-soft);background:var(--panel-2);color:var(--text-2);border-radius:999px;padding:3px 10px;font-size:11.5px;font-family:var(--mono);cursor:pointer;transition:all var(--speed)}
+.chip:hover{border-color:var(--accent);color:var(--accent-2)}
+.mdbar{display:flex;gap:2px;margin-bottom:6px}
+.mdbar button{width:30px;height:26px;border:1px solid var(--border-soft);background:var(--panel-2);color:var(--text-2);border-radius:6px;font-size:12.5px;cursor:pointer;transition:all var(--speed);font-family:var(--mono)}
+.mdbar button:hover{color:var(--text);border-color:var(--accent)}
+.mdbar button.it{font-style:italic}
+.mdbar button.ul{text-decoration:underline}
+.mdbar button.st{text-decoration:line-through}
+.mdbar button[data-md="**"]{font-weight:800}
+.accmenu{position:absolute;right:0;top:26px;z-index:40;background:var(--panel-solid);border:1px solid var(--border);border-radius:10px;padding:4px;display:flex;flex-direction:column;gap:2px;box-shadow:var(--shadow);animation:drop-in .16s var(--ease-out) backwards}
+.accmenu button{border:0;background:none;color:var(--text-2);font:inherit;font-size:12.5px;padding:6px 14px;border-radius:7px;cursor:pointer;text-align:left;white-space:nowrap}
+.accmenu button:hover{background:var(--panel-2);color:var(--text)}
+.comprow .cbtns{position:relative}
+.cbtn.acc{color:var(--accent-2)}
+@media (max-width:1100px){.cedit{grid-template-columns:1fr}.cedit-prev{position:static;order:-1}}

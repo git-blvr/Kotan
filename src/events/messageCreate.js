@@ -38,7 +38,7 @@ module.exports = {
 
         // Leveling — every surviving message earns XP (commands included).
         // Fire-and-forget: never blocks or slows command resolution.
-        if (settings) leveling.awardXp(message, settings.leveling).catch(() => {});
+        if (settings) leveling.awardXp(message, settings).catch(() => {});
 
         let command = null;
         let args = [];

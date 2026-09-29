@@ -3,7 +3,7 @@ const { awaitReply } = require('../../helpers/collect');
 const { formatCoins } = require('../../helpers/format');
 const { fromMessage, fromInteraction } = require('../../helpers/ctx');
 const { gameCfg } = require('../../helpers/gamecfg')
-const { withCoinMult } = require('../../helpers/inv');
+const { winAmount } = require('../../helpers/inv');
 const db = require('../../utils/database');
 const config = require('../../config');
 
@@ -48,7 +48,7 @@ async function run(ctx) {
         );
 
     const profile = await db.getProfile(ctx.guild.id, winner.author.id);
-    profile.wallet += withCoinMult(profile, reward);
+    profile.wallet += winAmount(winner.member, ctx.settings, profile, reward);
     await db.saveProfile(ctx.guild.id, winner.author.id, profile);
 
     return ctx.channel.send(

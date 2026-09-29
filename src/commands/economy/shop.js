@@ -63,20 +63,23 @@ function homeView(uid, shop, cats, profile, cur) {
 
 // Category view — each item is a Section with a Buy button accessory.
 // Kept under the 10-component container cap (1 header + 7 items + menu).
-function catView(uid, cats, cat, profile, cur, accent, notice) {
+function catView(uid, cats, cat, profile, cur, accent, notice, member, settings) {
     const c = new ContainerBuilder().setAccentColor(accent);
+    const disc = inv.boostPerk(member, settings, 'shop');
     c.addTextDisplayComponents(
         text(
             (notice ? `${notice}\n` : '') +
-                `## ${cat.name}\n-# Your wallet: ${formatCoins(profile.wallet, cur)}`
+                `## ${cat.name}\n-# Your wallet: ${formatCoins(profile.wallet, cur)}${disc ? ` · booster −${disc}%` : ''}`
         )
     );
     for (const item of cat.items.slice(0, 7)) {
+        const price = Math.round(item.price * (1 - disc / 100));
+        const priceTxt = disc && price !== item.price ? `~~${formatCoins(item.price, cur)}~~ ${formatCoins(price, cur)}` : formatCoins(item.price, cur);
         c.addSectionComponents(
             new SectionBuilder()
                 .addTextDisplayComponents(
                     text(
-                        `**${item.name}** — ${formatCoins(item.price, cur)}\n-# ${item.desc || itemBlurb(item, cur)}`
+                        `**${item.name}** — ${priceTxt}\n-# ${item.desc || itemBlurb(item, cur)}`
                     )
                 )
                 .setButtonAccessory(
@@ -118,11 +121,13 @@ async function applyItem(member, guild, item, profile, cur) {
 }
 
 // Shared buy path for prefix arg and Buy buttons. Returns {err} or {msg,profile}.
-async function buy({ guild, member, user }, item, cur) {
+async function buy({ guild, member, user, settings }, item, cur) {
+    const st = settings || (await db.getGuildSettings(guild.id));
+    const price = Math.round(item.price * (1 - inv.boostPerk(member, st, 'shop') / 100));
     const profile = await db.getProfile(guild.id, user.id);
-    if (profile.wallet < item.price)
-        return { err: `**${item.name}** costs ${formatCoins(item.price, cur)} — you only have ${formatCoins(profile.wallet, cur)}.` };
-    profile.wallet -= item.price;
+    if (profile.wallet < price)
+        return { err: `**${item.name}** costs ${formatCoins(price, cur)} — you only have ${formatCoins(profile.wallet, cur)}.` };
+    profile.wallet -= price;
     let msg;
     try {
         msg = await applyItem(member, guild, item, profile, cur);
@@ -150,7 +155,7 @@ async function run(ctx, itemQuery) {
         const item = inv.findItem(cats, itemQuery);
         if (!item)
             return sendError(ctx, `No item called "${itemQuery}". Check \`${ctx.prefix}shop\` for the list.`);
-        const res = await buy({ guild: ctx.guild, member: ctx.member, user: ctx.user }, item, cur);
+        const res = await buy({ guild: ctx.guild, member: ctx.member, user: ctx.user, settings: ctx.settings }, item, cur);
         if (res.err) return sendError(ctx, res.err);
         return ctx.reply(cv2(success(res.msg, `${capitalize(item.name)} purchased`)));
     }
@@ -175,7 +180,7 @@ async function executeComponent(i) {
     if (step === 'cat') {
         const cat = cats.find((c) => c.id === i.values?.[0]);
         return i
-            .update(cv2(cat ? catView(uid, cats, cat, profile, cur, accent) : homeView(uid, settings.shop, cats, profile, cur)))
+            .update(cv2(cat ? catView(uid, cats, cat, profile, cur, accent, undefined, i.member, settings) : homeView(uid, settings.shop, cats, profile, cur)))
             .catch(() => {});
     }
 
@@ -183,7 +188,7 @@ async function executeComponent(i) {
         const item = inv.allItems(cats).find((x) => x.id === rest.join(':'));
         if (!item)
             return i.reply(ephemeral(cv2(error('That item no longer exists — the shop was updated.')))).catch(() => {});
-        const res = await buy({ guild: i.guild, member: i.member, user: i.user }, item, cur);
+        const res = await buy({ guild: i.guild, member: i.member, user: i.user, settings }, item, cur);
         // Re-render the same category with the result pinned on top.
         const cat = cats.find((c) => c.id === item.cat);
         const notice = res.err ? `⚠️ ${res.err}` : `✅ ${res.msg}`;
@@ -191,7 +196,7 @@ async function executeComponent(i) {
         return i
             .update(
                 cat
-                    ? cv2(catView(uid, cats, cat, fresh, cur, accent, notice))
+                    ? cv2(catView(uid, cats, cat, fresh, cur, accent, notice, i.member, settings))
                     : cv2(homeView(uid, settings.shop, cats, fresh, cur))
             )
             .catch(() => {});

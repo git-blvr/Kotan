@@ -26,7 +26,7 @@ const DEFAULTS = {
     roles: { autorole: null, reactionRoles: [] },
     economy: { currency: null, dailyBase: null, dailyStreak: null, dailyMaxStreak: null, startBalance: null, shop: [] },
     games: { guessReward: 150, scrambleReward: 200, winMultiplier: 1, maxBet: 0, per: {} },
-    boosts: { channel: null, message: '{user} just boosted {server}! 🚀', roleId: null },
+    boosts: { channel: null, message: '{user} just boosted {server}! 🚀', roleId: null, perks: { games: 1, coins: 1, xp: 1, shop: 0 } },
     appearance: { accent: '', background: '', theme: '' },
     branding: { nickname: '' },
     leveling: {
@@ -362,6 +362,12 @@ const SECTIONS = {
         const role = optSnowflake(f.roleId);
         if (role === undefined) return 'Invalid role';
         s.boosts.roleId = role;
+        // Booster perks — multipliers clamped 1–10, shop discount 0–90%.
+        const p = s.boosts.perks ||= {};
+        p.games = Math.min(Math.max(parseFloat(f.perkGames) || 1, 1), 10);
+        p.coins = Math.min(Math.max(parseFloat(f.perkCoins) || 1, 1), 10);
+        p.xp = Math.min(Math.max(parseFloat(f.perkXp) || 1, 1), 10);
+        p.shop = Math.min(Math.max(parseFloat(f.perkShop) || 0, 0), 90);
     },
     appearance(s, f) {
         const c = String(f.accent || '').trim();

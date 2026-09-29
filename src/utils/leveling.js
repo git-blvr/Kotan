@@ -1,6 +1,6 @@
 const db = require('./database');
 const logger = require('./logger');
-const { multOf } = require('../helpers/inv');
+const { multOf, boostPerk } = require('../helpers/inv');
 
 // XP engine — called fire-and-forget from messageCreate for every message that
 // survives automod. Per-guild config comes from settings.leveling:
@@ -9,7 +9,8 @@ const { multOf } = require('../helpers/inv');
 // XP needed to advance level L -> L+1. Quadratic curve (MEE6-style).
 const xpForLevel = (level) => 5 * level * level + 50 * level + 100;
 
-async function awardXp(message, leveling) {
+async function awardXp(message, settings) {
+    const leveling = settings?.leveling;
     if (!leveling?.enabled || !message.guild) return;
 
     const profile = await db.getProfile(message.guild.id, message.author.id);
@@ -18,7 +19,7 @@ async function awardXp(message, leveling) {
 
     const min = Math.max(1, leveling.xpMin ?? 15);
     const max = Math.max(min, leveling.xpMax ?? 25);
-    const gain = Math.round((min + Math.random() * (max - min)) * (leveling.multiplier || 1) * multOf(profile, 'xp'));
+    const gain = Math.round((min + Math.random() * (max - min)) * (leveling.multiplier || 1) * multOf(profile, 'xp') * boostPerk(message.member, settings, 'xp'));
     if (gain <= 0) return;
 
     profile.xp += gain;

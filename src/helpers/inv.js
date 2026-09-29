@@ -82,4 +82,17 @@ const fmtLeft = (until) => {
     return h ? `${h}h ${m}m` : `${m}m`;
 };
 
-module.exports = { SHOP_CATS, catalog, allItems, findItem, multOf, activateMult, withCoinMult, fmtLeft };
+// Booster perk value for a member — `premiumSince` marks a real server
+// booster. Multiplier kinds (games/coins/xp) read 1 when not boosting;
+// 'shop' is a discount percent (0 when not boosting).
+function boostPerk(member, settings, kind) {
+    if (!member?.premiumSince) return kind === 'shop' ? 0 : 1;
+    const v = settings?.boosts?.perks?.[kind];
+    return v == null ? (kind === 'shop' ? 0 : 1) : +v;
+}
+
+// Game winnings: game perk × active coin booster.
+const winAmount = (member, settings, profile, base) =>
+    Math.round(withCoinMult(profile, base) * boostPerk(member, settings, 'games'));
+
+module.exports = { SHOP_CATS, catalog, allItems, findItem, multOf, activateMult, withCoinMult, fmtLeft, boostPerk, winAmount };

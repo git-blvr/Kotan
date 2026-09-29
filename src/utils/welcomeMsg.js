@@ -71,8 +71,15 @@ function cardContainer(components, color, fmtFn, imgFn) {
                     const sec = new SectionBuilder().addTextDisplayComponents(
                         new TextDisplayBuilder().setContent(fmtFn(c.text) || ' ')
                     );
-                    const img = imgFn(c.image);
-                    if (isHttp(img)) sec.setThumbnailAccessory(new ThumbnailBuilder().setURL(img));
+                    const btnUrl = imgFn(c.btnUrl);
+                    if (isHttp(btnUrl)) {
+                        sec.setButtonAccessory(
+                            new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel(fmtFn(c.btnLabel).slice(0, 80) || 'Open').setURL(btnUrl)
+                        );
+                    } else {
+                        const img = imgFn(c.image);
+                        if (isHttp(img)) sec.setThumbnailAccessory(new ThumbnailBuilder().setURL(img));
+                    }
                     container.addSectionComponents(sec);
                     break;
                 }

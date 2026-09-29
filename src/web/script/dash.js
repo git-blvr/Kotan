@@ -397,7 +397,9 @@
     let scrollSpy = null;
     function bindSubnav(page) {
         const heads = $$('.card h3', page);
-        if (heads.length < 3) return;
+        // Only worth a subnav when there's actually a lot to jump between —
+        // few sections or a page that fits the viewport gets none.
+        if (heads.length < 4 || page.scrollHeight < window.innerHeight * 1.15) return;
         const seen = new Map();
         heads.forEach((h, i) => {
             const base = h.textContent.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || `sec-${i}`;
@@ -433,6 +435,13 @@
     // and the profile popout. Text wraps by estimated width — it's a preview.
     const DC = { bg: '#313338', panel: '#2b2d31', border: '#43444c', text: '#dbdee1', head: '#f2f3f5', muted: '#949ba4', brand: '#5865f2', green: '#23a55a' };
     const DFONT = `'gg sans','Segoe UI','Helvetica Neue',Arial,sans-serif`;
+    // Discord-style "Today at h:mm AM" — .dsvg-ts nodes refresh on a 2s tick.
+    const tsNow = () => {
+        const d = new Date();
+        const h = d.getHours() % 12 || 12, ap = d.getHours() < 12 ? 'AM' : 'PM';
+        return `Today at ${h}:${String(d.getMinutes()).padStart(2, '0')} ${ap}`;
+    };
+    setInterval(() => { $$('.dsvg-ts').forEach((t) => (t.textContent = tsNow())); }, 2000);
     let svgUid = 0;
     const xesc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const normHex = (v, fb) => (/^#?[0-9a-f]{6}$/i.test(String(v || '').trim()) ? `#${String(v).trim().replace(/^#/, '')}` : fb);
@@ -502,8 +511,8 @@
         return { h, svg: `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="${DC.panel}"/><rect x="${x}" y="${y}" width="4" height="${h}" fill="${color}"/>${img}${body}` };
     };
 
-    // CV2 container — stacked components, per-type rendering.
-    const svgContainer = (comps, x, y, w) => {
+    // CV2 container — stacked components, per-type rendering, optional accent bar.
+    const svgContainer = (comps, x, y, w, accent) => {
         const pad = 16, iw = w - pad * 2;
         let cy = y + pad, body = '';
         for (const c of comps || []) {
@@ -525,31 +534,42 @@
                 body += svgImg(c.url, x + pad, cy, iw, ih);
                 cy += ih + 8;
             } else if (c.type === 'section') {
-                const ls = wrapTxt(c.text || 'Section text', Math.floor((iw - 76) / 6.9));
+                const accW = 96; // accessory column (thumbnail or button)
+                const ls = wrapTxt(c.text || 'Section text', Math.floor((iw - accW) / 6.9));
                 const sh = Math.max(ls.length * 19.6, 64);
                 body += txtLines(ls, x + pad, cy + 10 + Math.max(0, (sh - ls.length * 19.6) / 2));
-                body += svgImg(c.image, x + w - pad - 64, cy, 64, 64);
+                if (c.btnUrl || c.btnLabel) {
+                    // button accessory — Discord renders link buttons gray
+                    const bl = (c.btnLabel || 'Link').slice(0, 16);
+                    const bw = Math.max(64, bl.length * 8.4 + 34);
+                    body += `<rect x="${x + w - pad - bw}" y="${cy + (sh - 34) / 2}" width="${bw}" height="34" rx="8" fill="#4e5058"/>
+                        <text x="${x + w - pad - bw / 2}" y="${cy + (sh - 34) / 2 + 22}" text-anchor="middle" font-family="${DFONT}" font-size="14" font-weight="500" fill="#fff">${xesc(bl)}</text>`;
+                } else {
+                    body += svgImg(c.image, x + w - pad - 64, cy, 64, 64);
+                }
                 cy += sh + 8;
             } else if (c.type === 'link') {
-                body += `<rect x="${x + pad}" y="${cy}" width="120" height="34" rx="6" fill="${DC.brand}"/>
-                    <text x="${x + pad + 60}" y="${cy + 21.5}" text-anchor="middle" font-family="${DFONT}" font-size="14" font-weight="600" fill="#fff">${xesc((c.label || 'Link').slice(0, 16))}</text>
-                    <path d="M${x + pad + 106} ${cy + 11} h6 v6 M${x + pad + 112} ${cy + 11} l-7 7" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round"/>`;
+                const ll = (c.label || 'Link').slice(0, 20);
+                const lw = Math.max(80, ll.length * 8.4 + 46);
+                body += `<rect x="${x + pad}" y="${cy}" width="${lw}" height="34" rx="8" fill="#4e5058"/>
+                    <text x="${x + pad + lw / 2 - 7}" y="${cy + 22}" text-anchor="middle" font-family="${DFONT}" font-size="14" font-weight="500" fill="#fff">${xesc(ll)}</text>
+                    <path d="M${x + pad + lw - 16} ${cy + 11} h6 v6 M${x + pad + lw - 10} ${cy + 11} l-7 7" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round"/>`;
                 cy += 42;
             }
         }
         const h = Math.max(cy - y + pad - 4, 44);
-        return { h, svg: `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="12" fill="${DC.panel}" stroke="${DC.border}" stroke-opacity=".55"/>${body}` };
+        const bar = accent ? `<rect x="${x}" y="${y}" width="4" height="${h}" rx="2" fill="${normHex(accent, DC.brand)}"/>` : '';
+        return { h, svg: `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="12" fill="${DC.panel}" stroke="${DC.border}" stroke-opacity=".55"/>${bar}${body}` };
     };
 
     // A message row: avatar, name + BOT tag + timestamp, text, embed/container.
-    const svgMessage = ({ avatar, name, content, embed, container }) => {
+    const svgMessage = ({ avatar, name, content, embed, container, accent }) => {
         const W = 440;
         let body = svgAv(avatar, 38, 28, 20);
         const nw = Math.min(String(name).length * 8.4, 180);
         body += `<text x="72" y="32" font-family="${DFONT}" font-size="15" font-weight="600" fill="${DC.head}">${xesc(name)}</text>`;
         body += `<rect x="${76 + nw}" y="20" width="38" height="15" rx="4" fill="${DC.brand}"/><text x="${95 + nw}" y="31" text-anchor="middle" font-family="${DFONT}" font-size="10" font-weight="700" fill="#fff">BOT</text>`;
-        const hh = String(new Date().getHours()).padStart(2, '0'), mm = String(new Date().getMinutes()).padStart(2, '0');
-        body += `<text x="${121 + nw}" y="31" font-family="${DFONT}" font-size="11" fill="${DC.muted}">Today at ${hh}:${mm}</text>`;
+        body += `<text class="dsvg-ts" x="${121 + nw}" y="31" font-family="${DFONT}" font-size="11" fill="${DC.muted}">${tsNow()}</text>`;
         let cy = 44;
         if (content) {
             const ls = wrapTxt(content, 47);
@@ -557,7 +577,7 @@
             cy += ls.length * 19.6 + 6;
         }
         if (embed) { const r = svgEmbed(embed, 72, cy, 344); body += r.svg; cy += r.h + 8; }
-        if (container) { const r = svgContainer(container, 72, cy, 344); body += r.svg; cy += r.h + 8; }
+        if (container) { const r = svgContainer(container, 72, cy, 344, accent); body += r.svg; cy += r.h + 8; }
         const h = Math.max(cy + 8, 52);
         return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${h}" width="${W}" height="${h}" class="dsvg" role="img"><rect width="${W}" height="${h}" fill="${DC.bg}"/>${body}</svg>`;
     };
@@ -631,28 +651,47 @@
     // several editors can coexist on a page. Live component list is stored
     // on `e.__list`.
     function cardEditorHtml(p, e) {
+        const chips = ['{user}', '{username}', '{server}', '{members}', '{avatar}', '{icon}']
+            .map((v) => `<button type="button" class="chip" data-ins="${v}">${v.slice(1, -1)}</button>`).join('');
+        const mdbar = `<div class="mdbar">
+            <button type="button" data-md="**">B</button><button type="button" data-md="*" class="it">I</button>
+            <button type="button" data-md="__" class="ul">U</button><button type="button" data-md="~~" class="st">S</button>
+            <button type="button" data-md="\`">\`\`</button><button type="button" data-mdlink>🔗</button>
+        </div>`;
         return `
             <h4 class="mt mb">Card ${tgl(`${p}e_on`, 'enabled', e.enabled)}</h4>
-            <div id="${p}ecard">
-                <div class="grid2">
-                    ${fldHtml('Style', `<select name="${p}e_style"><option value="embed" ${e.style !== 'cv2' ? 'selected' : ''}>Embed</option><option value="cv2" ${e.style === 'cv2' ? 'selected' : ''}>CV2 container</option></select>`)}
-                    ${fldHtml('Accent color', `<input type="text" name="${p}e_color" value="${esc(e.color ? `#${e.color}` : '')}" placeholder="#5865f2" maxlength="7">`, 'hex — empty = brand color')}
-                </div>
-                <div id="${p}e_embed">
+            <div class="cedit" id="${p}ecard">
+                <div class="cedit-fields">
+                    <div class="cesec"><span class="ceic">${svg('<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M7 9h10M7 13h6"/>')}</span>
+                        <div><b>Basics</b><p class="sub">Style and accent — clear fields to hide them.</p></div></div>
                     <div class="grid2">
-                        ${fldHtml('Title', txtIn(`${p}e_title`, e.title || '', 'e.g. Welcome to {server}!'))}
-                        ${fldHtml('Footer', txtIn(`${p}e_footer`, e.footer || ''))}
+                        ${fldHtml('Style', `<select name="${p}e_style"><option value="embed" ${e.style !== 'cv2' ? 'selected' : ''}>Embed</option><option value="cv2" ${e.style === 'cv2' ? 'selected' : ''}>CV2 container</option></select>`)}
+                        ${fldHtml('Accent color', `<input type="text" name="${p}e_color" value="${esc(e.color ? `#${e.color}` : '')}" placeholder="#5865f2" maxlength="7">`, 'hex — empty = brand color')}
                     </div>
-                    ${fldHtml('Description', txtArea(`${p}e_desc`, e.description || ''), 'supports the same placeholders')}
-                    ${fldHtml('Thumbnail URL', txtIn(`${p}e_thumburl`, e.thumb || '', '{avatar} {icon} or https://'), 'empty = member avatar')}
-                    ${tgl(`${p}e_thumb`, 'Show thumbnail', e.thumbnail)}
+                    <div id="${p}e_embed">
+                        <div class="cesec"><span class="ceic">${svg('<path d="M4 6h16M4 12h10M4 18h13"/>')}</span>
+                            <div><b>Content</b><p class="sub">Markdown and placeholders supported.</p></div></div>
+                        <div class="inschips"><span>Insert</span>${chips}</div>
+                        <div class="grid2">
+                            ${fldHtml('Title', txtIn(`${p}e_title`, e.title || '', 'e.g. Welcome to {server}!'))}
+                            ${fldHtml('Footer', txtIn(`${p}e_footer`, e.footer || ''))}
+                        </div>
+                        ${fldHtml('Description', mdbar + txtArea(`${p}e_desc`, e.description || ''), 'supports the same placeholders')}
+                        ${fldHtml('Thumbnail URL', txtIn(`${p}e_thumburl`, e.thumb || '', '{avatar} {icon} or https://'), 'empty = member avatar')}
+                        ${tgl(`${p}e_thumb`, 'Show thumbnail', e.thumbnail)}
+                    </div>
+                    <div id="${p}e_cv2">
+                        <div class="cesec"><span class="ceic">${svg('<path d="M4 5h16v4H4zM4 11h16v4H4zM4 17h16v4H4z"/>')}</span>
+                            <div><b>Components</b><p class="sub">Drag to reorder — max 10 — <code class="mono">+</code> on a text row attaches a thumbnail or button.</p></div></div>
+                        <div id="${p}comps"></div>
+                        <div class="compadd mt">${COMP_DEFS.map(([t, l]) => `<button class="btn sm" data-add="${t}">+ ${l}</button>`).join('')}</div>
+                    </div>
                 </div>
-                <div id="${p}e_cv2">
-                    <p class="sub mb">Drag components to reorder — <code class="mono">{avatar}</code> and <code class="mono">{icon}</code> also work in image fields.</p>
-                    <div id="${p}comps"></div>
-                    <div class="compadd mt">${COMP_DEFS.map(([t, l]) => `<button class="btn sm" data-add="${t}">+ ${l}</button>`).join('')}</div>
+                <div class="cedit-prev">
+                    <span class="cepv-t">Live Discord preview</span>
+                    <p class="sub mb">Matches the message Discord will post.</p>
+                    <div class="dprev" id="${p}dprev"></div>
                 </div>
-                <div class="dprev" id="${p}dprev"></div>
             </div>`;
     }
 
@@ -666,9 +705,13 @@
                 return `<select data-k="size"><option value="small" ${c.size !== 'large' ? 'selected' : ''}>Small gap</option><option value="large" ${c.size === 'large' ? 'selected' : ''}>Large gap</option></select>`;
             case 'image':
                 return `<input type="text" data-k="url" value="${esc(c.url || '')}" placeholder="https://… or {avatar} / {icon}">`;
-            case 'section':
-                return `<input type="text" data-k="text" value="${esc(c.text || '')}" placeholder="Text beside the thumbnail" class="grow">
-                        <input type="text" data-k="image" value="${esc(c.image || '')}" placeholder="{avatar} or URL" style="flex:0 0 160px">`;
+            case 'section': {
+                const acc = (c.btnUrl !== undefined || c.btnLabel !== undefined)
+                    ? `<input type="text" data-k="btnLabel" value="${esc(c.btnLabel || '')}" placeholder="Button label" style="flex:0 0 120px">
+                       <input type="text" data-k="btnUrl" value="${esc(c.btnUrl || '')}" placeholder="https://…" style="flex:0 0 150px">`
+                    : `<input type="text" data-k="image" value="${esc(c.image || '')}" placeholder="{avatar} or URL" style="flex:0 0 160px">`;
+                return `<input type="text" data-k="text" value="${esc(c.text || '')}" placeholder="Text beside the accessory" class="grow">${acc}`;
+            }
             case 'link':
                 return `<input type="text" data-k="label" value="${esc(c.label || '')}" placeholder="Button label" style="flex:0 0 140px">
                         <input type="text" data-k="url" value="${esc(c.url || '')}" placeholder="https://…" class="grow">`;
@@ -701,7 +744,7 @@
             const b = { avatar: botAv, name: botName };
             if (f[`${p}e_style`] === 'cv2') {
                 const comps = list.map((c) => ({ ...c, text: sampleFill(c.text), url: sampleFill(c.url), image: sampleFill(c.image), label: sampleFill(c.label) }));
-                el.innerHTML = comps.length ? svgMessage({ ...b, container: comps }) : '<p class="muted small">Add components to preview the card.</p>';
+                el.innerHTML = comps.length ? svgMessage({ ...b, container: comps, accent: f[`${p}e_color`] }) : '<p class="muted small">Add components to preview the card.</p>';
             } else {
                 el.innerHTML = svgMessage({ ...b, embed: {
                     title: sampleFill(f[`${p}e_title`]), description: sampleFill(f[`${p}e_desc`]),
@@ -718,7 +761,7 @@
                     <span class="drag" title="Drag to reorder">⠿</span>
                     <span class="ctype">${COMP_DEFS.find(([t]) => t === c.type)?.[1] || c.type}</span>
                     ${cardCompFields(c)}
-                    <span class="cbtns"><button class="cbtn" data-up="${i}" title="Move up">↑</button><button class="cbtn" data-dn="${i}" title="Move down">↓</button><button class="cbtn danger" data-del="${i}" title="Remove">✕</button></span>
+                    <span class="cbtns">${c.type === 'text' ? `<button class="cbtn acc" data-acc="${i}" title="Attach accessory">＋</button>` : ''}<button class="cbtn" data-up="${i}" title="Move up">↑</button><button class="cbtn" data-dn="${i}" title="Move down">↓</button><button class="cbtn danger" data-del="${i}" title="Remove">✕</button></span>
                 </div>`).join('') || '<p class="muted small">No components — add some below.</p>';
             $$('.comprow [data-k]', el).forEach((inp) => {
                 const row = inp.closest('.comprow');
@@ -727,6 +770,25 @@
             $$('.comprow [data-up]', el).forEach((b) => (b.onclick = () => { const i = +b.dataset.up; if (i > 0) { [list[i - 1], list[i]] = [list[i], list[i - 1]]; renderComps(); } }));
             $$('.comprow [data-dn]', el).forEach((b) => (b.onclick = () => { const i = +b.dataset.dn; if (i < list.length - 1) { [list[i + 1], list[i]] = [list[i], list[i + 1]]; renderComps(); } }));
             $$('.comprow [data-del]', el).forEach((b) => (b.onclick = () => { list.splice(+b.dataset.del, 1); renderComps(); }));
+            // "+" on a text row — turn it into a section with a thumbnail or
+            // link-button accessory (that's how CV2 attaches media to text).
+            $$('.comprow [data-acc]', el).forEach((b) => (b.onclick = (ev) => {
+                ev.stopPropagation();
+                $$('.accmenu', el).forEach((m) => m.remove());
+                const menu = document.createElement('div');
+                menu.className = 'accmenu';
+                menu.innerHTML = `<button type="button" data-accto="thumb">Thumbnail</button><button type="button" data-accto="btn">Link button</button>`;
+                b.closest('.cbtns').appendChild(menu);
+                menu.querySelectorAll('[data-accto]').forEach((mb) => (mb.onclick = () => {
+                    const i = +b.dataset.acc;
+                    const c = list[i];
+                    list[i] = mb.dataset.accto === 'thumb'
+                        ? { type: 'section', text: c.text, image: '' }
+                        : { type: 'section', text: c.text, btnLabel: '', btnUrl: '' };
+                    renderComps();
+                }));
+                setTimeout(() => document.addEventListener('click', () => menu.remove(), { once: true }), 0);
+            }));
             let dragIdx = null;
             $$('.comprow', el).forEach((row) => {
                 row.ondragstart = (ev) => { dragIdx = +row.dataset.i; ev.dataTransfer.effectAllowed = 'move'; row.classList.add('dragging'); };
@@ -755,8 +817,37 @@
         on.onchange = sync; styleSel.onchange = sync; sync();
         $(`#${p}ecard`, page).addEventListener('input', updPrev);
         $(`#${p}ecard`, page).addEventListener('change', updPrev);
+
+        // Insert chips land in the last-focused field inside this editor;
+        // the md toolbar wraps the description textarea's selection.
+        let lastField = null;
+        const insAt = (el, v) => {
+            const s = el.selectionStart ?? el.value.length, e2 = el.selectionEnd ?? el.value.length;
+            el.value = el.value.slice(0, s) + v + el.value.slice(e2);
+            el.focus(); el.setSelectionRange(s + v.length, s + v.length);
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+        };
+        const mdWrap = (el, pre, post = pre) => {
+            const s = el.selectionStart ?? 0, e2 = el.selectionEnd ?? 0;
+            el.value = el.value.slice(0, s) + pre + el.value.slice(s, e2) + post + el.value.slice(e2);
+            el.focus(); el.setSelectionRange(s + pre.length, e2 + pre.length);
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+        };
+        page.addEventListener('focusin', (e) => {
+            if (e.target.matches(`#${p}ecard input, #${p}ecard textarea`)) lastField = e.target;
+        });
+        page.addEventListener('click', (e) => {
+            const chip = e.target.closest(`#${p}ecard .chip[data-ins]`);
+            if (chip && lastField) insAt(lastField, chip.dataset.ins);
+            const md = e.target.closest(`#${p}ecard [data-md]`);
+            if (md && $(`[name=${p}e_desc]`, page)) mdWrap($(`[name=${p}e_desc]`, page), md.dataset.md);
+            const mdl = e.target.closest(`#${p}ecard [data-mdlink]`);
+            if (mdl && $(`[name=${p}e_desc]`, page)) mdWrap($(`[name=${p}e_desc]`, page), '[', '](https://)');
+        });
+
         renderComps();
         $$(`.compadd [data-add]`, $(`#${p}e_cv2`, page)).forEach((b) => (b.onclick = () => {
+            if (list.length >= 10) return toast('CV2 containers cap at 10 components', 'err');
             list.push({ type: b.dataset.add });
             renderComps();
         }));
@@ -1494,14 +1585,26 @@
                 <div class="card"><h3>Booster role</h3>
                     ${fldHtml('Role granted on boost', selSlot('brole'), 'empty = none')}
                 </div>
+                <div class="card"><h3>Booster perks</h3><p class="sub mb">Passive boosts for members while they boost the server. Multipliers stack on top of purchased boosters.</p>
+                    <div class="grid2">
+                        ${fldHtml('Game winnings ×', txtIn('pgames', b.perks?.games ?? 1), 'multiplier on all game payouts — 1 = off')}
+                        ${fldHtml('Coin earnings ×', txtIn('pcoins', b.perks?.coins ?? 1), 'multiplier on daily/other earnings — 1 = off')}
+                        ${fldHtml('XP gain ×', txtIn('pxp', b.perks?.xp ?? 1), 'multiplier on message XP — 1 = off')}
+                        ${fldHtml('Shop discount %', txtIn('pshop', b.perks?.shop ?? 0), '0–90 — 0 = off')}
+                    </div>
+                </div>
                 ${saveBar('boosts')}`;
             mountSelect(page, 'bch', { options: [{ value: '', label: 'Off' }, ...chOpts(DATA.channels)], value: b.channel || '', placeholder: 'Off' });
             mountSelect(page, 'brole', { options: [{ value: '', label: 'None' }, ...roOpts(DATA.roles)], value: b.roleId || '', placeholder: 'None' });
-            bindSave(page, 'boosting', () => ({
-                channel: mounts.bch.get() || null,
-                message: $('[name=bmsg]', page).value,
-                roleId: mounts.brole.get() || null,
-            }));
+            bindSave(page, 'boosts', () => {
+                const f = formVals(page);
+                return {
+                    channel: mounts.bch.get() || null,
+                    message: f.bmsg,
+                    roleId: mounts.brole.get() || null,
+                    perkGames: f.pgames, perkCoins: f.pcoins, perkXp: f.pxp, perkShop: f.pshop,
+                };
+            });
         },
 
         async settings(page) {
@@ -1657,7 +1760,12 @@
             DATA.categories = ch.categories || [];
             DATA.roles = ro.roles || [];
         }
+        // shell() rebuilds the sidebar — keep the nav's scroll position so
+        // items near the bottom don't jump to the top on every click.
+        const navScroll = $('.dnav')?.scrollTop ?? 0;
         shell(slug);
+        const navEl = $('.dnav');
+        if (navEl && navScroll) navEl.scrollTop = navScroll;
         const page = $('#page');
         const render = PAGES[slug] || PAGES.overview;
         // Drop select mounts from the previous page — stale elements would

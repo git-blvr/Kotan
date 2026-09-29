@@ -3,7 +3,7 @@ const { awaitReply } = require('../../helpers/collect');
 const { formatCoins } = require('../../helpers/format');
 const { fromMessage, fromInteraction } = require('../../helpers/ctx');
 const { gameCfg } = require('../../helpers/gamecfg')
-const { withCoinMult } = require('../../helpers/inv');
+const { winAmount } = require('../../helpers/inv');
 const db = require('../../utils/database');
 const config = require('../../config');
 
@@ -37,7 +37,7 @@ async function run(ctx) {
         const n = Number.parseInt(guess.content.trim(), 10);
         if (n === target) {
             const profile = await db.getProfile(ctx.guild.id, ctx.user.id);
-            profile.wallet += withCoinMult(profile, reward);
+            profile.wallet += winAmount(ctx.member, ctx.settings, profile, reward);
             await db.saveProfile(ctx.guild.id, ctx.user.id, profile);
             return ctx.channel.send(
                 cv2(

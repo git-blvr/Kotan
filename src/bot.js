@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, Collection, Options, Partials } = require('discord.js');
+const { Client, GatewayIntentBits, Collection, Options, Partials, Events } = require('discord.js');
 const config = require('./config');
 const logger = require('./utils/logger');
 const sentry = require('./utils/sentry');
@@ -89,7 +89,7 @@ require('./utils/devrest').startDevApi(client, shutdown);
 // Interactive dev console — `kotan>` prompt in this terminal once the bot is
 // logged in (ready.js prints "Logged in as" first since it registered before
 // us). Skipped under pm2/devctl where stdin can't be typed into.
-client.once('ready', () => {
+client.once(Events.ClientReady, () => {
     setTimeout(() => require('./utils/devcli').startDevConsole(client, { shutdown }), 500);
 });
 

@@ -119,6 +119,8 @@ const DEFAULT_SETTINGS = {
         channel: null,      // boost announcement channel; null = off
         message: '{user} just boosted {server}! 🚀',
         roleId: null,       // role granted to boosters
+        // Passive perks while a member is boosting (premium_since set).
+        perks: { games: 1.0, coins: 1.0, xp: 1.0, shop: 0 },
     },
     // Per-guild dashboard theming — applies when viewing this guild's panel.
     appearance: {
