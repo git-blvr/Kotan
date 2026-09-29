@@ -231,24 +231,24 @@
 .dsel > button:hover { border-color: var(--accent); }
 .dsel > button .ph { color: var(--muted); }
 .dsel > button .caret { margin-left: auto; color: var(--muted); font-size: 10px; }
-.dsel .pop {
+.pop {
     position: fixed; z-index: 60; /* anchored to the trigger's rect in JS —
     immune to ancestor containing-block quirks (labels, transforms, filters) */
     background: var(--panel-solid); border: 1px solid var(--border);
     border-radius: var(--r-md); box-shadow: var(--shadow-lg);
     max-height: 260px; overflow-y: auto; padding: var(--s1);
 }
-.dsel .pop .search { padding: var(--s1); position: sticky; top: 0; background: var(--panel-solid); }
-.dsel .opt {
+.pop .search { padding: var(--s1); position: sticky; top: 0; background: var(--panel-solid); }
+.pop .opt {
     display: flex; align-items: center; gap: var(--s2);
     padding: var(--s2) var(--s3); border-radius: var(--r-sm);
     font-size: 13.5px; cursor: pointer; color: var(--text-2);
 }
-.dsel .opt:hover, .dsel .opt.sel { background: var(--panel-2); color: var(--text); }
-.dsel .opt .swatch { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; background: var(--border); }
-.dsel .opt .tic { width: 15px; text-align: center; color: var(--muted); font-size: 12px; }
+.pop .opt:hover, .pop .opt.sel { background: var(--panel-2); color: var(--text); }
+.pop .opt .swatch { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; background: var(--border); }
+.pop .opt .tic { width: 15px; text-align: center; color: var(--muted); font-size: 12px; }
 .dsel .empty { padding: var(--s3); color: var(--muted); font-size: 13px; text-align: center; }
-.dsel.multi .opt.sel::after { content: '✓'; margin-left: auto; color: var(--accent-2); }
+.pop.multi .opt.sel::after { content: '✓'; margin-left: auto; color: var(--accent-2); }
 
 /* ---- toast ---- */
 .toasts { position: fixed; bottom: var(--s5); right: var(--s5); z-index: 200; display: flex; flex-direction: column; gap: var(--s2); }
@@ -514,7 +514,7 @@ html { scroll-behavior: smooth; }
 .dnav a .ic { transition: all var(--speed), transform .18s var(--ease-out); }
 
 /* select popups drop in */
-.dsel .pop { animation: drop-in .16s var(--ease-out) backwards; }
+.pop { animation: drop-in .16s var(--ease-out) backwards; }
 @keyframes drop-in { from { opacity: 0; transform: translateY(-6px) scale(.98); } }
 
 /* cards glow on hover; rows sweep */
@@ -597,8 +597,8 @@ html { scroll-behavior: smooth; }
 [data-glass='1'] .pk-search,
 [data-glass='1'] .theme-panel,
 [data-glass='1'] .dsel > button,
-[data-glass='1'] .dsel .pop,
-[data-glass='1'] .dsel .pop .search,
+[data-glass='1'] .pop,
+[data-glass='1'] .pop .search,
 [data-glass='1'] .modal,
 [data-glass='1'] .toast,
 [data-glass='1'] .subnav {

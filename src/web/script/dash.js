@@ -90,7 +90,7 @@
         const btn = document.createElement('button');
         btn.type = 'button';
         const pop = document.createElement('div');
-        pop.className = 'pop'; pop.style.display = 'none';
+        pop.className = `pop${opts.multi ? ' multi' : ''}`; pop.style.display = 'none';
         el.append(btn, pop);
 
         const options = opts.options || [];
@@ -115,12 +115,16 @@
             if (inp) { inp.focus(); inp.oninput = () => renderPop(inp.value.trim().toLowerCase()); inp.onkeydown = (e) => e.stopPropagation(); }
         }
 
+        const closePop = () => { pop.style.display = 'none'; };
         btn.onclick = () => {
             const open = pop.style.display !== 'none';
-            $$('.dsel .pop').forEach((p) => (p.style.display = 'none'));
+            $$('.dselpop').forEach((p) => (p.style.display = 'none'));
             pop.style.display = open ? 'none' : 'block';
             if (!open) {
-                // .pop is position:fixed — anchor it to the trigger's viewport rect.
+                // portal to <body> — ancestor backdrop-filter/transform creates a
+                // containing block that would break position:fixed anchoring
+                if (pop.parentElement !== document.body) document.body.appendChild(pop);
+                pop.classList.add('dselpop');
                 const r = btn.getBoundingClientRect();
                 pop.style.top = `${r.bottom + 4}px`;
                 pop.style.left = `${r.left}px`;
@@ -136,11 +140,11 @@
             if (!opt) return;
             const v = opt.dataset.v;
             if (opts.multi) { values.has(v) ? values.delete(v) : values.add(v); renderPop($('.search input', pop)?.value.trim().toLowerCase() || ''); }
-            else { values = new Set([v]); pop.style.display = 'none'; }
+            else { values = new Set([v]); closePop(); }
             renderBtn();
             el.dispatchEvent(new Event('change', { bubbles: true }));
         };
-        document.addEventListener('click', (e) => { if (!el.contains(e.target)) pop.style.display = 'none'; });
+        document.addEventListener('click', (e) => { if (!el.contains(e.target) && !pop.contains(e.target)) closePop(); });
 
         el.get = () => (opts.multi ? [...values] : ([...values][0] || null));
         el.set = (v) => { values = new Set(Array.isArray(v) ? v.map(String) : [v].filter(Boolean).map(String)); renderBtn(); };
@@ -179,7 +183,7 @@
     // Fixed-position dropdowns don't follow their trigger on scroll — close
     // them instead (capture picks up scrolls inside nested containers too).
     window.addEventListener('scroll', () => {
-        $$('.dsel .pop').forEach((p) => (p.style.display = 'none'));
+        $$('.dselpop').forEach((p) => (p.style.display = 'none'));
     }, { capture: true, passive: true });
 
     // ---------- charts (inline SVG) ----------
@@ -1782,8 +1786,10 @@
         const page = $('#page');
         const render = PAGES[slug] || PAGES.overview;
         // Drop select mounts from the previous page — stale elements would
-        // otherwise leak into the next page's collects.
+        // otherwise leak into the next page's collects. Portal'd pops on
+        // <body> outlive their triggers, so sweep them too.
         for (const k in mounts) delete mounts[k];
+        $$('.dselpop').forEach((p) => p.remove());
         try {
             await render(page);
             bindSubnav(page);
