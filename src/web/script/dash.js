@@ -119,7 +119,14 @@
             const open = pop.style.display !== 'none';
             $$('.dsel .pop').forEach((p) => (p.style.display = 'none'));
             pop.style.display = open ? 'none' : 'block';
-            if (!open) renderPop();
+            if (!open) {
+                // .pop is position:fixed — anchor it to the trigger's viewport rect.
+                const r = btn.getBoundingClientRect();
+                pop.style.top = `${r.bottom + 4}px`;
+                pop.style.left = `${r.left}px`;
+                pop.style.width = `${r.width}px`;
+                renderPop();
+            }
         };
         pop.onclick = (e) => {
             // dsel often sits inside a <label class="fld"> — the label would
@@ -168,6 +175,12 @@
         return el;
     }
     const selSlot = (key) => `<span data-mount="${key}"></span>`;
+
+    // Fixed-position dropdowns don't follow their trigger on scroll — close
+    // them instead (capture picks up scrolls inside nested containers too).
+    window.addEventListener('scroll', () => {
+        $$('.dsel .pop').forEach((p) => (p.style.display = 'none'));
+    }, { capture: true, passive: true });
 
     // ---------- charts (inline SVG) ----------
     function sparkline(values, color = 'var(--accent)', w = 600, h = 110) {

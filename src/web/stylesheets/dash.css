@@ -232,7 +232,8 @@
 .dsel > button .ph { color: var(--muted); }
 .dsel > button .caret { margin-left: auto; color: var(--muted); font-size: 10px; }
 .dsel .pop {
-    position: absolute; z-index: 60; top: calc(100% + 4px); left: 0; right: 0;
+    position: fixed; z-index: 60; /* anchored to the trigger's rect in JS —
+    immune to ancestor containing-block quirks (labels, transforms, filters) */
     background: var(--panel-solid); border: 1px solid var(--border);
     border-radius: var(--r-md); box-shadow: var(--shadow-lg);
     max-height: 260px; overflow-y: auto; padding: var(--s1);

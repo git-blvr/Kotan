@@ -116,6 +116,8 @@
                 $$('.doc-cat', docBody).forEach((s) => spy.observe(s));
             }
 
+            reveal(docBody); // scroll-reveal the freshly rendered doc cards
+
             // click a command card to copy the invocation
             docBody.addEventListener('click', (e) => {
                 const card = e.target.closest('.cmd');
@@ -149,6 +151,27 @@
                 }
             });
         });
+    }
+
+    // --- scroll reveal: elements blur+rise in as they enter the viewport ---
+    const REDUCED = theme.motion === 'off' || matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!REDUCED && 'IntersectionObserver' in window) {
+        const io = new IntersectionObserver((ents) => {
+            ents.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+        }, { threshold: 0.12, rootMargin: '0px 0px -6%' });
+        const RV_SEL = '.hero-img, .hero-copy > h1, .hero-copy > p, .hero-actions, .bstat, .features > h2, .features > p, .feature, .doc-cat h2, .cmd, .foot, .upt-card, .card.sect';
+        window.reveal = (scope = document) => {
+            $$(RV_SEL, scope).forEach((el) => {
+                if (el.classList.contains('rv')) return;
+                el.classList.add('rv');
+                // stagger among siblings — siblings appearing later start later
+                el.style.setProperty('--rvd', `${Math.min([...el.parentElement.children].indexOf(el) * 70, 420)}ms`);
+                io.observe(el);
+            });
+        };
+        reveal();
+    } else {
+        window.reveal = () => {};
     }
 
     // --- login page ---
