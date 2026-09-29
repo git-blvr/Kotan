@@ -1,2 +1,0 @@
-◇ injected env (9) from .env
-◇ injected env (0) from .env
