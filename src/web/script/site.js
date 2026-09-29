@@ -22,21 +22,40 @@
     const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const api = (path) => fetch(path).then((r) => (r.ok ? r.json() : null)).catch(() => null);
 
+    // --- stage slider (index): page never scrolls; wheel/keys swap .fpsec screens ---
+    const fp = $('.fp');
+    const SLD = !!fp && matchMedia('(min-width: 901px)').matches;
+
     // --- scroll reveal: elements blur+rise in as they enter the viewport ---
     const REDUCED = theme.motion === 'off' || matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (!REDUCED && 'IntersectionObserver' in window) {
+    if (SLD && !REDUCED) {
+        // slider mode: tag items .sdi — they cascade in when their .fpsec gets .on
+        const RV_SEL = '.hero-img, .hero-copy > h1, .hero-copy > p, .hero-actions, .bstat, .features > h2, .features > p, .feature, .foot';
+        window.reveal = (scope = document) => {
+            $$(RV_SEL, scope).forEach((el) => {
+                if (el.classList.contains('sdi')) return;
+                el.classList.add('sdi');
+                el.style.setProperty('--rvd', `${Math.min([...el.parentElement.children].indexOf(el) * 80, 480)}ms`);
+            });
+        };
+        reveal();
+    } else if (!REDUCED && 'IntersectionObserver' in window) {
         const io = new IntersectionObserver((ents) => {
             ents.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
         }, { threshold: 0.12, rootMargin: '0px 0px -6%' });
         const RV_SEL = '.hero-img, .hero-copy > h1, .hero-copy > p, .hero-actions, .bstat, .features > h2, .features > p, .feature, .doc-cat h2, .cmd, .foot, .upt-card, .card.sect';
+        const EXIT_SEL = '.hero-img img, .hero-copy'; // parallax-exit targets (no entrance tag — avoids transform conflicts)
+        const SDA = typeof CSS !== 'undefined' && CSS.supports?.('animation-timeline: view()');
         window.reveal = (scope = document) => {
             $$(RV_SEL, scope).forEach((el) => {
-                if (el.classList.contains('rv')) return;
-                el.classList.add('rv');
+                if (el.classList.contains('rv') || el.classList.contains('sda')) return;
                 // stagger among siblings — siblings appearing later start later
                 el.style.setProperty('--rvd', `${Math.min([...el.parentElement.children].indexOf(el) * 70, 420)}ms`);
+                if (SDA) { el.classList.add('sda'); return; }
+                el.classList.add('rv');
                 io.observe(el);
             });
+            if (SDA) $$(EXIT_SEL, scope).forEach((el) => el.classList.add('sda-x'));
         };
         reveal();
     } else {
@@ -175,45 +194,40 @@
     }
 
 
-    // --- fullpage section-stepping (index): one wheel gesture glides to the next section ---
-    const fp = $('.fp');
-    if (fp && matchMedia('(min-width: 901px)').matches) {
+    // --- stage machine: wheel/keys cross-fade sections; the page itself never moves ---
+    if (SLD) {
+        const secs = $$('.fpsec', fp);
+        // safety: only hijack if the slider CSS actually loaded (fp is overflow:hidden)
+        const armed = () => getComputedStyle(fp).overflow === 'hidden' || getComputedStyle(fp).overflowY === 'hidden';
+        let idx = Math.max(0, secs.findIndex((s) => s.classList.contains('on')));
         let busy = false;
-        const snaps = () => {
-            const vh = fp.clientHeight, pts = [0];
-            $$('.fpsec', fp).forEach((s) => {
-                pts.push(s.offsetTop);
-                if (s.offsetHeight > vh + 8) pts.push(s.offsetTop + s.offsetHeight - vh); // sub-snap: section's own bottom
-            });
-            pts.push(Math.max(0, fp.scrollHeight - vh));
-            return [...new Set(pts)].sort((a, b) => a - b);
-        };
-        const target = (dir) => {
-            const c = fp.scrollTop, pts = snaps();
-            return dir > 0 ? pts.find((p) => p > c + 4) : [...pts].reverse().find((p) => p < c - 4);
-        };
-        const go = (dir) => {
-            const t = target(dir);
-            if (t == null) return;
+        const show = (i) => {
+            i = Math.max(0, Math.min(secs.length - 1, i));
+            if (i === idx) return;
+            idx = i;
             busy = true;
-            fp.scrollTo({ top: t, behavior: REDUCED ? 'auto' : 'smooth' });
-            setTimeout(() => { busy = false; }, REDUCED ? 60 : 850);
+            secs.forEach((s, j) => s.classList.toggle('on', j === idx));
+            setTimeout(() => { busy = false; }, REDUCED ? 60 : 950);
         };
         fp.addEventListener('wheel', (e) => {
-            const d = e.deltaY;
-            if (Math.abs(d) < 8 || busy) return;
-            // only hijack when fp is genuinely scrollable and we have a snap to go to —
-            // otherwise let native scrolling happen (never trap the page)
-            if (fp.scrollHeight - fp.clientHeight < 8 || target(d > 0 ? 1 : -1) == null) return;
+            if (!armed() || busy || Math.abs(e.deltaY) < 8) return;
             e.preventDefault();
-            go(d > 0 ? 1 : -1);
+            show(idx + (e.deltaY > 0 ? 1 : -1));
         }, { passive: false });
+        let ty = null;
+        fp.addEventListener('touchstart', (e) => { ty = e.touches[0].clientY; }, { passive: true });
+        fp.addEventListener('touchend', (e) => {
+            if (ty == null || busy || !armed()) return;
+            const d = ty - e.changedTouches[0].clientY;
+            if (Math.abs(d) > 48) show(idx + (d > 0 ? 1 : -1));
+            ty = null;
+        }, { passive: true });
         window.addEventListener('keydown', (e) => {
             if (busy || /input|textarea|select/i.test(e.target.tagName)) return;
-            if (['ArrowDown', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); go(1); }
-            else if (['ArrowUp', 'PageUp'].includes(e.key)) { e.preventDefault(); go(-1); }
-            else if (e.key === 'Home') { e.preventDefault(); fp.scrollTo({ top: 0, behavior: REDUCED ? 'auto' : 'smooth' }); }
-            else if (e.key === 'End') { e.preventDefault(); fp.scrollTo({ top: fp.scrollHeight, behavior: REDUCED ? 'auto' : 'smooth' }); }
+            if (['ArrowDown', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); show(idx + 1); }
+            else if (['ArrowUp', 'PageUp'].includes(e.key)) { e.preventDefault(); show(idx - 1); }
+            else if (e.key === 'Home') { e.preventDefault(); show(0); }
+            else if (e.key === 'End') { e.preventDefault(); show(secs.length - 1); }
         });
     }
 

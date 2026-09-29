@@ -226,24 +226,38 @@
         html { scroll-behavior: auto; }
     }
 
-    /* ---------- fullpage scroll + scroll reveal ---------- */
+    /* ---------- stage slider: page never scrolls; wheel blurs one screen out, next in ---------- */
     body.fppage { height: 100vh; overflow: hidden; }
-    .fp { height: 100vh; overflow-y: auto; overflow-x: hidden; scroll-behavior: smooth; }
-    .fpsec { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; }
-    .rv {
-        opacity: 0; transform: translateY(26px); filter: blur(10px);
-        transition: opacity .7s cubic-bezier(.2,.7,.3,1), transform .7s cubic-bezier(.2,.7,.3,1), filter .7s cubic-bezier(.2,.7,.3,1);
-        transition-delay: var(--rvd, 0ms);
-        will-change: opacity, transform, filter;
+    .fp { height: 100vh; overflow: hidden; position: relative; }
+    .fp > .nav-wrap { position: fixed; top: 14px; left: 0; right: 0; z-index: 50; }
+    .fpsec {
+        position: absolute; inset: 0;
+        display: flex; flex-direction: column; justify-content: center;
+        opacity: 0; transform: scale(.985); filter: blur(14px);
+        visibility: hidden; pointer-events: none;
+        transition: opacity .55s ease, transform .75s cubic-bezier(.2,.7,.3,1), filter .55s ease, visibility 0s .75s;
     }
-    .rv.in { opacity: 1; transform: none; filter: none; }
+    .fpsec.on {
+        opacity: 1; transform: none; filter: none;
+        visibility: visible; pointer-events: auto;
+        transition-delay: 0s;
+    }
+    /* children cascade in once their section is active */
+    .sdi {
+        opacity: 0; transform: translateY(26px); filter: blur(9px);
+        transition: opacity .6s cubic-bezier(.2,.7,.3,1), transform .6s cubic-bezier(.2,.7,.3,1), filter .6s cubic-bezier(.2,.7,.3,1);
+        transition-delay: var(--rvd, 0ms);
+        transition-property: opacity, transform, filter;
+    }
+    .fpsec.on .sdi { opacity: 1; transform: none; filter: none; }
     @media (prefers-reduced-motion: reduce) {
-        .rv { opacity: 1; transform: none; filter: none; transition: none; }
+        .fpsec, .sdi { transition: none; }
     }
     @media (max-width: 900px) {
         body.fppage { height: auto; overflow: auto; }
         .fp { height: auto; overflow: visible; }
-        .fpsec { min-height: 0; padding: 40px 0; }
+        .fpsec { position: static; min-height: 0; padding: 40px 0; opacity: 1; transform: none; filter: none; visibility: visible; pointer-events: auto; }
+        .fpsec .sdi, .sdi { opacity: 1; transform: none; filter: none; }
     }
 </style>
 </head>
@@ -264,7 +278,7 @@
     </nav>
 </div>
 
-<header class="wrap fpsec">
+<header class="wrap fpsec on">
     <div class="hero">
         <div class="hero-img">
             <img src="https://i.imgur.com/WjohOL6.png" alt="Kotan — the mascot, in her sailor uniform" width="680" height="1020">
@@ -334,6 +348,6 @@
 </footer>
 </div>
 
-<script src="/script/site.js?v=12" defer></script>
+<script src="/script/site.js?v=14" defer></script>
 </body>
 </html>

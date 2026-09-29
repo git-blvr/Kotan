@@ -339,16 +339,31 @@ label.fld .hint { font-weight: 400; color: var(--muted); font-size: 12px; }
     .rv { opacity: 1; transform: none; filter: none; transition: none; }
 }
 
-/* ---- fullpage scroll (index only: body.fppage > .fp) ---- */
-body.fppage { height: 100vh; overflow: hidden; }
-.fp { height: 100vh; overflow-y: auto; overflow-x: hidden; scroll-behavior: smooth; }
-.fpsec {
-    min-height: 100vh;
-    display: flex; flex-direction: column; justify-content: center;
+
+/* scroll-driven (scrubbed) animations — Chrome/Edge; .rv observer is the fallback */
+@keyframes sda-in {
+    from { opacity: 0; transform: translateY(60px) scale(.96); filter: blur(12px); }
+    to   { opacity: 1; transform: none; filter: none; }
 }
-.fp > .nav-wrap { position: sticky; top: 14px; }
+@keyframes sda-out {
+    to { opacity: .12; transform: translateY(-110px) scale(.92); filter: blur(8px); }
+}
+@supports (animation-timeline: view()) {
+    .sda   { animation: sda-in 1s linear both; animation-timeline: view(); animation-range: entry 0% entry 60%; }
+    .sda-x { animation: sda-out 1s linear both; animation-timeline: view(); animation-range: exit 0% exit 100%; }
+}
+/* ---- stage slider (index only: body.fppage > .fp) ---- */
+body.fppage { height: 100vh; overflow: hidden; }
+.fp { height: 100vh; overflow: hidden; position: relative; }
+.fp > .nav-wrap { position: fixed; top: 14px; left: 0; right: 0; z-index: 50; }
+.fpsec { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; opacity: 0; transform: scale(.985); filter: blur(14px); visibility: hidden; pointer-events: none; transition: opacity .55s ease, transform .75s cubic-bezier(.2,.7,.3,1), filter .55s ease, visibility 0s .75s; }
+.fpsec.on { opacity: 1; transform: none; filter: none; visibility: visible; pointer-events: auto; transition-delay: 0s; }
+.sdi { opacity: 0; transform: translateY(26px); filter: blur(9px); transition: opacity .6s cubic-bezier(.2,.7,.3,1), transform .6s cubic-bezier(.2,.7,.3,1), filter .6s cubic-bezier(.2,.7,.3,1); transition-delay: var(--rvd, 0ms); }
+.fpsec.on .sdi { opacity: 1; transform: none; filter: none; }
+@media (prefers-reduced-motion: reduce) { .fpsec, .sdi { transition: none; } }
 @media (max-width: 900px) {
     body.fppage { height: auto; overflow: auto; }
     .fp { height: auto; overflow: visible; }
-    .fpsec { min-height: 0; padding: 40px 0; }
+    .fpsec { position: static; min-height: 0; padding: 40px 0; opacity: 1; transform: none; filter: none; visibility: visible; pointer-events: auto; }
+    .sdi { opacity: 1; transform: none; filter: none; }
 }
