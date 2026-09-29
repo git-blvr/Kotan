@@ -338,3 +338,17 @@ label.fld .hint { font-weight: 400; color: var(--muted); font-size: 12px; }
 @media (prefers-reduced-motion: reduce) {
     .rv { opacity: 1; transform: none; filter: none; transition: none; }
 }
+
+/* ---- fullpage scroll (index only: body.fppage > .fp) ---- */
+body.fppage { height: 100vh; overflow: hidden; }
+.fp { height: 100vh; overflow-y: auto; overflow-x: hidden; scroll-behavior: smooth; }
+.fpsec {
+    min-height: 100vh;
+    display: flex; flex-direction: column; justify-content: center;
+}
+.fp > .nav-wrap { position: sticky; top: 14px; }
+@media (max-width: 900px) {
+    body.fppage { height: auto; overflow: auto; }
+    .fp { height: auto; overflow: visible; }
+    .fpsec { min-height: 0; padding: 40px 0; }
+}

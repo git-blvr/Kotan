@@ -174,6 +174,40 @@
         window.reveal = () => {};
     }
 
+    // --- fullpage section-stepping (index): one wheel gesture glides to the next section ---
+    const fp = $('.fp');
+    if (fp && matchMedia('(min-width: 901px)').matches) {
+        let busy = false;
+        const snaps = () => {
+            const vh = fp.clientHeight, pts = [0];
+            $$('.fpsec', fp).forEach((s) => {
+                pts.push(s.offsetTop);
+                if (s.offsetHeight > vh + 8) pts.push(s.offsetTop + s.offsetHeight - vh); // sub-snap: section's own bottom
+            });
+            pts.push(Math.max(0, fp.scrollHeight - vh));
+            return [...new Set(pts)].sort((a, b) => a - b);
+        };
+        const go = (dir) => {
+            const c = fp.scrollTop, pts = snaps();
+            const t = dir > 0 ? pts.find((p) => p > c + 4) : [...pts].reverse().find((p) => p < c - 4);
+            if (t == null) return;
+            busy = true;
+            fp.scrollTo({ top: t, behavior: REDUCED ? 'auto' : 'smooth' });
+            setTimeout(() => { busy = false; }, REDUCED ? 60 : 850);
+        };
+        fp.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            if (!busy && Math.abs(e.deltaY) >= 8) go(e.deltaY > 0 ? 1 : -1);
+        }, { passive: false });
+        window.addEventListener('keydown', (e) => {
+            if (busy || /input|textarea|select/i.test(e.target.tagName)) return;
+            if (['ArrowDown', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); go(1); }
+            else if (['ArrowUp', 'PageUp'].includes(e.key)) { e.preventDefault(); go(-1); }
+            else if (e.key === 'Home') { e.preventDefault(); fp.scrollTo({ top: 0, behavior: REDUCED ? 'auto' : 'smooth' }); }
+            else if (e.key === 'End') { e.preventDefault(); fp.scrollTo({ top: fp.scrollHeight, behavior: REDUCED ? 'auto' : 'smooth' }); }
+        });
+    }
+
     // --- login page ---
     if ($('#login-btn')) {
         const next = new URLSearchParams(location.search).get('next');
