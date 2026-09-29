@@ -22,6 +22,27 @@
     const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const api = (path) => fetch(path).then((r) => (r.ok ? r.json() : null)).catch(() => null);
 
+    // --- scroll reveal: elements blur+rise in as they enter the viewport ---
+    const REDUCED = theme.motion === 'off' || matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!REDUCED && 'IntersectionObserver' in window) {
+        const io = new IntersectionObserver((ents) => {
+            ents.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+        }, { threshold: 0.12, rootMargin: '0px 0px -6%' });
+        const RV_SEL = '.hero-img, .hero-copy > h1, .hero-copy > p, .hero-actions, .bstat, .features > h2, .features > p, .feature, .doc-cat h2, .cmd, .foot, .upt-card, .card.sect';
+        window.reveal = (scope = document) => {
+            $$(RV_SEL, scope).forEach((el) => {
+                if (el.classList.contains('rv')) return;
+                el.classList.add('rv');
+                // stagger among siblings — siblings appearing later start later
+                el.style.setProperty('--rvd', `${Math.min([...el.parentElement.children].indexOf(el) * 70, 420)}ms`);
+                io.observe(el);
+            });
+        };
+        reveal();
+    } else {
+        window.reveal = () => {};
+    }
+
     // --- chrome ---
     const navKey = { '/': 'home', '/doc': 'doc', '/uptime': 'uptime', '/dashboard': 'dash' }[location.pathname];
     if (navKey) $(`[data-nav="${navKey}"]`)?.classList.add('active');
@@ -153,26 +174,6 @@
         });
     }
 
-    // --- scroll reveal: elements blur+rise in as they enter the viewport ---
-    const REDUCED = theme.motion === 'off' || matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (!REDUCED && 'IntersectionObserver' in window) {
-        const io = new IntersectionObserver((ents) => {
-            ents.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
-        }, { threshold: 0.12, rootMargin: '0px 0px -6%' });
-        const RV_SEL = '.hero-img, .hero-copy > h1, .hero-copy > p, .hero-actions, .bstat, .features > h2, .features > p, .feature, .doc-cat h2, .cmd, .foot, .upt-card, .card.sect';
-        window.reveal = (scope = document) => {
-            $$(RV_SEL, scope).forEach((el) => {
-                if (el.classList.contains('rv')) return;
-                el.classList.add('rv');
-                // stagger among siblings — siblings appearing later start later
-                el.style.setProperty('--rvd', `${Math.min([...el.parentElement.children].indexOf(el) * 70, 420)}ms`);
-                io.observe(el);
-            });
-        };
-        reveal();
-    } else {
-        window.reveal = () => {};
-    }
 
     // --- fullpage section-stepping (index): one wheel gesture glides to the next section ---
     const fp = $('.fp');
@@ -187,17 +188,25 @@
             pts.push(Math.max(0, fp.scrollHeight - vh));
             return [...new Set(pts)].sort((a, b) => a - b);
         };
-        const go = (dir) => {
+        const target = (dir) => {
             const c = fp.scrollTop, pts = snaps();
-            const t = dir > 0 ? pts.find((p) => p > c + 4) : [...pts].reverse().find((p) => p < c - 4);
+            return dir > 0 ? pts.find((p) => p > c + 4) : [...pts].reverse().find((p) => p < c - 4);
+        };
+        const go = (dir) => {
+            const t = target(dir);
             if (t == null) return;
             busy = true;
             fp.scrollTo({ top: t, behavior: REDUCED ? 'auto' : 'smooth' });
             setTimeout(() => { busy = false; }, REDUCED ? 60 : 850);
         };
         fp.addEventListener('wheel', (e) => {
+            const d = e.deltaY;
+            if (Math.abs(d) < 8 || busy) return;
+            // only hijack when fp is genuinely scrollable and we have a snap to go to —
+            // otherwise let native scrolling happen (never trap the page)
+            if (fp.scrollHeight - fp.clientHeight < 8 || target(d > 0 ? 1 : -1) == null) return;
             e.preventDefault();
-            if (!busy && Math.abs(e.deltaY) >= 8) go(e.deltaY > 0 ? 1 : -1);
+            go(d > 0 ? 1 : -1);
         }, { passive: false });
         window.addEventListener('keydown', (e) => {
             if (busy || /input|textarea|select/i.test(e.target.tagName)) return;
