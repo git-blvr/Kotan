@@ -258,6 +258,45 @@
         }, { passive: true });
     }
 
+    // --- horizontal swipe: drag the screen left/right to turn pages ---
+    const PAGE_ORDER = ['/', '/doc', '/uptime', '/dashboard'];
+    const pi = PAGE_ORDER.indexOf(location.pathname);
+    if (pi !== -1 && !REDUCED) {
+        const dragEl = fp || document.body;
+        const pageTurn = (dir) => { const t = PAGE_ORDER[pi + dir]; if (t) sweep(t); };
+        let pd = null;
+        const resetDrag = () => {
+            if (!pd) return;
+            dragEl.style.transition = '';
+            dragEl.style.transform = '';
+            dragEl.style.filter = '';
+            pd = null;
+        };
+        window.addEventListener('pointerdown', (e) => {
+            if (e.pointerType === 'mouse' && e.button !== 0) return;
+            if (e.target.closest('a, button, input, textarea, select, [role="button"], nav')) return;
+            pd = { x: e.clientX, y: e.clientY, id: e.pointerId, dx: 0, lock: false };
+        });
+        window.addEventListener('pointermove', (e) => {
+            if (!pd || e.pointerId !== pd.id) return;
+            const dx = e.clientX - pd.x, dy = e.clientY - pd.y;
+            if (!pd.lock && Math.abs(dx) > 14 && Math.abs(dx) > Math.abs(dy) * 1.35) pd.lock = true;
+            if (!pd.lock) return;
+            pd.dx = dx;
+            dragEl.style.transition = 'none';
+            dragEl.style.transform = `translateX(${dx * 0.9}px)`;
+            dragEl.style.filter = `blur(${Math.min(Math.abs(dx) / 60, 6)}px)`;
+        });
+        window.addEventListener('pointerup', (e) => {
+            if (!pd || e.pointerId !== pd.id) return;
+            const dx = pd.lock ? pd.dx : 0;
+            resetDrag();
+            if (dx < -90) pageTurn(1);
+            else if (dx > 90) pageTurn(-1);
+        });
+        window.addEventListener('pointercancel', resetDrag);
+    }
+
     // --- login page ---
     if ($('#login-btn')) {
         const next = new URLSearchParams(location.search).get('next');

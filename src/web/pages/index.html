@@ -52,6 +52,7 @@
         margin: 0; background: var(--bg); color: var(--text);
         font: 400 16px/1.6 'Inter', system-ui, sans-serif;
         transition: background var(--speed), color var(--speed);
+        touch-action: pan-y;
     }
     h1, h2, h3, .brand { font-family: 'Baloo 2', 'Inter', system-ui, sans-serif; }
     a { color: var(--accent); text-decoration: none; transition: color var(--speed); }
@@ -79,7 +80,7 @@
     .nav-links { display: flex; gap: 4px; margin: 0 auto; align-items: center; }
     .nav-links a {
         position: relative; width: 122px; height: 38px;
-        display: flex; align-items: center; justify-content: center;
+        display: flex; align-items: center; justify-content: center; justify-content: safe center;
         color: var(--text-2); font-weight: 500; font-size: 15px;
         background: var(--panel-2); border-radius: 999px;
         transition: color 0.35s ease, background-color 0.35s ease, transform 0.3s var(--spring);
@@ -114,7 +115,7 @@
     }
     .btn:active { transform: translateY(0) scale(0.97); }
     .btn.sm { padding: 9px 16px; font-size: 13.5px; border-radius: 999px; }
-    .btn.js-cta.nav-cta { width: 40px; height: 38px; padding: 0; justify-content: center; }
+    .btn.js-cta.nav-cta { width: 40px; height: 38px; padding: 0; justify-content: center; justify-content: safe center; }
     .nav-cta .cta-ic { width: 20px; height: 20px; }
     .btn.primary { background: var(--accent); color: #fff; }
     .btn.primary:hover { background: var(--accent-2); color: #fff; transform: translateY(-2px); box-shadow: 0 8px 22px rgba(232, 98, 46, 0.35); }
@@ -127,7 +128,7 @@
         gap: 56px; align-items: center;
         padding: 64px 0 56px; min-height: 480px;
     }
-    .hero-img { position: relative; display: flex; justify-content: center; }
+    .hero-img { position: relative; display: flex; justify-content: center; justify-content: safe center; }
     .hero-img::before {
         content: ''; position: absolute; left: 50%; top: 50%;
         width: 115%; padding-top: 115%; transform: translate(-50%, -52%);
@@ -210,7 +211,7 @@
         .hero { grid-template-columns: 1fr; gap: 34px; padding: 40px 0 50px; text-align: center; }
         .hero-img img { max-width: 280px; }
         .sub { margin-left: auto; margin-right: auto; }
-        .hero-actions, .stats { justify-content: center; }
+        .hero-actions, .stats { justify-content: center; justify-content: safe center; }
         .grid { grid-template-columns: repeat(2, 1fr); }
         .nav-links a:not(.btn) { display: none; }
         .nav { gap: 14px; }
@@ -232,12 +233,16 @@
     .fp > .nav-wrap { position: fixed; top: 14px; left: 0; right: 0; z-index: 50; }
     .fpsec {
         position: absolute; inset: 0;
-        display: flex; flex-direction: column; justify-content: center;
-        padding-bottom: 72px; /* clearance for the footer bar */
+        display: flex; flex-direction: column; justify-content: center; justify-content: safe center;
+        padding: 96px 24px 72px; /* clearance for the fixed nav + footer bar */
+        overflow-y: auto; /* escape hatch: ultra-tall content can still reach its top */
+        scrollbar-width: none; /* keep it swipeable without a visible bar */
+        -ms-overflow-style: none;
         opacity: 0; transform: scale(.985); filter: blur(14px);
         visibility: hidden; pointer-events: none;
         transition: opacity .55s ease, transform .75s cubic-bezier(.2,.7,.3,1), filter .55s ease, visibility 0s .75s;
     }
+    .fpsec::-webkit-scrollbar { display: none; }
     .fpsec.on {
         opacity: 1; transform: none; filter: none;
         visibility: visible; pointer-events: auto;
@@ -366,6 +371,6 @@
 </footer>
 </div>
 
-<script src="/script/site.js?v=15" defer></script>
+<script src="/script/site.js?v=16" defer></script>
 </body>
 </html>
