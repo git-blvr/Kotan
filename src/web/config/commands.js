@@ -34,6 +34,7 @@ module.exports = [
     { name: 'unrole', description: 'Removes a role from a member.', module: 'moderation' },
     { name: 'warn', description: 'Warns a member and stores the warning.', module: 'moderation' },
     { name: 'warns', description: 'Lists the warnings of a member (or your own).', module: 'moderation' },
+    { name: 'afk', description: 'Set your AFK status, or check who pinged you while away ("afk pings").', module: 'tools' },
     { name: 'avatar', description: 'Shows a user\'s avatar in full size.', module: 'tools' },
     { name: 'banner', description: 'Shows a user\'s profile banner.', module: 'tools' },
     { name: 'color', description: 'Extracts the dominant color of an image attachment or a user\'s avatar.', module: 'tools' },

@@ -62,7 +62,7 @@
         const panel = document.createElement('div');
         panel.className = 'theme-panel'; panel.style.display = 'none';
         panel.innerHTML = `<h4>Appearance</h4>
-            <div class="row">Accent <input type="color" id="th-accent" value="${theme.accent || '#e8622e'}"></div>
+            <div class="row">Accent <input type="color" id="th-accent" value="${/^#[0-9a-f]{3,8}$/i.test(theme.accent || '') ? theme.accent : '#e8622e'}"></div>
             <div class="row">Mode <select id="th-mode"><option value="">Dark</option><option value="light">Light</option></select></div>
             <div class="row">Density <select id="th-density"><option value="">Comfortable</option><option value="compact">Compact</option></select></div>
             <div class="row">Motion <select id="th-motion"><option value="">On</option><option value="off">Off</option></select></div>`;
@@ -334,6 +334,7 @@
             ['welcome', svg('<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>'), 'Welcome'],
             ['roles', svg('<path d="M3 12V4h8l9 9-8 8-9-9z"/><circle cx="7.5" cy="8.5" r="1.2" fill="currentColor" stroke="none"/>'), 'Roles'],
             ['leveling', svg('<path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/>'), 'Leveling'],
+            ['afk', svg('<circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.5 2"/>'), 'AFK'],
             ['economy', svg('<circle cx="12" cy="12" r="8.5"/><path d="M12 7v10M15 9.2c-.6-1-1.7-1.4-3-1.4-1.7 0-3 .9-3 2.4 0 3.2 6 1.7 6 4.9 0 1.5-1.3 2.4-3 2.4-1.3 0-2.4-.5-3-1.5"/>'), 'Economy'],
             ['shop', svg('<path d="M4 7l1.5-3h13L20 7"/><path d="M4 7h16v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7z"/><path d="M9 10a3 3 0 0 0 6 0"/>'), 'Shop'],
             ['games', svg('<rect x="2.5" y="7.5" width="19" height="11" rx="5.5"/><path d="M8 11v4M6 13h4"/><circle cx="15.5" cy="12" r="0.8" fill="currentColor" stroke="none"/><circle cx="18" cy="14" r="0.8" fill="currentColor" stroke="none"/>'), 'Games'],
@@ -1223,6 +1224,40 @@
         },
 
 
+
+        async afk(page) {
+            const a = CTX.settings.afk || {};
+            page.innerHTML = `
+                <div><div class="page-title">AFK</div><p class="page-desc">Members go away with <code class="mono">.afk</code> or <code class="mono">/afk</code> — pinging them announces it, and <code class="mono">.afk pings</code> shows who tried. Placeholders: <code class="mono">{user}</code> <code class="mono">{username}</code> <code class="mono">{message}</code> <code class="mono">{ago}</code> <code class="mono">{channel}</code></p></div>
+                <div class="card"><h3>Behavior</h3>
+                    ${tgl('a_on', 'AFK enabled', a.enabled !== false)}
+                    ${fldHtml('Default message', txtIn('a_def', a.defaultMessage || 'AFK'), 'used by a bare .afk with no text')}
+                    ${fldHtml('Announcement', txtIn('a_ann', a.announce || ''), 'reply when an AFK member gets pinged — {user} {message} {ago} {channel}')}
+                    ${tgl('a_clear', 'Welcome-back notice', a.selfClear !== false)}
+                </div>
+                <div class="card"><h3>Permissions</h3>
+                    ${fldHtml('Allowed roles', selSlot('a_roles'), 'members need one of these — empty = everyone')}
+                    ${fldHtml('Silent channels', selSlot('a_ch'), 'mentions here never announce AFK status')}
+                </div>
+                <div class="card"><h3>Announcement card</h3>
+                    <p class="sub mb">Rich card replacing the plain announcement line — the same editor as Welcome.</p>
+                    ${cardEditorHtml('afk', a.card || {})}
+                </div>
+                ${saveBar('afk')}`;
+
+            mountSelect(page, 'a_roles', { multi: true, options: roOpts(DATA.roles), value: a.roles || [], placeholder: 'Everyone' });
+            mountSelect(page, 'a_ch', { multi: true, options: chOpts(DATA.channels), value: a.exemptChannels || [], placeholder: 'None' });
+            const card = setupCardEditor(page, 'afk', a.card || {});
+            bindSave(page, 'afk', (el) => {
+                const f = formVals(el);
+                return {
+                    enabled: f.a_on, defaultMessage: f.a_def, announce: f.a_ann,
+                    selfClear: f.a_clear,
+                    roles: mounts.a_roles.get(), exemptChannels: mounts.a_ch.get(),
+                    card: card.collect(f),
+                };
+            });
+        },
 
         async roles(page) {
             const r = CTX.settings.roles;

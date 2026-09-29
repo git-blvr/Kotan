@@ -7,6 +7,7 @@ const { sendError } = require('../helpers/embeds');
 const { gateCommand } = require('../helpers/commandGate');
 const automod = require('../utils/automod');
 const leveling = require('../utils/leveling');
+const afk = require('../utils/afk');
 
 // The heart of the bot: turns a raw message into a command call.
 //
@@ -85,6 +86,13 @@ module.exports = {
                     .reply({ content: tagContent, allowedMentions: { parse: [] } }) // tags can't mass-ping
                     .catch(() => {});
         }
+        // AFK — runs for every surviving message (commands or not). A real
+        // message clears your status; pinging an AFK member announces it.
+        // `.afk` itself resolves to a command named afk and is excluded from
+        // the self-clear so it can show status instead of wiping it.
+        if (settings)
+            afk.handleMessage(message, settings.afk, command?.name === 'afk').catch(() => {});
+
         if (!command) return;
 
         // Anti-spam, dashboard toggles, permission and cooldown gates — shared

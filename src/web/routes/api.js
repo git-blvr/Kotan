@@ -6,7 +6,7 @@ const config = require('../../config');
 const env = require('../env');
 const { requireAuthApi } = require('../auth');
 const { rateLimit } = require('../rateLimit');
-const { manageableGuilds, checkGuildAccess, isDeveloper } = require('../permissions');
+const { manageableGuilds, checkGuildAccess, verifyMemberAccess, isDeveloper } = require('../permissions');
 const blacklist = require('../blacklist');
 const settings = require('../settings');
 const guildData = require('../guildData');
@@ -23,7 +23,26 @@ async function guildGate(req, reply) {
     const err = checkGuildAccess(req.client, req.session, req.params.id);
     if (err) return reply.code(err.status).send({ ok: false, ...err });
     req.guild = req.client.guilds.cache.get(req.params.id);
+    // Session guild list is a login-time snapshot; re-verify live membership
+    // (cached 10 min) so revoked MANAGE_GUILD can't ride a 30-day session.
+    const ok = await verifyMemberAccess(req.guild, req.session.user.id);
+    if (!ok) return reply.code(403).send({ ok: false, status: 403, error: 'You do not manage this server' });
 }
+
+// Route-level caps on top of the global 240/min — write and upload endpoints
+// get tighter buckets since they're the expensive/abusable ones.
+const mutLimit = rateLimit({ max: 60 });
+const uploadLimit = rateLimit({ max: 15 });
+
+// Matches the decoded buffer against the declared image type — the data-URL
+// prefix is client-supplied and says nothing about the actual bytes.
+const MAGIC = {
+    png: [0x89, 0x50, 0x4e, 0x47],
+    jpg: [0xff, 0xd8, 0xff],
+    gif: [0x47, 0x49, 0x46, 0x38], // GIF8
+};
+const isWebp = (b) => b.length > 12 && b.toString('latin1', 0, 4) === 'RIFF' && b.toString('latin1', 8, 12) === 'WEBP';
+const magicOk = (ext, buf) => (ext === 'webp' ? isWebp(buf) : (MAGIC[ext] || []).every((v, i) => buf[i] === v));
 
 module.exports = async (app) => {
     app.addHook('preHandler', rateLimit({ max: 240 }));
@@ -127,7 +146,7 @@ module.exports = async (app) => {
 
         // Posts the ticket panel into a channel — used by the dashboard's
         // "Post panel" button so setup is fully web-side.
-        gg.post('/tickets/panel', async (req, reply) => {
+        gg.post('/tickets/panel', { preHandler: mutLimit }, async (req, reply) => {
             const ch = req.guild.channels.cache.get(String(req.body?.channel || ''));
             if (!ch || !ch.isTextBased()) return reply.code(400).send({ error: 'Unknown channel' });
             const t = (await settings.getSettings(req.guild.id)).tickets;
@@ -157,7 +176,7 @@ module.exports = async (app) => {
             return reply.send({ usage, growth, mod, audit, recent, ping: req.client?.ws.ping ?? -1 });
         });
 
-        gg.post('/settings', async (req, reply) => {
+        gg.post('/settings', { preHandler: mutLimit }, async (req, reply) => {
             const { section, fields } = req.body || {};
             const result = await settings.applySection(req.guild.id, req.session.user.id, String(section || ''), fields);
             if (result.error) return reply.code(result.status).send({ ok: false, error: result.error });
@@ -200,25 +219,31 @@ module.exports = async (app) => {
                 return reply.code(500).send({ ok: false, error: e.message });
             }
         };
-        gg.post('/branding/avatar', brandUpload('avatar'));
-        gg.post('/branding/banner', brandUpload('banner'));
-        gg.delete('/branding/avatar', brandClear('avatar'));
-        gg.delete('/branding/banner', brandClear('banner'));
+        gg.post('/branding/avatar', { preHandler: uploadLimit }, brandUpload('avatar'));
+        gg.post('/branding/banner', { preHandler: uploadLimit }, brandUpload('banner'));
+        gg.delete('/branding/avatar', { preHandler: uploadLimit }, brandClear('avatar'));
+        gg.delete('/branding/banner', { preHandler: uploadLimit }, brandClear('banner'));
 
         // Dashboard wallpaper upload — stored per-guild under data/bgs and
         // served back through /bg (kept out of src/web so uploads aren't source files).
         const BG_DIR = path.join(__dirname, '..', '..', '..', 'data', 'bgs');
         const bgFile = (gid) => (fs.existsSync(BG_DIR) ? fs.readdirSync(BG_DIR).find((f) => f.startsWith(`${gid}.`)) : null);
-        gg.post('/appearance/bg', async (req, reply) => {
+        gg.post('/appearance/bg', { preHandler: uploadLimit }, async (req, reply) => {
             const dataUrl = String(req.body?.image || '');
             const m = /^data:image\/(png|jpe?g|webp|gif);base64,([a-z0-9+/=\s]+)$/i.exec(dataUrl);
             if (!m || dataUrl.length > 8_000_000)
                 return reply.code(400).send({ ok: false, error: 'Send a PNG/JPEG/WebP/GIF under ~6MB' });
-            fs.mkdirSync(BG_DIR, { recursive: true });
+            const ext = m[1].toLowerCase().replace('jpeg', 'jpg');
+            const buf = Buffer.from(m[2], 'base64');
+            if (!buf.length || buf.length > 6_000_000)
+                return reply.code(400).send({ ok: false, error: 'Decoded image must be under 6MB' });
+            if (!magicOk(ext, buf))
+                return reply.code(400).send({ ok: false, error: `File is not a valid ${ext.toUpperCase()}` });
+            const fsp = fs.promises;
+            await fsp.mkdir(BG_DIR, { recursive: true });
             const old = bgFile(req.guild.id);
-            if (old) fs.rmSync(path.join(BG_DIR, old), { force: true });
-            const ext = m[1].replace('jpeg', 'jpg');
-            fs.writeFileSync(path.join(BG_DIR, `${req.guild.id}.${ext}`), Buffer.from(m[2], 'base64'));
+            if (old) await fsp.rm(path.join(BG_DIR, old), { force: true });
+            await fsp.writeFile(path.join(BG_DIR, `${req.guild.id}.${ext}`), buf, { mode: 0o600 });
             return reply.send({ ok: true, url: `/api/guilds/${req.guild.id}/bg?v=${Date.now()}` });
         });
         gg.get('/bg', async (req, reply) => {
@@ -231,14 +256,14 @@ module.exports = async (app) => {
         gg.get('/tags', async (req, reply) =>
             reply.send({ tags: await db.getTags(req.guild.id) }));
 
-        gg.post('/tags', async (req, reply) => {
+        gg.post('/tags', { preHandler: mutLimit }, async (req, reply) => {
             const { name, content, trigger } = req.body || {};
             const tag = await db.addTag(req.guild.id, String(name || '').toLowerCase(), String(content || ''), req.session.user.id, trigger === true);
             if (!tag) return reply.code(400).send({ ok: false, error: 'Invalid tag name (a-z 0-9 _ -, max 32) or empty content' });
             return reply.send({ ok: true, tag });
         });
 
-        gg.delete('/tags/:name', async (req, reply) => {
+        gg.delete('/tags/:name', { preHandler: mutLimit }, async (req, reply) => {
             const ok = await db.deleteTag(req.guild.id, req.params.name);
             return reply.code(ok ? 200 : 404).send({ ok });
         });
@@ -254,7 +279,7 @@ module.exports = async (app) => {
 
         admin.get('/', (req, reply) => reply.send({ entries: blacklist.list() }));
 
-        admin.post('/', (req, reply) => {
+        admin.post('/', { preHandler: mutLimit }, (req, reply) => {
             const { guildId, reason } = req.body || {};
             if (!/^\d{17,20}$/.test(String(guildId || ''))) return reply.code(400).send({ ok: false, error: 'Invalid guild ID' });
             blacklist.add(guildId, String(reason || 'No reason provided').slice(0, 200), req.session.user.id);
@@ -263,7 +288,7 @@ module.exports = async (app) => {
             return reply.send({ ok: true });
         });
 
-        admin.delete('/:guildId', (req, reply) =>
+        admin.delete('/:guildId', { preHandler: mutLimit }, (req, reply) =>
             reply.send({ ok: blacklist.remove(req.params.guildId) }));
     }, { prefix: '/api/admin/blacklist' });
 

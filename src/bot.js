@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ quiet: true }); // index.js already loads+logs .env
 const { Client, GatewayIntentBits, Collection, Options, Partials, Events } = require('discord.js');
 const config = require('./config');
 const logger = require('./utils/logger');

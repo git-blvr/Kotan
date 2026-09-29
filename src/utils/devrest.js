@@ -34,14 +34,38 @@ const db = require('./database');
 
 const ACTIVITY_TYPES = { playing: 0, streaming: 1, listening: 2, watching: 3, custom: 4, competing: 5 };
 
+// Constant-time bearer check — a plain !== leaks key bytes through timing.
+const crypto = require('crypto');
+function bearerOk(header, expected) {
+    if (typeof header !== 'string' || !header.startsWith('Bearer ')) return false;
+    const a = Buffer.from(header.slice(7));
+    const b = Buffer.from(expected);
+    return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
 module.exports = {
     startDevApi(client, shutdown) {
         const key = process.env.DEV_API_KEY;
         if (!key) return; // disabled — no token configured
+        if (key.length < 16) logger.warn('DEV_API_KEY is short (<16 chars) — use a longer random token');
 
         const port = parseInt(process.env.DEV_API_PORT || '3210', 10);
         const host = process.env.DEV_API_HOST || '127.0.0.1';
         const started = Date.now();
+        const isLoopback = ['127.0.0.1', '::1', 'localhost'].includes(host);
+        if (!isLoopback) logger.warn(`Dev API bound to ${host} — this is a remote-code-execution surface. Keep it firewalled.`);
+
+        // Cheap per-source-IP throttle so a guessed key can't be brute-forced
+        // and eval/reload can't be hammered: 60 requests per minute per IP.
+        const buckets = new Map();
+        const limited = (ip) => {
+            const now = Date.now();
+            const b = buckets.get(ip) || { n: 0, reset: now + 60_000 };
+            if (now > b.reset) { b.n = 0; b.reset = now + 60_000; }
+            buckets.set(ip, b);
+            if (buckets.size > 10000) for (const [k, v] of buckets) { if (v.reset < now) buckets.delete(k); }
+            return ++b.n > 60;
+        };
 
         const send = (res, code, obj) => {
             res.writeHead(code, { 'content-type': 'application/json' });
@@ -207,8 +231,12 @@ module.exports = {
 
         const server = http.createServer(async (req, res) => {
             try {
+                if (limited(req.socket.remoteAddress)) {
+                    res.writeHead(429, { 'content-type': 'application/json', 'retry-after': '60' });
+                    return res.end('{"ok":false,"error":"rate limited"}');
+                }
                 const auth = req.headers.authorization || '';
-                if (auth !== `Bearer ${key}`) return send(res, 401, { ok: false, error: 'unauthorized' });
+                if (!bearerOk(auth, key)) return send(res, 401, { ok: false, error: 'unauthorized' });
 
                 const url = req.url.split('?')[0];
                 const routeKey = `${req.method} ${url}`;

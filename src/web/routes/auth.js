@@ -11,8 +11,7 @@ module.exports = async (app) => {
 
     // /auth/discord → Discord authorize URL. `next` rides inside the signed state.
     app.get('/auth/discord', { preHandler: authLimit }, async (req, reply) => {
-        const next = typeof req.query.next === 'string' && req.query.next.startsWith('/') ? req.query.next : '/dashboard';
-        return reply.redirect(oauth.authorizeUrl(next));
+        return reply.redirect(oauth.authorizeUrl(oauth.safeNext(req.query.next) || '/dashboard'));
     });
 
     app.get('/auth/callback', { preHandler: authLimit }, async (req, reply) => {
@@ -28,6 +27,7 @@ module.exports = async (app) => {
         ]);
         if (!user?.id) return reply.redirect('/login?error=oauth');
 
+        if (req.sid) await sessions.destroy(req.sid); // rotate — kill any pre-login session
         const sid = await sessions.create({
             user: {
                 id: user.id,

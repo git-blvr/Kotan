@@ -222,10 +222,8 @@
         .hero { padding-top: 28px; }
         .nav { height: 52px; padding-left: 16px; }
     }
-    @media (prefers-reduced-motion: reduce) {
-        *, *::before, *::after { animation: none !important; }
-        html { scroll-behavior: auto; }
-    }
+    [data-motion="off"] *, [data-motion="off"] *::before, [data-motion="off"] *::after { animation: none !important; }
+    [data-motion="off"] html, html[data-motion="off"] { scroll-behavior: auto; }
 
     /* ---------- stage slider: page never scrolls; wheel blurs one screen out, next in ---------- */
     body.fppage { height: 100vh; height: 100dvh; overflow: hidden; }
@@ -248,6 +246,19 @@
         visibility: visible; pointer-events: auto;
         transition-delay: 0s;
     }
+    /* dead-end hint above the footer bar — shown when wheeling past the end */
+    .backhint {
+        position: fixed; left: 50%; bottom: 60px; transform: translate(-50%, 8px);
+        z-index: 60; padding: 7px 16px; border-radius: 999px;
+        background: rgba(20,22,28,.72); border: 1px solid var(--border);
+        backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+        color: var(--muted); font-size: 12.5px; letter-spacing: .02em;
+        opacity: 0; pointer-events: none;
+        transition: opacity .35s ease, transform .35s ease;
+    }
+    .backhint.on { opacity: 1; transform: translate(-50%, 0); }
+    @media (max-width: 900px) { .backhint { display: none; } }
+
     /* compact footer bar pinned to the stage bottom (not its own screen) */
     .fppage .fbar {
         position: absolute; left: 0; right: 0; bottom: 0; z-index: 40;
@@ -272,9 +283,10 @@
         transition-property: opacity, transform, filter;
     }
     .fpsec.on .sdi { opacity: 1; transform: none; filter: none; }
-    @media (prefers-reduced-motion: reduce) {
-        .fpsec, .sdi { transition: none; }
-    }
+    /* fab Motion=off kills the transitions; OS prefers-reduced-motion is not
+       consulted — this page's core presentation is the animation */
+    [data-motion="off"] .fpsec, [data-motion="off"] .sdi,
+    [data-motion="off"] .backhint { transition: none; }
     @media (max-width: 900px) {
         body.fppage { height: auto; overflow: auto; }
         .fp { height: auto; overflow: visible; }
@@ -358,6 +370,7 @@
     </div>
 </main>
 
+<div class="backhint" id="backhint">To go back, scroll up.</div>
 <footer class="fbar">
     <div class="wrap foot">
         <span>© <span id="yr">2025</span> Kotan</span>
@@ -371,6 +384,6 @@
 </footer>
 </div>
 
-<script src="/script/site.js?v=16" defer></script>
+<script src="/script/site.js?v=17" defer></script>
 </body>
 </html>

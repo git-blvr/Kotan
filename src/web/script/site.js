@@ -27,7 +27,11 @@
     const SLD = !!fp && matchMedia('(min-width: 901px)').matches;
 
     // --- scroll reveal: elements blur+rise in as they enter the viewport ---
-    const REDUCED = theme.motion === 'off' || matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // This page IS the animation — honor only the explicit in-site Motion
+    // toggle (the ◐ fab), not the OS-level prefers-reduced-motion hint, which
+    // silently blanked every transition for desktop visitors.
+    const REDUCED = theme.motion === 'off';
+    console.debug('[kotan] slider:', SLD, '| reduced-motion:', REDUCED, '| theme:', JSON.stringify(theme));
     if (SLD && !REDUCED) {
         // slider mode: tag items .sdi — they cascade in when their .fpsec gets .on
         const RV_SEL = '.hero-img, .hero-copy > h1, .hero-copy > p, .hero-actions, .bstat, .features > h2, .features > p, .feature';
@@ -220,11 +224,25 @@
             secs.forEach((s, j) => s.classList.toggle('on', j === idx));
             setTimeout(() => { busy = false; }, REDUCED ? 60 : 950);
         };
+        // Dead-end hint — wheeling past the last slide just pulses
+        // "To go back, scroll up." above the footer instead of leaving.
+        const backhint = $('#backhint');
+        let hintT = null;
+        const nudge = () => {
+            if (!backhint) return;
+            backhint.classList.add('on');
+            clearTimeout(hintT);
+            hintT = setTimeout(() => backhint.classList.remove('on'), 2400);
+        };
         fp.addEventListener('wheel', (e) => {
-            if (!armed() || busy || Math.abs(e.deltaY) < 8) return;
+            // Firefox reports wheel deltas in LINES (deltaMode 1, ~±3/notch)
+            // — normalize to pixels or the <8 deadzone eats every scroll.
+            const dy = e.deltaMode === 1 ? e.deltaY * 32 : e.deltaY;
+            if (!armed() || busy || Math.abs(dy) < 8) return;
             e.preventDefault();
-            if (e.deltaY > 0 && idx === secs.length - 1) { sweep(PAGE_CHAIN[location.pathname]); return; }
-            show(idx + (e.deltaY > 0 ? 1 : -1));
+            if (dy > 0 && idx === secs.length - 1) { nudge(); return; }
+            backhint?.classList.remove('on');
+            show(idx + (dy > 0 ? 1 : -1));
         }, { passive: false });
         let ty = null, tscroll = 0;
         fp.addEventListener('touchstart', (e) => {
@@ -235,12 +253,15 @@
             if (ty == null || busy || !armed()) return;
             const d = ty - e.changedTouches[0].clientY;
             const innerScrolled = Math.abs((secs[idx]?.scrollTop ?? 0) - tscroll) > 4;
-            if (Math.abs(d) > 48 && !innerScrolled) show(idx + (d > 0 ? 1 : -1));
+            if (Math.abs(d) > 48 && !innerScrolled) {
+                if (d > 0 && idx === secs.length - 1) nudge();
+                else show(idx + (d > 0 ? 1 : -1));
+            }
             ty = null;
         }, { passive: true });
         window.addEventListener('keydown', (e) => {
             if (busy || /input|textarea|select/i.test(e.target.tagName)) return;
-            if (['ArrowDown', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); show(idx + 1); }
+            if (['ArrowDown', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); idx === secs.length - 1 ? nudge() : show(idx + 1); }
             else if (['ArrowUp', 'PageUp'].includes(e.key)) { e.preventDefault(); show(idx - 1); }
             else if (e.key === 'Home') { e.preventDefault(); show(0); }
             else if (e.key === 'End') { e.preventDefault(); show(secs.length - 1); }

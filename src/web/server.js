@@ -41,7 +41,7 @@ async function startWebsite(client) {
     }
 
     const app = fastify({
-        trustProxy: true,
+        trustProxy: env.TRUST_PROXY,
         bodyLimit: 256 * 1024,
         routerOptions: { ignoreTrailingSlash: true },
     });
@@ -52,10 +52,15 @@ async function startWebsite(client) {
     // permits 'unsafe-inline' for style only; scripts stay self-hosted.
     app.addHook('onSend', async (req, reply) => {
         reply.headers({
-            'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https://cdn.discordapp.com https://i.imgur.com data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'",
+            'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' https://cdn.discordapp.com https://i.imgur.com data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'",
             'X-Content-Type-Options': 'nosniff',
             'Referrer-Policy': 'same-origin',
         });
+        // HSTS only when the deployment actually serves HTTPS (COOKIE_SECURE
+        // is the existing "production HTTPS" flag) — sending it on plain HTTP
+        // would pin browsers to a broken scheme.
+        if (env.COOKIE_SECURE)
+            reply.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     });
 
     app.addHook('preHandler', sessionMiddleware);
@@ -89,6 +94,13 @@ async function startWebsite(client) {
         app.get(route, { preHandler: pageLimit }, html(file));
 
     app.get('/robots.txt', (req, reply) => reply.type('text/plain').send('User-agent: *\nAllow: /\nDisallow: /dashboard\nDisallow: /api\nSitemap: ' + env.SITE_URL + '/sitemap.xml\n'));
+    // Discord domain verification (Developer Portal → Verify Domain) — serves
+    // the dh= token from DISCORD_DOMAIN_HASH; 404s when unset.
+    app.get('/.well-known/discord', (req, reply) => {
+        const hash = process.env.DISCORD_DOMAIN_HASH;
+        if (!hash) return reply.code(404).send({ ok: false });
+        return reply.type('text/plain').send(hash);
+    });
     app.get('/sitemap.xml', (req, reply) => {
         const urls = ['', '/doc', '/tos', '/privacy', '/uptime', '/login']
             .map((p) => `<url><loc>${env.SITE_URL}${p}</loc></url>`).join('');

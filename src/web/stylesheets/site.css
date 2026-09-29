@@ -335,9 +335,7 @@ label.fld .hint { font-weight: 400; color: var(--muted); font-size: 12px; }
     will-change: opacity, transform, filter;
 }
 .rv.in { opacity: 1; transform: none; filter: none; }
-@media (prefers-reduced-motion: reduce) {
-    .rv { opacity: 1; transform: none; filter: none; transition: none; }
-}
+[data-motion="off"] .rv { opacity: 1; transform: none; filter: none; transition: none; }
 
 
 /* scroll-driven (scrubbed) animations — Chrome/Edge; .rv observer is the fallback */
@@ -361,7 +359,7 @@ body.fppage { height: 100vh; height: 100dvh; overflow: hidden; }
 .fpsec.on { opacity: 1; transform: none; filter: none; visibility: visible; pointer-events: auto; transition-delay: 0s; }
 .sdi { opacity: 0; transform: translateY(26px); filter: blur(9px); transition: opacity .6s cubic-bezier(.2,.7,.3,1), transform .6s cubic-bezier(.2,.7,.3,1), filter .6s cubic-bezier(.2,.7,.3,1); transition-delay: var(--rvd, 0ms); }
 .fpsec.on .sdi { opacity: 1; transform: none; filter: none; }
-@media (prefers-reduced-motion: reduce) { .fpsec, .sdi { transition: none; } }
+[data-motion="off"] .fpsec, [data-motion="off"] .sdi { transition: none; }
 @media (max-width: 900px) {
     body.fppage { height: auto; overflow: auto; }
     .fp { height: auto; overflow: visible; }

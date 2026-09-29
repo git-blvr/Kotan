@@ -10,9 +10,14 @@ const SCOPES = 'identify guilds';
 const STATE_TTL = 10 * 60 * 1000;
 
 const sign = (v) => crypto.createHmac('sha256', env.SESSION_SECRET).update(v).digest('base64url');
+const signOk = (a, b) => a.length === b.length && crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
+
+// A safe in-site path: single leading slash, never protocol-relative
+// ("//host"), backslash-relative ("/\host") or scheme-embedded ("a:b").
+const safeNext = (n) => (typeof n === 'string' && /^\/[a-z0-9\-._~%!$&'()*+,;=:@]/i.test(n) ? n : null);
 
 function authorizeUrl(next = '/dashboard') {
-    const payload = Buffer.from(JSON.stringify({ n: next, t: Date.now() })).toString('base64url');
+    const payload = Buffer.from(JSON.stringify({ n: safeNext(next) || '/dashboard', t: Date.now() })).toString('base64url');
     const params = new URLSearchParams({
         client_id: env.CLIENT_ID,
         redirect_uri: env.REDIRECT_URI,
@@ -26,11 +31,11 @@ function authorizeUrl(next = '/dashboard') {
 
 function readState(state) {
     const [payload, sig] = String(state || '').split('.');
-    if (!payload || !sig || sign(payload) !== sig) return null;
+    if (!payload || !sig || payload.length > 512 || !signOk(sign(payload), sig)) return null;
     try {
         const p = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
-        if (Date.now() - p.t > STATE_TTL) return null;
-        return { next: typeof p.n === 'string' && p.n.startsWith('/') ? p.n : '/dashboard' };
+        if (!Number.isFinite(p.t) || Math.abs(Date.now() - p.t) > STATE_TTL) return null;
+        return { next: safeNext(p.n) || '/dashboard' };
     } catch {
         return null;
     }
@@ -47,18 +52,23 @@ async function exchangeCode(code) {
             code,
             redirect_uri: env.REDIRECT_URI,
         }),
-    });
+        signal: AbortSignal.timeout(10_000),
+    }).catch(() => null);
+    if (!res) return null;
     const data = await res.json().catch(() => null);
     return res.ok ? data : null;
 }
 
 async function fetchJson(path, accessToken) {
-    const res = await fetch(`${API}${path}`, { headers: { Authorization: `Bearer ${accessToken}` } });
-    if (!res.ok) return null;
+    const res = await fetch(`${API}${path}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        signal: AbortSignal.timeout(10_000),
+    }).catch(() => null);
+    if (!res?.ok) return null;
     return res.json().catch(() => null);
 }
 
 const fetchUser = (t) => fetchJson('/users/@me', t);
 const fetchGuilds = (t) => fetchJson('/users/@me/guilds', t);
 
-module.exports = { authorizeUrl, readState, exchangeCode, fetchUser, fetchGuilds };
+module.exports = { authorizeUrl, readState, exchangeCode, fetchUser, fetchGuilds, safeNext };

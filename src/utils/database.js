@@ -39,10 +39,11 @@ const audit = createStore('audit');
 const meta = createStore('meta'); // process heartbeat for the website's status page
 const sessions = createStore('sessions'); // website login sessions
 const tickets = createStore('tickets');   // open ticket channels per guild
+const afk = createStore('afk');           // per-member away status + ping log
 
 // A store error (Redis disconnect, disk failure) must never crash the process.
 // @keyv/redis reconnects automatically; SQLite is in-process and won't drop.
-for (const store of [profiles, warns, tempbans, guilds, usage, tags, audit, meta, sessions, tickets]) {
+for (const store of [profiles, warns, tempbans, guilds, usage, tags, audit, meta, sessions, tickets, afk]) {
     store.on('error', (err) => logger.error(`Storage error in "${store.namespace}":`, err));
 }
 if (sharedRedis) sharedRedis.on('error', (err) => logger.error('Redis error:', err));
@@ -186,11 +187,23 @@ const DEFAULT_SETTINGS = {
         // which stat cards show on Overview, in display order
         cards: ['members', 'commands', 'warns', 'tempbans'],
     },
+    // Away-status system — .afk sets it, speaking clears it, mentioning an
+    // AFK member announces it (and records the ping for `.afk pings`).
+    afk: {
+        enabled: true,
+        defaultMessage: 'AFK',
+        // Plain announcement when `card.enabled` is off.
+        announce: '{user} is AFK: {message} · {ago}',
+        selfClear: true,       // "welcome back" notice when they speak
+        roles: [],             // roles allowed to use .afk; empty = everyone
+        exemptChannels: [],    // mentions here never announce
+        card: { enabled: false, style: 'cv2', title: '', description: '', color: '', footer: '', thumbnail: true, thumb: '', components: [] },
+    },
 };
 
 // Nested sections must merge key-by-key — a saved doc written before a new
 // sub-key existed shouldn't lose the defaults.
-const NESTED = ['automod', 'logging', 'welcome', 'roles', 'economy', 'leveling', 'access', 'overview', 'games', 'boosts', 'appearance', 'branding', 'shop', 'tickets'];
+const NESTED = ['automod', 'logging', 'welcome', 'roles', 'economy', 'leveling', 'access', 'overview', 'games', 'boosts', 'appearance', 'branding', 'shop', 'tickets', 'afk'];
 
 async function getGuildSettings(guildId) {
     const hit = settingsCache.get(guildId);
@@ -604,6 +617,47 @@ async function useTag(guildId, name, triggerOnly = false) {
     return tag.content;
 }
 
+// ---------- AFK ----------
+
+// Record: { message, at, pings: [{userId, channelId, at}] }. Pings cap at 25
+// (newest kept) so a ping farm can't bloat the row.
+async function getAfk(guildId, userId) {
+    return (await afk.get(key(guildId, userId))) || null;
+}
+
+async function setAfk(guildId, userId, data) {
+    const rec = {
+        message: String(data.message || 'AFK').slice(0, 200),
+        at: data.at || Date.now(),
+        pings: Array.isArray(data.pings) ? data.pings.slice(-25) : [],
+    };
+    await afk.set(key(guildId, userId), rec);
+    return rec;
+}
+
+async function clearAfk(guildId, userId) {
+    const k = key(guildId, userId);
+    const rec = await afk.get(k);
+    if (rec) await afk.delete(k);
+    return rec || null;
+}
+
+async function pushAfkPing(guildId, userId, ping) {
+    const k = key(guildId, userId);
+    const rec = await afk.get(k);
+    if (!rec) return; // they un-AFK'd between the read and this write
+    rec.pings = [...(rec.pings || []), ping].slice(-25);
+    await afk.set(k, rec);
+}
+
+async function clearAfkPings(guildId, userId) {
+    const k = key(guildId, userId);
+    const rec = await afk.get(k);
+    if (!rec) return;
+    rec.pings = [];
+    await afk.set(k, rec);
+}
+
 // ---------- tickets ----------
 
 // Open ticket state per guild: counter, channel records and a user->channel
@@ -661,6 +715,11 @@ module.exports = {
     useTag,
     getTickets,
     saveTickets,
+    getAfk,
+    setAfk,
+    clearAfk,
+    pushAfkPing,
+    clearAfkPings,
     isGuildBlacklisted,
     blacklistGuild,
     unblacklistGuild,

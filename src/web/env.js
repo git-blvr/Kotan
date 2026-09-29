@@ -36,5 +36,18 @@ module.exports = {
     // on those hosts it's the ONLY reachable port; WEB_PORT for local override.
     PORT: port,
     COOKIE_SECURE: env.COOKIE_SECURE === 'true',
+    // How much Fastify trusts proxy headers (X-Forwarded-For → req.ip, which
+    // rate limiting keys on). Default 'loopback' only trusts a proxy running
+    // on this machine — a bare `true` lets ANY client spoof their IP.
+    // TRUST_PROXY accepts: true | false | <hop count> | comma-separated
+    // trusted proxy IPs/CIDRs (e.g. "10.0.0.0/8,172.16.0.0/12").
+    TRUST_PROXY: (() => {
+        const v = env.TRUST_PROXY;
+        if (v == null || v === '') return 'loopback';
+        if (v === 'true') return true;
+        if (v === 'false') return false;
+        if (/^\d+$/.test(v)) return Number(v);
+        return v.split(',').map((s) => s.trim()).filter(Boolean);
+    })(),
     crypto,
 };

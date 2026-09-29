@@ -38,6 +38,12 @@ const DEFAULTS = {
     moduleChannels: {},
     commandRules: [],
     overview: { cards: ['members', 'commands', 'warns', 'tempbans'] },
+    afk: {
+        enabled: true, defaultMessage: 'AFK',
+        announce: '{user} is AFK: {message} · {ago}', selfClear: true,
+        roles: [], exemptChannels: [],
+        card: { enabled: false, style: 'cv2', title: '', description: '', color: '', footer: '', thumbnail: true, thumb: '', components: [] },
+    },
     shop: {
         enabled: true, title: 'Shop',
         description: 'Spend your coins on boosts and goodies.', color: '',
@@ -54,7 +60,7 @@ const DEFAULTS = {
     },
 };
 
-const NESTED = ['automod', 'logging', 'welcome', 'roles', 'economy', 'leveling', 'access', 'overview', 'games', 'boosts', 'appearance', 'branding', 'shop', 'tickets'];
+const NESTED = ['automod', 'logging', 'welcome', 'roles', 'economy', 'leveling', 'access', 'overview', 'games', 'boosts', 'appearance', 'branding', 'shop', 'tickets', 'afk'];
 
 async function getSettings(guildId) {
     const s = await db.getGuildSettings(guildId);
@@ -94,8 +100,16 @@ function f_components(e) {
                 return { type: 'separator', size: c.size === 'large' ? 'large' : 'small' };
             case 'image':
                 return { type: 'image', url: str(c.url, 500) || '' };
-            case 'section':
-                return { type: 'section', text: str(c.text, 1000) || '', image: str(c.image, 500) || '' };
+            case 'section': {
+                const o = { type: 'section', text: str(c.text, 1000) || '', image: str(c.image, 500) || '' };
+                // Button accessory only exists when the editor emitted the
+                // keys — presence of btnUrl/btnLabel picks button vs thumbnail.
+                if (c.btnUrl !== undefined || c.btnLabel !== undefined) {
+                    o.btnLabel = str(c.btnLabel, 80) || '';
+                    o.btnUrl = str(c.btnUrl, 500) || '';
+                }
+                return o;
+            }
             case 'link':
                 return { type: 'link', label: str(c.label, 80) || '', url: str(c.url, 500) || '' };
             default: return null;
@@ -403,6 +417,18 @@ const SECTIONS = {
             for (const [k, v] of Object.entries(f.sections))
                 if (/^[a-z-]{1,32}$/.test(k) && ['member', 'mod', 'admin', 'manager'].includes(v))
                     s.access.sections[k] = v;
+    },
+    afk(s, f) {
+        s.afk.enabled = bool(f.enabled);
+        s.afk.defaultMessage = str(f.defaultMessage, 200) || 'AFK';
+        s.afk.announce = str(f.announce, 300) || '{user} is AFK: {message} · {ago}';
+        s.afk.selfClear = bool(f.selfClear);
+        if (f.roles !== undefined) s.afk.roles = idArr(f.roles);
+        if (f.exemptChannels !== undefined) s.afk.exemptChannels = idArr(f.exemptChannels);
+        if (f.card) {
+            const err = SECTIONS.welcomeEmbed(s.afk.card, f.card, true);
+            if (err) return err;
+        }
     },
 };
 
