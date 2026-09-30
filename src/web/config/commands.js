@@ -34,6 +34,7 @@ module.exports = [
     { name: 'unrole', description: 'Removes a role from a member.', module: 'moderation' },
     { name: 'warn', description: 'Warns a member and stores the warning.', module: 'moderation' },
     { name: 'warns', description: 'Lists the warnings of a member (or your own).', module: 'moderation' },
+    { name: 'verify', description: 'Posts the CAPTCHA verification panel in this channel.', module: 'moderation' },
     { name: 'afk', description: 'Set your AFK status, or check who pinged you while away ("afk pings").', module: 'tools' },
     { name: 'invite', description: 'Shows the link to add Kotan to your own server.', module: 'tools' },
     { name: 'avatar', description: 'Shows a user\'s avatar in full size.', module: 'tools' },

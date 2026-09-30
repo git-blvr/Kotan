@@ -58,9 +58,13 @@ const DEFAULTS = {
         maxOpen: 1, naming: 'ticket-{user}', topics: [],
         panel: { enabled: true, style: 'cv2', title: 'Support', description: 'Pick a topic below to open a ticket.', color: '', footer: '', thumbnail: false, thumb: '', components: [] },
     },
+    captcha: {
+        enabled: false, roleId: null, logChannel: null,
+        panel: { enabled: true, style: 'cv2', title: 'Verification required', description: 'This server is protected — click **Verify** below and pick the characters you see.', color: '', footer: '', thumbnail: false, thumb: '', components: [] },
+    },
 };
 
-const NESTED = ['automod', 'logging', 'welcome', 'roles', 'economy', 'leveling', 'access', 'overview', 'games', 'boosts', 'appearance', 'branding', 'shop', 'tickets', 'afk'];
+const NESTED = ['automod', 'logging', 'welcome', 'roles', 'economy', 'leveling', 'access', 'overview', 'games', 'boosts', 'appearance', 'branding', 'shop', 'tickets', 'afk', 'captcha'];
 
 async function getSettings(guildId) {
     const s = await db.getGuildSettings(guildId);
@@ -365,6 +369,23 @@ const SECTIONS = {
                 .filter((t) => t.name);
         if (f.panel) {
             const err = SECTIONS.welcomeEmbed(s.tickets.panel, f.panel, true);
+            if (err) return err;
+        }
+    },
+    captcha(s, f) {
+        if (f.enabled !== undefined) s.captcha.enabled = bool(f.enabled);
+        if (f.roleId !== undefined) {
+            const v = optSnowflake(f.roleId);
+            if (v === undefined) return 'Invalid role';
+            s.captcha.roleId = v;
+        }
+        if (f.logChannel !== undefined) {
+            const v = optSnowflake(f.logChannel);
+            if (v === undefined) return 'Invalid channel';
+            s.captcha.logChannel = v;
+        }
+        if (f.panel) {
+            const err = SECTIONS.welcomeEmbed(s.captcha.panel, f.panel, true);
             if (err) return err;
         }
     },

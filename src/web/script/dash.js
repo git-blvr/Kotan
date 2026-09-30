@@ -329,6 +329,7 @@
             ['automod', svg('<path d="M12 3l8 3v6c0 4.5-3.2 7.6-8 9-4.8-1.4-8-4.5-8-9V6l8-3z"/><path d="M9 12l2 2 4-4"/>'), 'Automod'],
             ['logging', svg('<path d="M4 5h16M4 12h16M4 19h10"/>'), 'Logging'],
             ['tickets', svg('<path d="M3 9V7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4z"/><path d="M13 5v2M13 11v2M13 17v2"/>'), 'Tickets'],
+            ['captcha', svg('<path d="M7 3H5a2 2 0 0 0-2 2v2M17 3h2a2 2 0 0 1 2 2v2M7 21H5a2 2 0 0 1-2-2v-2M17 21h2a2 2 0 0 0 2-2v-2"/><path d="M9 9.5h.01M15 9.5h.01"/><path d="M9.5 14.5c1.2 1 3.8 1 5 0"/>'), 'CAPTCHA'],
         ] },
         { group: 'Engagement', items: [
             ['welcome', svg('<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>'), 'Welcome'],
@@ -1621,6 +1622,51 @@
                     maxOpen: +f.tkmax || 1,
                     naming: f.tkname,
                     topics: topics.map((x, i) => ({ name: f[`tn_${i}`], desc: f[`td_${i}`] })),
+                    panel: card.collect(f),
+                };
+            });
+        },
+
+        async captcha(page) {
+            const c = CTX.settings.captcha || {};
+            page.innerHTML = `
+                <div><div class="page-title">CAPTCHA</div><p class="page-desc">Keep bots out — members click Verify on the panel, then pick the characters shown in a scrambled image to get the role.</p></div>
+                <div class="card"><h3>Setup</h3>
+                    <div class="mb">${tgl('cp_on', 'Enable CAPTCHA verification', c.enabled)}</div>
+                    <div class="grid2">
+                        ${fldHtml('Verified role', selSlot('cprole'), 'granted when a member passes — required')}
+                        ${fldHtml('Log channel', selSlot('cplog'), 'pass/fail announcements — empty = silent')}
+                    </div>
+                    <p class="sub">Tip: hide your channels from @everyone and let only the verified role see them — that's what makes the gate work.</p>
+                </div>
+                <div class="card"><h3>Panel card</h3><p class="sub mb">The message people verify from — CV2 container, classic embed, or plain text when the card is off. The Verify button is attached automatically.</p>
+                    ${cardEditorHtml('cp', c.panel || {})}</div>
+                <div class="card"><h3>Post panel</h3>
+                    ${fldHtml('Channel', selSlot('cppost'), 'sends the panel immediately — uses saved settings')}
+                    <div class="mt"><button class="btn" id="post-panel">Post panel</button> <span class="hint" id="post-status"></span></div></div>
+                ${saveBar('captcha')}`;
+
+            mountSelect(page, 'cprole', { options: roOpts(DATA.roles), value: c.roleId || '', placeholder: 'Pick a role…' });
+            mountSelect(page, 'cplog', { options: [{ value: '', label: 'Off' }, ...chOpts(DATA.channels)], value: c.logChannel || '', placeholder: 'Off' });
+            mountSelect(page, 'cppost', { options: chOpts(DATA.channels), placeholder: 'Pick a channel…' });
+            const card = setupCardEditor(page, 'cp', c.panel || {});
+
+            $('#post-panel', page).onclick = async (e) => {
+                const status = $('#post-status', page);
+                const channel = mounts.cppost.get();
+                if (!channel) { status.textContent = '— pick a channel first'; return; }
+                e.target.disabled = true;
+                const r = await api(`/api/guilds/${guildId}/captcha/panel`, { body: { channel } }).catch(() => null);
+                e.target.disabled = false;
+                status.textContent = r?.ok ? '— posted!' : `— ${r?.error || 'failed (save your settings first)'}`;
+            };
+
+            bindSave(page, 'captcha', (el) => {
+                const f = formVals(el);
+                return {
+                    enabled: !!f.cp_on,
+                    roleId: mounts.cprole.get() || null,
+                    logChannel: mounts.cplog.get() || null,
                     panel: card.collect(f),
                 };
             });

@@ -145,6 +145,15 @@ const DEFAULT_SETTINGS = {
         topics: [],             // [{name, desc}] — the panel dropdown (max 10)
         panel: { enabled: true, style: 'cv2', title: 'Support', description: 'Pick a topic below to open a ticket.', color: '', footer: '', thumbnail: false, thumb: '', components: [] },
     },
+    // CAPTCHA gate — dashboard-posted CV2 panel whose Verify button gives
+    // the member a scrambled-code image and three pick-buttons; passing
+    // grants roleId. For servers that want to keep bots out.
+    captcha: {
+        enabled: false,
+        roleId: null,           // role granted on a correct answer
+        logChannel: null,       // pass/fail announcements; null = silent
+        panel: { enabled: true, style: 'cv2', title: 'Verification required', description: 'This server is protected — click **Verify** below and pick the characters you see.', color: '', footer: '', thumbnail: false, thumb: '', components: [] },
+    },
     leveling: {
         enabled: false,
         xpMin: 15,          // xp granted per message, random between min/max
@@ -203,7 +212,7 @@ const DEFAULT_SETTINGS = {
 
 // Nested sections must merge key-by-key — a saved doc written before a new
 // sub-key existed shouldn't lose the defaults.
-const NESTED = ['automod', 'logging', 'welcome', 'roles', 'economy', 'leveling', 'access', 'overview', 'games', 'boosts', 'appearance', 'branding', 'shop', 'tickets', 'afk'];
+const NESTED = ['automod', 'logging', 'welcome', 'roles', 'economy', 'leveling', 'access', 'overview', 'games', 'boosts', 'appearance', 'branding', 'shop', 'tickets', 'afk', 'captcha'];
 
 async function getGuildSettings(guildId) {
     const hit = settingsCache.get(guildId);

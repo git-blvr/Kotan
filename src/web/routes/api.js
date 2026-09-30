@@ -11,6 +11,7 @@ const blacklist = require('../blacklist');
 const settings = require('../settings');
 const guildData = require('../guildData');
 const tickets = require('../../utils/tickets');
+const captcha = require('../../utils/captcha');
 const commands = require('../config/commands');
 const modules = require('../config/modules');
 
@@ -152,6 +153,17 @@ module.exports = async (app) => {
             const t = (await settings.getSettings(req.guild.id)).tickets;
             if (!t?.enabled) return reply.code(400).send({ error: 'Tickets are disabled — enable and save first' });
             await ch.send(tickets.panelPayload(req.guild, t)).catch(() => {});
+            return reply.send({ ok: true });
+        });
+
+        // Posts the CAPTCHA verify panel — same "Post panel" pattern as tickets.
+        gg.post('/captcha/panel', { preHandler: mutLimit }, async (req, reply) => {
+            const ch = req.guild.channels.cache.get(String(req.body?.channel || ''));
+            if (!ch || !ch.isTextBased()) return reply.code(400).send({ error: 'Unknown channel' });
+            const c = (await settings.getSettings(req.guild.id)).captcha;
+            if (!c?.enabled) return reply.code(400).send({ error: 'CAPTCHA is disabled — enable and save first' });
+            if (!c.roleId) return reply.code(400).send({ error: 'Pick a verified role first — nothing to grant otherwise' });
+            await ch.send(captcha.panelPayload(req.guild, c)).catch(() => {});
             return reply.send({ ok: true });
         });
         gg.get('/roles', (req, reply) => reply.send({ roles: guildData.guildRoles(req.guild) }));
