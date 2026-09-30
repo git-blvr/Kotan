@@ -93,6 +93,16 @@ async function startWebsite(client) {
         ['/privacy', 'privacy.html'], ['/uptime', 'uptime.html'], ['/login', 'login.html']])
         app.get(route, { preHandler: pageLimit }, html(file));
 
+    // /invite → Discord's add-bot flow with the permission set the bot needs.
+    app.get('/invite', (req, reply) => {
+        if (!req.client?.user) return reply.code(503).send({ ok: false, error: 'Bot is not ready yet' });
+        return reply.redirect(req.client.generateInvite({
+            scopes: ['bot', 'applications.commands'],
+            permissions: require('../utils/invitePerms'),
+        }));
+    });
+    app.get('/favicon.ico', (req, reply) => reply.redirect('/assets/icon.png'));
+
     app.get('/robots.txt', (req, reply) => reply.type('text/plain').send('User-agent: *\nAllow: /\nDisallow: /dashboard\nDisallow: /api\nSitemap: ' + env.SITE_URL + '/sitemap.xml\n'));
     // Discord domain verification (Developer Portal → Verify Domain) — serves
     // the dh= token from DISCORD_DOMAIN_HASH; 404s when unset.
