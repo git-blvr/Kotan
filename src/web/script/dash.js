@@ -112,7 +112,7 @@
                         ${o.color ? `<span class="swatch" style="background:${esc(o.color)}"></span>` : ''}
                         ${esc(o.label)}</div>`).join('') : '<div class="empty">Nothing found</div>');
             const inp = $('.search input', pop);
-            if (inp) { inp.focus(); inp.oninput = () => renderPop(inp.value.trim().toLowerCase()); inp.onkeydown = (e) => e.stopPropagation(); }
+            if (inp) { inp.focus({ preventScroll: true }); inp.oninput = () => renderPop(inp.value.trim().toLowerCase()); inp.onkeydown = (e) => e.stopPropagation(); }
         }
 
         const closePop = () => { pop.style.display = 'none'; };
@@ -125,11 +125,25 @@
                 // containing block that would break position:fixed anchoring
                 if (pop.parentElement !== document.body) document.body.appendChild(pop);
                 pop.classList.add('dselpop');
+                renderPop(); // fill first so offsetHeight measures real content
                 const r = btn.getBoundingClientRect();
-                pop.style.top = `${r.bottom + 4}px`;
-                pop.style.left = `${r.left}px`;
-                pop.style.width = `${r.width}px`;
-                renderPop();
+                const w = Math.min(r.width, innerWidth - 16);
+                pop.style.width = `${w}px`;
+                pop.style.left = `${Math.max(8, Math.min(r.left, innerWidth - w - 8))}px`;
+                // Fit inside the viewport — the pop is fixed, so it can't ride
+                // a page scroll; options must be reachable where it opens.
+                // Open downward unless the full list won't fit and there's
+                // more room above, then flip up.
+                const below = innerHeight - r.bottom - 8;
+                const above = r.top - 8;
+                const cap = Math.min(260, innerHeight - 16);
+                if (below < Math.min(pop.offsetHeight, cap) && above > below) {
+                    pop.style.maxHeight = `${Math.min(cap, above)}px`;
+                    pop.style.top = `${Math.max(8, r.top - pop.offsetHeight - 4)}px`;
+                } else {
+                    pop.style.maxHeight = `${Math.min(cap, Math.max(120, below))}px`;
+                    pop.style.top = `${r.bottom + 4}px`;
+                }
             }
         };
         pop.onclick = (e) => {
