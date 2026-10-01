@@ -12,6 +12,7 @@ const settings = require('../settings');
 const guildData = require('../guildData');
 const tickets = require('../../utils/tickets');
 const captcha = require('../../utils/captcha');
+const { dominantColor, toHex } = require('../../utils/dominantColor');
 const commands = require('../config/commands');
 const modules = require('../config/modules');
 
@@ -44,6 +45,10 @@ const MAGIC = {
 };
 const isWebp = (b) => b.length > 12 && b.toString('latin1', 0, 4) === 'RIFF' && b.toString('latin1', 8, 12) === 'WEBP';
 const magicOk = (ext, buf) => (ext === 'webp' ? isWebp(buf) : (MAGIC[ext] || []).every((v, i) => buf[i] === v));
+
+// Dominant-color extraction is a server-side fetch — the host allowlist
+// keeps it from becoming an open proxy (same hosts the dashboard CSP shows).
+const DOM_COLOR_HOSTS = /^(cdn\.discordapp\.com|media\.discordapp\.net|images-ext-\d+\.discordapp\.net|i\.imgur\.com)$/;
 
 module.exports = async (app) => {
     app.addHook('preHandler', rateLimit({ max: 240 }));
@@ -165,6 +170,19 @@ module.exports = async (app) => {
             if (!c.roleId) return reply.code(400).send({ error: 'Pick a verified role first — nothing to grant otherwise' });
             await ch.send(captcha.panelPayload(req.guild, c)).catch(() => {});
             return reply.send({ ok: true });
+        });
+
+        // Card editors' "dominant color" button — picks the accent matching
+        // the card's thumbnail/icon so users don't have to eyeball a hex.
+        gg.get('/dominant-color', { preHandler: rateLimit({ max: 30 }) }, async (req, reply) => {
+            let u;
+            try { u = new URL(String(req.query?.src || '')); }
+            catch { return reply.code(400).send({ ok: false, error: 'Invalid URL' }); }
+            if (u.protocol !== 'https:' || !DOM_COLOR_HOSTS.test(u.hostname))
+                return reply.code(400).send({ ok: false, error: 'Discord CDN or i.imgur.com image URLs only' });
+            const color = await dominantColor(u.href);
+            if (color === null) return reply.code(422).send({ ok: false, error: 'Could not read that image' });
+            return reply.send({ ok: true, color: toHex(color) });
         });
         gg.get('/roles', (req, reply) => reply.send({ roles: guildData.guildRoles(req.guild) }));
 

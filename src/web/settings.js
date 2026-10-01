@@ -106,6 +106,7 @@ function f_components(e) {
                 return { type: 'image', url: str(c.url, 500) || '' };
             case 'section': {
                 const o = { type: 'section', text: str(c.text, 1000) || '', image: str(c.image, 500) || '' };
+                if (c.big === true) o.big = true; // heading-converted sections stay heading-size
                 // Button accessory only exists when the editor emitted the
                 // keys — presence of btnUrl/btnLabel picks button vs thumbnail.
                 if (c.btnUrl !== undefined || c.btnLabel !== undefined) {

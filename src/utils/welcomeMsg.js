@@ -68,8 +68,9 @@ function cardContainer(components, color, fmtFn, imgFn) {
                     break;
                 }
                 case 'section': {
+                    const t = fmtFn(c.text) || ' ';
                     const sec = new SectionBuilder().addTextDisplayComponents(
-                        new TextDisplayBuilder().setContent(fmtFn(c.text) || ' ')
+                        new TextDisplayBuilder().setContent(c.big && t.trim() ? `# ${t}` : t)
                     );
                     const btnUrl = imgFn(c.btnUrl);
                     if (isHttp(btnUrl)) {

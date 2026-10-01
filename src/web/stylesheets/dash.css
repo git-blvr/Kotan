@@ -237,6 +237,8 @@
     background: var(--panel-solid); border: 1px solid var(--border);
     border-radius: var(--r-md); box-shadow: var(--shadow-lg);
     max-height: 260px; overflow-y: auto; padding: var(--s1);
+    overscroll-behavior: contain; /* wheeling at the list's end stays inside —
+    chaining to the page would scroll the trigger and force a close */
 }
 .pop .search { padding: var(--s1); position: sticky; top: 0; background: var(--panel-solid); }
 .pop .opt {

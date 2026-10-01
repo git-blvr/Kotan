@@ -182,8 +182,12 @@
 
     // Fixed-position dropdowns don't follow their trigger on scroll — close
     // them instead (capture picks up scrolls inside nested containers too).
-    window.addEventListener('scroll', () => {
-        $$('.dselpop').forEach((p) => (p.style.display = 'none'));
+    // Scrolls INSIDE the popover's own option list are exempt — that list is
+    // scrollable itself and must not nuke the open dropdown.
+    window.addEventListener('scroll', (e) => {
+        $$('.dselpop').forEach((p) => {
+            if (!p.contains(e.target)) p.style.display = 'none';
+        });
     }, { capture: true, passive: true });
 
     // ---------- charts (inline SVG) ----------
@@ -554,9 +558,12 @@
                 cy += ih + 8;
             } else if (c.type === 'section') {
                 const accW = 96; // accessory column (thumbnail or button)
-                const ls = wrapTxt(c.text || 'Section text', Math.floor((iw - accW) / 6.9));
-                const sh = Math.max(ls.length * 19.6, 64);
-                body += txtLines(ls, x + pad, cy + 10 + Math.max(0, (sh - ls.length * 19.6) / 2));
+                const big = c.big === true; // converted headings keep the size
+                const lh = big ? 22.4 : 19.6;
+                const ls = wrapTxt(c.text || 'Section text', Math.floor((iw - accW) / (big ? 9 : 6.9)));
+                const sh = Math.max(ls.length * lh, 64);
+                body += txtLines(ls, x + pad, cy + 10 + Math.max(0, (sh - ls.length * lh) / 2),
+                    big ? { size: 16, fill: DC.head, weight: 700 } : {});
                 if (c.btnUrl || c.btnLabel) {
                     // button accessory — Discord renders link buttons gray
                     const bl = (c.btnLabel || 'Link').slice(0, 16);
@@ -685,7 +692,12 @@
                         <div><b>Basics</b><p class="sub">Style and accent — clear fields to hide them.</p></div></div>
                     <div class="grid2">
                         ${fldHtml('Style', `<select name="${p}e_style"><option value="embed" ${e.style !== 'cv2' ? 'selected' : ''}>Embed</option><option value="cv2" ${e.style === 'cv2' ? 'selected' : ''}>CV2 container</option></select>`)}
-                        ${fldHtml('Accent color', `<input type="text" name="${p}e_color" value="${esc(e.color ? `#${e.color}` : '')}" placeholder="#5865f2" maxlength="7">`, 'hex — empty = brand color')}
+                        ${fldHtml('Accent color', `<div class="clrrow">
+                            <input type="color" id="${p}e_colpick" value="${/^#?[0-9a-f]{6}$/i.test(e.color || '') ? `#${String(e.color).replace(/^#/, '')}` : '#5865f2'}">
+                            <input type="text" name="${p}e_color" value="${esc(e.color ? `#${e.color}` : '')}" placeholder="#5865f2" maxlength="7">
+                            <button type="button" class="btn sm" id="${p}e_coldom" title="Dominant color — extract from the thumbnail/first CV2 image, or the server icon">◈ Dominant</button>
+                            <button type="button" class="btn sm" id="${p}e_colclr" title="Clear — use the brand color">✕</button>
+                        </div>`, 'hex — empty = brand color')}
                     </div>
                     <div id="${p}e_embed">
                         <div class="cesec"><span class="ceic">${svg('<path d="M4 6h16M4 12h10M4 18h13"/>')}</span>
@@ -780,7 +792,7 @@
                     <span class="drag" title="Drag to reorder">⠿</span>
                     <span class="ctype">${COMP_DEFS.find(([t]) => t === c.type)?.[1] || c.type}</span>
                     ${cardCompFields(c)}
-                    <span class="cbtns">${c.type === 'text' ? `<button class="cbtn acc" data-acc="${i}" title="Attach accessory">＋</button>` : ''}<button class="cbtn" data-up="${i}" title="Move up">↑</button><button class="cbtn" data-dn="${i}" title="Move down">↓</button><button class="cbtn danger" data-del="${i}" title="Remove">✕</button></span>
+                    <span class="cbtns">${c.type === 'text' || c.type === 'heading' ? `<button class="cbtn acc" data-acc="${i}" title="Attach accessory">＋</button>` : ''}<button class="cbtn" data-up="${i}" title="Move up">↑</button><button class="cbtn" data-dn="${i}" title="Move down">↓</button><button class="cbtn danger" data-del="${i}" title="Remove">✕</button></span>
                 </div>`).join('') || '<p class="muted small">No components — add some below.</p>';
             $$('.comprow [data-k]', el).forEach((inp) => {
                 const row = inp.closest('.comprow');
@@ -801,9 +813,12 @@
                 menu.querySelectorAll('[data-accto]').forEach((mb) => (mb.onclick = () => {
                     const i = +b.dataset.acc;
                     const c = list[i];
+                    // Headings become sections too — big:true keeps the
+                    // heading-size text so the conversion doesn't shrink it.
+                    const big = c.type === 'heading' ? { big: true } : {};
                     list[i] = mb.dataset.accto === 'thumb'
-                        ? { type: 'section', text: c.text, image: '' }
-                        : { type: 'section', text: c.text, btnLabel: '', btnUrl: '' };
+                        ? { type: 'section', text: c.text, image: '', ...big }
+                        : { type: 'section', text: c.text, btnLabel: '', btnUrl: '', ...big };
                     renderComps();
                 }));
                 setTimeout(() => document.addEventListener('click', () => menu.remove(), { once: true }), 0);
@@ -836,6 +851,28 @@
         on.onchange = sync; styleSel.onchange = sync; sync();
         $(`#${p}ecard`, page).addEventListener('input', updPrev);
         $(`#${p}ecard`, page).addEventListener('change', updPrev);
+
+        // Accent color row — swatch picker, dominant-from-image, clear.
+        const colIn = $(`[name=${p}e_color]`, page);
+        const colPick = $(`#${p}e_colpick`, page);
+        colPick.oninput = () => { colIn.value = colPick.value; updPrev(); };
+        colIn.addEventListener('input', () => {
+            const v = colIn.value.trim();
+            if (/^#?[0-9a-f]{6}$/i.test(v)) colPick.value = `#${v.replace(/^#/, '')}`;
+        });
+        $(`#${p}e_colclr`, page).onclick = () => { colIn.value = ''; updPrev(); };
+        $(`#${p}e_coldom`, page).onclick = async (ev) => {
+            // Source order: thumbnail field, then the first CV2 image/
+            // section thumbnail, then the server icon as a last resort.
+            const imgComp = list.find((c) => c.type === 'image' || (c.type === 'section' && c.image)) || {};
+            const raw = ($(`[name=${p}e_thumburl]`, page)?.value || '').trim() || imgComp.url || imgComp.image || '{icon}';
+            const src = raw === '{avatar}' ? (memberAv || guildIcon) : /^https?:\/\//.test(raw) ? raw : guildIcon;
+            ev.target.disabled = true;
+            const r = await api(`/api/guilds/${guildId}/dominant-color?src=${encodeURIComponent(src)}`).catch(() => null);
+            ev.target.disabled = false;
+            if (r?.ok) { colIn.value = r.color; colPick.value = r.color; updPrev(); }
+            else toast(r?.error || 'Could not read that image', 'err');
+        };
 
         // Insert chips land in the last-focused field inside this editor;
         // the md toolbar wraps the description textarea's selection.
