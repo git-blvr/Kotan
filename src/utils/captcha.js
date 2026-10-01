@@ -13,7 +13,8 @@ const {
     AttachmentBuilder,
 } = require('discord.js');
 const { base, cv2 } = require('../helpers/embeds');
-const { cardContainer } = require('./welcomeMsg');
+const { cardContainer, cardImgSrc } = require('./welcomeMsg');
+const { accentFor } = require('./dominantColor');
 const config = require('../config');
 const logger = require('./logger');
 
@@ -203,10 +204,12 @@ function challengePayload(ch, note) {
 }
 
 // Panel payload — the configured card (cv2/embed/plain) with the Verify
-// button attached, mirroring the tickets panel.
-function panelPayload(guild, c) {
+// button attached, mirroring the tickets panel. Async since 'dominant'
+// color mode extracts the accent from the card's image/icon.
+async function panelPayload(guild, c) {
     const row = verifyRow();
     const p = c.panel || {};
+    const color = await accentFor(p, cardImgSrc(p, (u) => gimg(u, guild), guild.iconURL({ size: 256 }) || ''), accent(p.color));
     if (p.enabled === false)
         return {
             content: p.description || 'Click **Verify** to prove you\'re human.',
@@ -214,7 +217,8 @@ function panelPayload(guild, c) {
             allowedMentions: { users: [], roles: [], everyone: false },
         };
     if (p.style === 'embed') {
-        const e = new EmbedBuilder().setColor(accent(p.color));
+        const e = new EmbedBuilder();
+        if (color !== false) e.setColor(color);
         if (p.title) e.setTitle(gfmt(p.title, guild));
         if (p.description) e.setDescription(gfmt(p.description, guild));
         if (p.footer) e.setFooter({ text: gfmt(p.footer, guild) });
@@ -231,7 +235,7 @@ function panelPayload(guild, c) {
               { type: 'text', text: p.description || 'This server is protected — click **Verify** below and pick the characters you see.' },
               ...(p.footer ? [{ type: 'separator', size: 'small' }, { type: 'text', text: p.footer }] : []),
           ];
-    const container = cardContainer(comps, accent(p.color), (s) => gfmt(s, guild), (u) => gimg(u, guild));
+    const container = cardContainer(comps, color, (s) => gfmt(s, guild), (u) => gimg(u, guild));
     container.addActionRowComponents(row);
     return cv2(container);
 }

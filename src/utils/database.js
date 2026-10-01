@@ -90,10 +90,10 @@ const DEFAULT_SETTINGS = {
         message: 'Welcome {user} to {server}! You are member #{members}.',
         // optional rich card — when enabled, replaces the plain message
         // style: 'embed' (classic embed) | 'cv2' (Kotan container)
-        embed: { enabled: false, style: 'embed', title: '', description: '', color: '', footer: '', thumbnail: true, thumb: '', components: [] },
+        embed: { enabled: false, style: 'embed', title: '', description: '', color: '', colorMode: '', footer: '', thumbnail: true, thumb: '', components: [] },
         goodbyeChannel: null,
         goodbyeMessage: '**{username}** left {server}.',
-        goodbyeEmbed: { enabled: false, style: 'embed', title: '', description: '', color: '', footer: '', thumbnail: true, thumb: '', components: [] },
+        goodbyeEmbed: { enabled: false, style: 'embed', title: '', description: '', color: '', colorMode: '', footer: '', thumbnail: true, thumb: '', components: [] },
     },
     roles: {
         autorole: null,     // role id granted on join
@@ -122,6 +122,8 @@ const DEFAULT_SETTINGS = {
         roleId: null,       // role granted to boosters
         // Passive perks while a member is boosting (premium_since set).
         perks: { games: 1.0, coins: 1.0, xp: 1.0, shop: 0 },
+        // Optional rich card for the announcement — same editor as welcome.
+        card: { enabled: false, style: 'cv2', title: '', description: '', color: '', colorMode: '', footer: '', thumbnail: true, thumb: '', components: [] },
     },
     // Per-guild dashboard theming — applies when viewing this guild's panel.
     appearance: {
@@ -143,7 +145,7 @@ const DEFAULT_SETTINGS = {
         maxOpen: 1,             // open tickets per member
         naming: 'ticket-{user}',// channel name template — {user} {count}
         topics: [],             // [{name, desc}] — the panel dropdown (max 10)
-        panel: { enabled: true, style: 'cv2', title: 'Support', description: 'Pick a topic below to open a ticket.', color: '', footer: '', thumbnail: false, thumb: '', components: [] },
+        panel: { enabled: true, style: 'cv2', title: 'Support', description: 'Pick a topic below to open a ticket.', color: '', colorMode: '', footer: '', thumbnail: false, thumb: '', components: [] },
     },
     // CAPTCHA gate — dashboard-posted CV2 panel whose Verify button gives
     // the member a scrambled-code image and three pick-buttons; passing
@@ -152,7 +154,7 @@ const DEFAULT_SETTINGS = {
         enabled: false,
         roleId: null,           // role granted on a correct answer
         logChannel: null,       // pass/fail announcements; null = silent
-        panel: { enabled: true, style: 'cv2', title: 'Verification required', description: 'This server is protected — click **Verify** below and pick the characters you see.', color: '', footer: '', thumbnail: false, thumb: '', components: [] },
+        panel: { enabled: true, style: 'cv2', title: 'Verification required', description: 'This server is protected — click **Verify** below and pick the characters you see.', color: '', colorMode: '', footer: '', thumbnail: false, thumb: '', components: [] },
     },
     leveling: {
         enabled: false,
@@ -206,7 +208,7 @@ const DEFAULT_SETTINGS = {
         selfClear: true,       // "welcome back" notice when they speak
         roles: [],             // roles allowed to use .afk; empty = everyone
         exemptChannels: [],    // mentions here never announce
-        card: { enabled: false, style: 'cv2', title: '', description: '', color: '', footer: '', thumbnail: true, thumb: '', components: [] },
+        card: { enabled: false, style: 'cv2', title: '', description: '', color: '', colorMode: '', footer: '', thumbnail: true, thumb: '', components: [] },
     },
 };
 

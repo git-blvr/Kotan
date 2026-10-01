@@ -1,6 +1,7 @@
 const { EmbedBuilder } = require('discord.js');
 const { base, cv2 } = require('../helpers/embeds');
-const { cardContainer } = require('./welcomeMsg');
+const { cardContainer, cardImgSrc } = require('./welcomeMsg');
+const { accentFor } = require('./dominantColor');
 const config = require('../config');
 const db = require('./database');
 
@@ -35,14 +36,14 @@ const afkFmt = (tpl, member, rec, channelId) =>
 
 const isHttp = (u) => /^https?:\/\//i.test(u);
 
-// Send-ready payload announcing `rec`'s AFK status. Card config mirrors the
-// welcome editor (classic embed or CV2 container); disabled card falls back
-// to the plain `announce` template line inside a plain container.
-function afkPayload(member, rec, cfg, channelId) {
+// Send-ready payload announcing `rec`'s AFK status — async since 'dominant'
+// color mode extracts the accent from the card's image. Card config mirrors
+// the welcome editor; disabled card falls back to the plain announce line.
+async function afkPayload(member, rec, cfg, channelId) {
     const fmtFn = (s) => afkFmt(s, member, rec, channelId);
     const card = cfg.card;
     if (card?.enabled) {
-        const color = card.color ? parseInt(card.color, 16) : config.colors.main;
+        const color = await accentFor(card, cardImgSrc(card, fmtFn, fmtFn('{avatar}')), config.colors.main);
         const thumbSrc = fmtFn(card.thumb || '{avatar}');
         const thumb = card.thumbnail && isHttp(thumbSrc) ? thumbSrc : null;
         if (card.style === 'cv2') {
@@ -56,7 +57,8 @@ function afkPayload(member, rec, cfg, channelId) {
                 ] };
             return cv2(cardContainer(e.components, color, fmtFn, fmtFn));
         }
-        const e = new EmbedBuilder().setColor(color);
+        const e = new EmbedBuilder();
+        if (color !== false) e.setColor(color);
         if (card.title) e.setTitle(fmtFn(card.title));
         if (card.description) e.setDescription(fmtFn(card.description));
         if (card.footer) e.setFooter({ text: fmtFn(card.footer) });
@@ -108,7 +110,7 @@ async function handleMessage(message, cfg, isAfkCmd) {
             message.mentions.members?.get(id) ||
             message.guild.members.cache.get(id) ||
             { user, guild: message.guild, toString: () => `<@${id}>` };
-        await message.reply(afkPayload(member, rec, cfg, message.channel.id)).catch(() => {});
+        await message.reply(await afkPayload(member, rec, cfg, message.channel.id)).catch(() => {});
     }
 }
 

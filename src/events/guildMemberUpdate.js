@@ -1,7 +1,7 @@
 const { Events } = require('discord.js');
 const db = require('../utils/database');
 const logger = require('../utils/logger');
-const { fmt } = require('../utils/welcomeMsg');
+const { memberPayload } = require('../utils/welcomeMsg');
 const { logEvent } = require('../utils/eventlog');
 
 // Server boosts — a member's premium_since going null -> set means they just
@@ -49,9 +49,11 @@ module.exports = {
                 newMember.guild.channels.cache.get(boosts.channel) ||
                 (await newMember.guild.channels.fetch(boosts.channel).catch(() => null));
             if (channel?.isTextBased()) {
-                const text = fmt(boosts.message || '{user} just boosted {server}!', newMember)
-                    .replaceAll('{boosts}', String(newMember.guild.premiumSubscriptionCount || 0));
-                await channel.send(text).catch(() => {});
+                // Card-enabled announcements render embed/CV2 like welcome —
+                // memberPayload applies {boosts} via fmt for all fields.
+                await channel.send(
+                    await memberPayload(newMember, boosts.card, boosts.message || '{user} just boosted {server}!')
+                ).catch(() => {});
             }
         }
     },

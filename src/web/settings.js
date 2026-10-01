@@ -18,15 +18,16 @@ const DEFAULTS = {
     welcome: {
         channel: null,
         message: 'Welcome {user} to {server}! You are member #{members}.',
-        embed: { enabled: false, style: 'embed', title: '', description: '', color: '', footer: '', thumbnail: true, components: [] },
+        embed: { enabled: false, style: 'embed', title: '', description: '', color: '', colorMode: '', footer: '', thumbnail: true, components: [] },
         goodbyeChannel: null,
         goodbyeMessage: '**{username}** left {server}.',
-        goodbyeEmbed: { enabled: false, style: 'embed', title: '', description: '', color: '', footer: '', thumbnail: true, components: [] },
+        goodbyeEmbed: { enabled: false, style: 'embed', title: '', description: '', color: '', colorMode: '', footer: '', thumbnail: true, components: [] },
     },
     roles: { autorole: null, reactionRoles: [] },
     economy: { currency: null, dailyBase: null, dailyStreak: null, dailyMaxStreak: null, startBalance: null, shop: [] },
     games: { guessReward: 150, scrambleReward: 200, winMultiplier: 1, maxBet: 0, per: {} },
-    boosts: { channel: null, message: '{user} just boosted {server}! 🚀', roleId: null, perks: { games: 1, coins: 1, xp: 1, shop: 0 } },
+    boosts: { channel: null, message: '{user} just boosted {server}! 🚀', roleId: null, perks: { games: 1, coins: 1, xp: 1, shop: 0 },
+              card: { enabled: false, style: 'cv2', title: '', description: '', color: '', colorMode: '', footer: '', thumbnail: true, thumb: '', components: [] } },
     appearance: { accent: '', background: '', theme: '' },
     branding: { nickname: '' },
     leveling: {
@@ -42,7 +43,7 @@ const DEFAULTS = {
         enabled: true, defaultMessage: 'AFK',
         announce: '{user} is AFK: {message} · {ago}', selfClear: true,
         roles: [], exemptChannels: [],
-        card: { enabled: false, style: 'cv2', title: '', description: '', color: '', footer: '', thumbnail: true, thumb: '', components: [] },
+        card: { enabled: false, style: 'cv2', title: '', description: '', color: '', colorMode: '', footer: '', thumbnail: true, thumb: '', components: [] },
     },
     shop: {
         enabled: true, title: 'Shop',
@@ -56,11 +57,11 @@ const DEFAULTS = {
     tickets: {
         enabled: false, categoryId: null, logChannel: null, supportRoles: [],
         maxOpen: 1, naming: 'ticket-{user}', topics: [],
-        panel: { enabled: true, style: 'cv2', title: 'Support', description: 'Pick a topic below to open a ticket.', color: '', footer: '', thumbnail: false, thumb: '', components: [] },
+        panel: { enabled: true, style: 'cv2', title: 'Support', description: 'Pick a topic below to open a ticket.', color: '', colorMode: '', footer: '', thumbnail: false, thumb: '', components: [] },
     },
     captcha: {
         enabled: false, roleId: null, logChannel: null,
-        panel: { enabled: true, style: 'cv2', title: 'Verification required', description: 'This server is protected — click **Verify** below and pick the characters you see.', color: '', footer: '', thumbnail: false, thumb: '', components: [] },
+        panel: { enabled: true, style: 'cv2', title: 'Verification required', description: 'This server is protected — click **Verify** below and pick the characters you see.', color: '', colorMode: '', footer: '', thumbnail: false, thumb: '', components: [] },
     },
 };
 
@@ -231,6 +232,8 @@ const SECTIONS = {
         target.thumb = str(e.thumb, 500) ?? ''; // custom thumbnail source — {avatar}/{icon}/URL
         const c = String(e.color || '').trim();
         target.color = /^#?[0-9a-fA-F]{6}$/.test(c) ? c.replace('#', '') : '';
+        const cm = String(e.colorMode || '');
+        target.colorMode = ['dominant', 'none'].includes(cm) ? cm : '';
         if (f_components(e)) target.components = f_components(e);
         if (allowEmpty) return;
         if (target.enabled && target.style === 'embed' && !target.title && !target.description)
@@ -404,6 +407,13 @@ const SECTIONS = {
         p.coins = Math.min(Math.max(parseFloat(f.perkCoins) || 1, 1), 10);
         p.xp = Math.min(Math.max(parseFloat(f.perkXp) || 1, 1), 10);
         p.shop = Math.min(Math.max(parseFloat(f.perkShop) || 0, 0), 90);
+        // Optional rich card for the announcement — standalone message, so
+        // it gets the same strict validation as welcome (embed needs a
+        // title/desc; CV2 needs at least one component).
+        if (f.card !== undefined) {
+            const err = SECTIONS.welcomeEmbed(s.boosts.card, f.card);
+            if (err) return err;
+        }
     },
     appearance(s, f) {
         const c = String(f.accent || '').trim();

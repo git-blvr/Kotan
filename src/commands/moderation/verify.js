@@ -62,7 +62,7 @@ module.exports = {
         const c = (await db.getGuildSettings(message.guild.id)).captcha;
         if (!c?.enabled)
             return sendError(message, `CAPTCHA is disabled — configure it on the dashboard under **CAPTCHA**.`);
-        await message.channel.send(cap.panelPayload(message.guild, c)).catch(() => {});
+        await message.channel.send(await cap.panelPayload(message.guild, c)).catch(() => {});
         return message.reply(cv2(success('Verification panel posted.', 'CAPTCHA'))).catch(() => {});
     },
     executeComponent,

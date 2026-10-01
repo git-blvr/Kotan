@@ -28,7 +28,7 @@ module.exports = {
                 (await member.guild.channels.fetch(settings.welcome.channel).catch(() => null));
             if (channel?.isTextBased())
                 await channel
-                    .send(memberPayload(member, settings.welcome.embed, settings.welcome.message || 'Welcome {user}!'))
+                    .send(await memberPayload(member, settings.welcome.embed, settings.welcome.message || 'Welcome {user}!'))
                     .catch(() => {});
         }
 

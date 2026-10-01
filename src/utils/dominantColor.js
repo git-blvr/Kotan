@@ -95,4 +95,19 @@ async function dominantColor(input) {
 // 0x5865F2 -> "#5865f2" — handy for displaying the color as text.
 const toHex = (color) => `#${color.toString(16).padStart(6, '0')}`;
 
-module.exports = { dominantColor, toHex };
+// Resolves a card's accent color from its colorMode:
+//   ''        -> the card's custom hex, else `fallback`
+//   dominant  -> extracted from `src` (thumb/avatar/icon/first image),
+//                falling back to the custom hex then `fallback`
+//   none      -> false — callers skip setColor/setAccentColor entirely
+async function accentFor(card, src, fallback) {
+    if (card?.colorMode === 'none') return false;
+    if (card?.colorMode === 'dominant') {
+        const c = /^https?:\/\//i.test(src || '') ? await dominantColor(src) : null;
+        if (c !== null) return c;
+    }
+    const n = card?.color ? parseInt(String(card.color).replace('#', ''), 16) : NaN;
+    return Number.isFinite(n) ? n : fallback;
+}
+
+module.exports = { dominantColor, toHex, accentFor };

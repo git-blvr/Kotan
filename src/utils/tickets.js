@@ -11,7 +11,8 @@ const {
     MessageFlags,
 } = require('discord.js');
 const { base, cv2 } = require('../helpers/embeds');
-const { cardContainer } = require('./welcomeMsg');
+const { cardContainer, cardImgSrc } = require('./welcomeMsg');
+const { accentFor } = require('./dominantColor');
 const db = require('./database');
 const config = require('../config');
 const logger = require('./logger');
@@ -54,11 +55,13 @@ function topicsRow(t) {
     return row;
 }
 
-// Send-ready payload for the ticket panel. Honors the card editor's style:
-// cv2 container, classic embed, or plain text when the card is disabled.
-function panelPayload(guild, t) {
+// Send-ready payload for the ticket panel — async since 'dominant' color
+// mode extracts the accent from the card's image/icon. Honors the card
+// editor's style: cv2 container, classic embed, or plain text when off.
+async function panelPayload(guild, t) {
     const row = topicsRow(t);
     const p = t.panel || {};
+    const color = await accentFor(p, cardImgSrc(p, (u) => gimg(u, guild), guild.iconURL({ size: 256 }) || ''), accent(p.color));
     if (p.enabled === false)
         return {
             content: p.description || 'Pick a topic below to open a ticket.',
@@ -66,7 +69,8 @@ function panelPayload(guild, t) {
             allowedMentions: { users: [], roles: [], everyone: false },
         };
     if (p.style === 'embed') {
-        const e = new EmbedBuilder().setColor(accent(p.color));
+        const e = new EmbedBuilder();
+        if (color !== false) e.setColor(color);
         if (p.title) e.setTitle(gfmt(p.title, guild));
         if (p.description) e.setDescription(gfmt(p.description, guild));
         if (p.footer) e.setFooter({ text: gfmt(p.footer, guild) });
@@ -83,7 +87,7 @@ function panelPayload(guild, t) {
               { type: 'text', text: p.description || 'Pick a topic below to open a ticket.' },
               ...(p.footer ? [{ type: 'separator', size: 'small' }, { type: 'text', text: p.footer }] : []),
           ];
-    const container = cardContainer(comps, accent(p.color), (s) => gfmt(s, guild), (u) => gimg(u, guild));
+    const container = cardContainer(comps, color, (s) => gfmt(s, guild), (u) => gimg(u, guild));
     container.addActionRowComponents(row);
     return cv2(container);
 }
@@ -149,7 +153,9 @@ async function openTicket(guild, member, topicIdx, settings, client) {
     };
     await db.saveTickets(guild.id, data);
 
-    const oc = new ContainerBuilder().setAccentColor(accent(t.panel?.color));
+    const oc = new ContainerBuilder();
+    const ocColor = await accentFor(t.panel, cardImgSrc(t.panel, (u) => gimg(u, guild), guild.iconURL({ size: 256 }) || ''), accent(t.panel?.color));
+    if (ocColor !== false) oc.setAccentColor(ocColor);
     oc.addTextDisplayComponents(
         new TextDisplayBuilder().setContent(
             `## Ticket #${data.count}${topic ? ` — ${topic.name}` : ''}\nHey ${member} — staff will be with you shortly.\n-# Describe your issue below.`

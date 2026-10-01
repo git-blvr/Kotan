@@ -157,7 +157,7 @@ module.exports = async (app) => {
             if (!ch || !ch.isTextBased()) return reply.code(400).send({ error: 'Unknown channel' });
             const t = (await settings.getSettings(req.guild.id)).tickets;
             if (!t?.enabled) return reply.code(400).send({ error: 'Tickets are disabled — enable and save first' });
-            await ch.send(tickets.panelPayload(req.guild, t)).catch(() => {});
+            await ch.send(await tickets.panelPayload(req.guild, t)).catch(() => {});
             return reply.send({ ok: true });
         });
 
@@ -168,7 +168,7 @@ module.exports = async (app) => {
             const c = (await settings.getSettings(req.guild.id)).captcha;
             if (!c?.enabled) return reply.code(400).send({ error: 'CAPTCHA is disabled — enable and save first' });
             if (!c.roleId) return reply.code(400).send({ error: 'Pick a verified role first — nothing to grant otherwise' });
-            await ch.send(captcha.panelPayload(req.guild, c)).catch(() => {});
+            await ch.send(await captcha.panelPayload(req.guild, c)).catch(() => {});
             return reply.send({ ok: true });
         });
 

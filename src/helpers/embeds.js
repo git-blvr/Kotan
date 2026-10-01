@@ -28,7 +28,9 @@ const cv2 = (...components) => ({
 });
 
 function base(options = {}) {
-    const container = new ContainerBuilder().setAccentColor(options.color ?? config.colors.main);
+    const container = new ContainerBuilder();
+    // color === false means "no accent bar" (the editor's color mode none).
+    if (options.color !== false) container.setAccentColor(options.color ?? config.colors.main);
 
     const head = [];
     if (options.author) head.push(`-# ${options.author.name ?? options.author}`);

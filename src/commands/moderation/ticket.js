@@ -34,7 +34,7 @@ async function run(ctx, action, targetUser, text) {
         // Posting a panel is a staff action, not something members can spam.
         if (!ctx.member.permissions.has(PermissionFlagsBits.ManageGuild))
             return sendError(ctx, 'You need **Manage Server** to post a ticket panel.');
-        await ctx.channel.send(tk.panelPayload(ctx.guild, t)).catch(() => {});
+        await ctx.channel.send(await tk.panelPayload(ctx.guild, t)).catch(() => {});
         return ctx.reply(cv2(success('Ticket panel posted.', 'Tickets'))).catch(() => {});
     }
 

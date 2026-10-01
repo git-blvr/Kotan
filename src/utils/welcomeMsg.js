@@ -13,6 +13,7 @@ const {
 } = require('discord.js');
 const config = require('../config');
 const { base, cv2 } = require('../helpers/embeds');
+const { accentFor } = require('./dominantColor');
 
 // Welcome/goodbye payload rendering — the dashboard configures either a plain
 // text message or a rich card (classic embed or CV2 container). Placeholders
@@ -33,6 +34,16 @@ const imgUrl = (v, member) =>
         .replaceAll('{icon}', member.guild.iconURL({ size: 256 }) || '');
 
 const isHttp = (u) => /^https?:\/\//i.test(u);
+
+// Dominant-mode image source for a card: its thumbnail, else the first
+// image/section thumbnail component, else the caller's fallback.
+function cardImgSrc(card, imgFn, fallback) {
+    const t = imgFn(card?.thumb || '');
+    if (isHttp(t)) return t;
+    const c = (card?.components || []).find((x) => x.type === 'image' || (x.type === 'section' && x.image));
+    const u = c ? imgFn(c.url || c.image) : '';
+    return isHttp(u) ? u : fallback;
+}
 
 // Builds a CV2 container from the dragged-together component list.
 // fmtFn/imgFn resolve placeholders per context (member join/leave vs
@@ -107,11 +118,16 @@ function cv2Card(member, embed, color) {
     return cardContainer(embed.components, color, (s) => fmt(s, member), (u) => imgUrl(u, member));
 }
 
-// Returns a send()-ready payload for one side (join or leave).
+// Returns a send()-ready payload for one side (join or leave) — async since
+// 'dominant' color mode extracts the accent from the card's image.
 // `embed` is the configured payload object; `fallback` is the plain message.
-function memberPayload(member, embed, fallback) {
+async function memberPayload(member, embed, fallback) {
     if (embed?.enabled) {
-        const color = embed.color ? parseInt(embed.color, 16) : config.colors.main;
+        const color = await accentFor(
+            embed,
+            cardImgSrc(embed, (u) => imgUrl(u, member), member.user.displayAvatarURL({ size: 256 })),
+            config.colors.main
+        );
         // Thumbnail source: custom URL/placeholder wins over the member avatar.
         const thumbSrc = embed.thumb ? imgUrl(embed.thumb, member) : member.user.displayAvatarURL({ size: 128 });
         const thumb = embed.thumbnail && isHttp(thumbSrc) ? thumbSrc : null;
@@ -128,7 +144,8 @@ function memberPayload(member, embed, fallback) {
                 ] };
             return cv2(cv2Card(member, e, color));
         }
-        const e = new EmbedBuilder().setColor(color);
+        const e = new EmbedBuilder();
+        if (color !== false) e.setColor(color);
         if (embed.title) e.setTitle(fmt(embed.title, member));
         if (embed.description) e.setDescription(fmt(embed.description, member));
         if (embed.footer) e.setFooter({ text: fmt(embed.footer, member) });
@@ -138,4 +155,4 @@ function memberPayload(member, embed, fallback) {
     return fmt(fallback, member);
 }
 
-module.exports = { fmt, memberPayload, cardContainer };
+module.exports = { fmt, memberPayload, cardContainer, cardImgSrc };

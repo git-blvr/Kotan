@@ -18,7 +18,7 @@ module.exports = {
                 (await member.guild.channels.fetch(settings.welcome.goodbyeChannel).catch(() => null));
             if (channel?.isTextBased())
                 await channel
-                    .send(memberPayload(member, settings.welcome.goodbyeEmbed, settings.welcome.goodbyeMessage || '**{username}** left.'))
+                    .send(await memberPayload(member, settings.welcome.goodbyeEmbed, settings.welcome.goodbyeMessage || '**{username}** left.'))
                     .catch(() => {});
         }
 

@@ -525,7 +525,7 @@
         const pad = 14, iw = w - 32;
         const thumb = e.thumbUrl ? 80 : 0;
         const tw = iw - (thumb ? 92 : 0);
-        const color = normHex(e.color, DC.brand);
+        const color = e.color === false ? DC.border : normHex(e.color, DC.brand);
         let cy = y + pad, body = '';
         if (e.title) {
             const ls = wrapTxt(e.title, Math.floor(tw / 8.2));
@@ -690,8 +690,8 @@
     // Markup for one card editor — prefix `p` namespaces every field/id so
     // several editors can coexist on a page. Live component list is stored
     // on `e.__list`.
-    function cardEditorHtml(p, e) {
-        const chips = ['{user}', '{username}', '{server}', '{members}', '{avatar}', '{icon}']
+    function cardEditorHtml(p, e, extraChips = []) {
+        const chips = ['{user}', '{username}', '{server}', '{members}', '{avatar}', '{icon}', ...extraChips]
             .map((v) => `<button type="button" class="chip" data-ins="${v}">${v.slice(1, -1)}</button>`).join('');
         const mdbar = `<div class="mdbar">
             <button type="button" data-md="**">B</button><button type="button" data-md="*" class="it">I</button>
@@ -706,10 +706,17 @@
                         <div><b>Basics</b><p class="sub">Style and accent — clear fields to hide them.</p></div></div>
                     <div class="grid2">
                         ${fldHtml('Style', `<select name="${p}e_style"><option value="embed" ${e.style !== 'cv2' ? 'selected' : ''}>Embed</option><option value="cv2" ${e.style === 'cv2' ? 'selected' : ''}>CV2 container</option></select>`)}
+                        ${fldHtml('Color', `<select name="${p}e_colmode">
+                            <option value="" ${e.colorMode !== 'dominant' && e.colorMode !== 'none' ? 'selected' : ''}>Custom / brand</option>
+                            <option value="dominant" ${e.colorMode === 'dominant' ? 'selected' : ''}>Dominant (auto)</option>
+                            <option value="none" ${e.colorMode === 'none' ? 'selected' : ''}>None — no accent</option>
+                        </select>`, 'dominant = tinted from the card image/avatar')}
+                    </div>
+                    <div id="${p}e_colrow">
                         ${fldHtml('Accent color', `<div class="clrrow">
                             <input type="color" id="${p}e_colpick" value="${/^#?[0-9a-f]{6}$/i.test(e.color || '') ? `#${String(e.color).replace(/^#/, '')}` : '#5865f2'}">
                             <input type="text" name="${p}e_color" value="${esc(e.color ? `#${e.color}` : '')}" placeholder="#5865f2" maxlength="7">
-                            <button type="button" class="btn sm" id="${p}e_coldom" title="Dominant color — extract from the thumbnail/first CV2 image, or the server icon">◈ Dominant</button>
+                            <button type="button" class="btn sm" id="${p}e_coldom" title="Sample — extract the dominant color once and use it as the custom accent">◈ Sample image</button>
                             <button type="button" class="btn sm" id="${p}e_colclr" title="Clear — use the brand color">✕</button>
                         </div>`, 'hex — empty = brand color')}
                     </div>
@@ -780,20 +787,41 @@
             .replaceAll('{server}', CTX.guild.name)
             .replaceAll('{members}', String(CTX.guild.memberCount))
             .replaceAll('{avatar}', memberAv || 'avatar')
-            .replaceAll('{icon}', guildIcon || 'icon');
+            .replaceAll('{icon}', guildIcon || 'icon')
+            .replaceAll('{boosts}', '7');
+        // Dominant-mode preview — the real accent is extracted at send time;
+        // the preview approximates it by fetching the same source once.
+        let domCol = null, domSrc = '';
+        const domSource = () => {
+            const imgComp = list.find((c) => c.type === 'image' || (c.type === 'section' && c.image)) || {};
+            const raw = ($(`[name=${p}e_thumburl]`, page)?.value || '').trim() || imgComp.url || imgComp.image || '';
+            const src = raw === '{avatar}' ? (memberAv || guildIcon) : raw === '{icon}' ? guildIcon : /^https?:\/\//.test(raw) ? raw : '';
+            return src || memberAv || guildIcon;
+        };
+        const maybeFetchDom = async () => {
+            if ($(`[name=${p}e_colmode]`, page)?.value !== 'dominant') return;
+            const src = domSource();
+            if (!src || src === domSrc) return;
+            domSrc = src;
+            const r = await api(`/api/guilds/${guildId}/dominant-color?src=${encodeURIComponent(src)}`).catch(() => null);
+            if (r?.ok && src === domSrc) { domCol = r.color; updPrev(); }
+        };
+
         const updPrev = () => {
             const el = $(`#${p}dprev`, page);
             if (!el) return;
             const f = formVals(page);
             if (!f[`${p}e_on`]) { el.innerHTML = ''; return; }
             const b = { avatar: botAv, name: botName };
+            const mode = f[`${p}e_colmode`];
+            const acv = mode === 'dominant' ? (domCol || '') : f[`${p}e_color`];
             if (f[`${p}e_style`] === 'cv2') {
                 const comps = list.map((c) => ({ ...c, text: sampleFill(c.text), url: sampleFill(c.url), image: sampleFill(c.image), label: sampleFill(c.label) }));
-                el.innerHTML = comps.length ? svgMessage({ ...b, container: comps, accent: f[`${p}e_color`] }) : '<p class="muted small">Add components to preview the card.</p>';
+                el.innerHTML = comps.length ? svgMessage({ ...b, container: comps, accent: mode === 'none' ? '' : acv }) : '<p class="muted small">Add components to preview the card.</p>';
             } else {
                 el.innerHTML = svgMessage({ ...b, embed: {
                     title: sampleFill(f[`${p}e_title`]), description: sampleFill(f[`${p}e_desc`]),
-                    footer: sampleFill(f[`${p}e_footer`]), color: f[`${p}e_color`],
+                    footer: sampleFill(f[`${p}e_footer`]), color: mode === 'none' ? false : acv,
                     thumbUrl: f[`${p}e_thumb`] ? (sampleFill(f[`${p}e_thumburl`]) || memberAv) : '',
                 } });
             }
@@ -853,18 +881,23 @@
             updPrev();
         };
 
-        // Card editor collapses when disabled; embed vs CV2 fields follow the style select.
+        // Card editor collapses when disabled; embed vs CV2 fields follow the
+        // style select; the accent row only applies to custom-color mode.
         const on = $(`[name=${p}e_on]`, page);
         const styleSel = $(`[name=${p}e_style]`, page);
+        const modeSel = $(`[name=${p}e_colmode]`, page);
         const sync = () => {
             $(`#${p}ecard`, page).style.display = on.checked ? '' : 'none';
             const cv2Mode = styleSel.value === 'cv2';
             $(`#${p}e_embed`, page).style.display = cv2Mode ? 'none' : '';
             $(`#${p}e_cv2`, page).style.display = cv2Mode ? '' : 'none';
+            $(`#${p}e_colrow`, page).style.display = modeSel.value === '' ? '' : 'none';
         };
-        on.onchange = sync; styleSel.onchange = sync; sync();
+        on.onchange = sync; styleSel.onchange = sync;
+        modeSel.onchange = () => { sync(); maybeFetchDom(); };
+        sync(); maybeFetchDom();
         $(`#${p}ecard`, page).addEventListener('input', updPrev);
-        $(`#${p}ecard`, page).addEventListener('change', updPrev);
+        $(`#${p}ecard`, page).addEventListener('change', () => { updPrev(); maybeFetchDom(); });
 
         // Accent color row — swatch picker, dominant-from-image, clear.
         const colIn = $(`[name=${p}e_color]`, page);
@@ -927,7 +960,7 @@
                 enabled: !!f[`${p}e_on`],
                 style: f[`${p}e_style`],
                 title: f[`${p}e_title`], description: f[`${p}e_desc`],
-                color: f[`${p}e_color`], footer: f[`${p}e_footer`],
+                color: f[`${p}e_color`], colorMode: f[`${p}e_colmode`], footer: f[`${p}e_footer`],
                 thumbnail: !!f[`${p}e_thumb`], thumb: f[`${p}e_thumburl`],
                 components: f[`${p}e_style`] === 'cv2' ? list : [],
             }),
@@ -1729,7 +1762,8 @@
                 <div><div class="page-title">Boosting</div><p class="page-desc">Perks for members who boost the server.</p></div>
                 <div class="card"><h3>Announcement</h3>
                     ${fldHtml('Channel', selSlot('bch'), 'empty = no announcement')}
-                    ${fldHtml('Message', txtArea('bmsg', b.message), '{user} {username} {server} {boosts}')}
+                    ${fldHtml('Message', txtArea('bmsg', b.message), '{user} {username} {server} {boosts} — sent as plain text when the card below is off')}
+                    ${cardEditorHtml('bc', b.card || {}, ['{boosts}'])}
                 </div>
                 <div class="card"><h3>Booster role</h3>
                     ${fldHtml('Role granted on boost', selSlot('brole'), 'empty = none')}
@@ -1745,6 +1779,7 @@
                 ${saveBar('boosts')}`;
             mountSelect(page, 'bch', { options: [{ value: '', label: 'Off' }, ...chOpts(DATA.channels)], value: b.channel || '', placeholder: 'Off' });
             mountSelect(page, 'brole', { options: [{ value: '', label: 'None' }, ...roOpts(DATA.roles)], value: b.roleId || '', placeholder: 'None' });
+            const card = setupCardEditor(page, 'bc', b.card || {});
             bindSave(page, 'boosts', () => {
                 const f = formVals(page);
                 return {
@@ -1752,6 +1787,7 @@
                     message: f.bmsg,
                     roleId: mounts.brole.get() || null,
                     perkGames: f.pgames, perkCoins: f.pcoins, perkXp: f.pxp, perkShop: f.pshop,
+                    card: card.collect(f),
                 };
             });
         },
