@@ -1881,6 +1881,12 @@
             const card = setupCardEditor(page, 'tp', t.panel || {});
 
             const tpEl = $('#topics', page);
+            // Re-renders rebuild from `topics`, so typed-but-unsaved input
+            // must be pulled back into the array before add/remove.
+            const syncTopics = () => topics.forEach((x, i) => {
+                x.name = tpEl.querySelector(`[name="tn_${i}"]`)?.value ?? '';
+                x.desc = tpEl.querySelector(`[name="td_${i}"]`)?.value ?? '';
+            });
             const renderTopics = () => {
                 tpEl.innerHTML = topics.map((x, i) => `
                     <div class="modrow">
@@ -1888,10 +1894,10 @@
                         <input type="text" name="td_${i}" value="${esc(x.desc || '')}" placeholder="Dropdown description" class="grow">
                         <button class="btn sm danger" data-del="${i}">✕</button></div>`).join('')
                     || '<p class="muted small">No topics — the panel falls back to a single open button.</p>';
-                $$('#topics [data-del]', page).forEach((b) => (b.onclick = () => { topics.splice(+b.dataset.del, 1); renderTopics(); }));
+                $$('#topics [data-del]', page).forEach((b) => (b.onclick = () => { syncTopics(); topics.splice(+b.dataset.del, 1); renderTopics(); }));
             };
             renderTopics();
-            $('#add-topic', page).onclick = () => { if (topics.length < 10) { topics.push({ name: '', desc: '' }); renderTopics(); } };
+            $('#add-topic', page).onclick = () => { if (topics.length < 10) { syncTopics(); topics.push({ name: '', desc: '' }); renderTopics(); } };
 
             $('#post-panel', page).onclick = async (e) => {
                 const status = $('#post-status', page);
