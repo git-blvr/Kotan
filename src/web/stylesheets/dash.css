@@ -45,7 +45,7 @@
 .dnav a {
     display: flex; align-items: center; gap: var(--s3);
     padding: calc(6px * var(--density)) var(--s2);
-    border-radius: 12px; color: var(--text-2);
+    border-radius: 999px; color: var(--text-2);
     font-size: 14px; font-weight: 500;
     border: 1px solid transparent;
     transition: all var(--speed);
@@ -59,7 +59,7 @@
 .dnav a .ic {
     width: 28px; height: 28px; flex-shrink: 0;
     display: grid; place-items: center;
-    border-radius: 8px;
+    border-radius: 50%;
     background: var(--panel-2); border: 1px solid var(--border-soft);
     color: var(--text-2);
     transition: all var(--speed);
@@ -497,8 +497,8 @@ body.has-dirty .dpage { padding-bottom: 76px; }
 
 /* In-page subnav — generated from section headings, sits above the title.
    Sticks below the 58px topbar (never overlaps it). */
-.subnav{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px;position:sticky;top:calc(var(--topbar-h) + 8px);z-index:30;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);padding:6px;border:1px solid var(--border);border-radius:12px}
-.snv{appearance:none;border:1px solid transparent;background:transparent;color:var(--text-2);font:inherit;font-size:12.5px;font-weight:600;padding:6px 11px;border-radius:8px;cursor:pointer;transition:all .18s ease;white-space:nowrap}
+.subnav{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px;position:sticky;top:calc(var(--topbar-h) + 8px);z-index:30;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);padding:6px;border:1px solid var(--border);border-radius:999px}
+.snv{appearance:none;border:1px solid transparent;background:transparent;color:var(--text-2);font:inherit;font-size:12.5px;font-weight:600;padding:6px 11px;border-radius:999px;cursor:pointer;transition:all .18s ease;white-space:nowrap}
 .snv:hover{background:var(--panel-2);color:var(--text)}
 .snv.on{background:var(--panel-2);color:var(--text);border-color:var(--border);box-shadow:inset 0 -2px 0 var(--accent)}
 @media (max-width:720px){.subnav{top:calc(var(--topbar-h) + 4px);overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none}.subnav::-webkit-scrollbar{display:none}}
