@@ -360,8 +360,12 @@ async function panelPayload(guild, vm) {
               ...(p.footer ? [{ type: 'separator', size: 'small' }, { type: 'text', text: p.footer }] : []),
           ];
     const container = cardContainer(comps, color, (s) => gfmt(s, guild), (u) => gimg(u, guild));
-    // Top-level action rows ride alongside the container — keeps the
-    // card's own 10-component budget untouched.
+    // Controls ride inside the card like tickets/captcha — a container
+    // caps at 10 components, so a maxed-out card spills them below.
+    if (comps.length + rows.length <= 10) {
+        for (const row of rows) container.addActionRowComponents(row);
+        return { components: [container], flags: MessageFlags.IsComponentsV2 };
+    }
     return { components: [container, ...rows], flags: MessageFlags.IsComponentsV2 };
 }
 

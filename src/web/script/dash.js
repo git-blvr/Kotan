@@ -556,6 +556,29 @@
         return { h, svg: `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="${DC.panel}"/><rect x="${x}" y="${y}" width="4" height="${h}" fill="${color}"/>${img}${body}` };
     };
 
+    // Button/select rows — pseudo-comps the preview layers onto feature
+    // panels (voicemaster grid, ticket topic picker, verify button). One
+    // call renders one action row; `color` picks the Discord button tint.
+    const BTN_COLORS = { primary: '#5865f2', success: '#248046', danger: '#da373c' };
+    const svgRowComp = (c, x, y, w) => {
+        let svg = '';
+        if (c.type === 'buttons') {
+            let bx = x;
+            for (const l of c.labels || []) {
+                const bw = Math.max(48, String(l).length * 7.8 + 30);
+                if (bx + bw > x + w) break;
+                svg += `<rect x="${bx}" y="${y}" width="${bw}" height="34" rx="8" fill="${BTN_COLORS[c.color] || '#4e5058'}"/>
+                    <text x="${bx + bw / 2}" y="${y + 22}" text-anchor="middle" font-family="${DFONT}" font-size="14" font-weight="500" fill="#fff">${xesc(l)}</text>`;
+                bx += bw + 8;
+            }
+        } else if (c.type === 'select') {
+            svg = `<rect x="${x}" y="${y}" width="${w}" height="34" rx="8" fill="#383a40"/>
+                <text x="${x + 12}" y="${y + 22}" font-family="${DFONT}" font-size="14" fill="#b5bac1">${xesc(c.label || 'Make a selection')}</text>
+                <path d="M${x + w - 24} ${y + 14} l5 5 5 -5" stroke="#b5bac1" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+        }
+        return { svg, h: 42 };
+    };
+
     // CV2 container — stacked components, per-type rendering, optional accent bar.
     const svgContainer = (comps, x, y, w, accent) => {
         const pad = 16, iw = w - pad * 2;
@@ -603,6 +626,10 @@
                     <text x="${x + pad + lw / 2 - 7}" y="${cy + 22}" text-anchor="middle" font-family="${DFONT}" font-size="14" font-weight="500" fill="#fff">${xesc(ll)}</text>
                     <path d="M${x + pad + lw - 16} ${cy + 11} h6 v6 M${x + pad + lw - 10} ${cy + 11} l-7 7" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round"/>`;
                 cy += 42;
+            } else if (c.type === 'buttons' || c.type === 'select') {
+                const r = svgRowComp(c, x + pad, cy, iw);
+                body += r.svg;
+                cy += r.h;
             }
         }
         const h = Math.max(cy - y + pad - 4, 44);
@@ -611,7 +638,9 @@
     };
 
     // A message row: avatar, name + BOT tag + timestamp, text, embed/container.
-    const svgMessage = ({ avatar, name, content, embed, container, accent }) => {
+    // `rows` are action rows rendered below the body (panels whose controls
+    // didn't fit inside the card, or non-CV2 styles).
+    const svgMessage = ({ avatar, name, content, embed, container, accent, rows }) => {
         const W = 440;
         let body = svgAv(avatar, 38, 28, 20);
         const nw = Math.min(String(name).length * 8.4, 180);
@@ -626,6 +655,7 @@
         }
         if (embed) { const r = svgEmbed(embed, 72, cy, 344); body += r.svg; cy += r.h + 8; }
         if (container) { const r = svgContainer(container, 72, cy, 344, accent); body += r.svg; cy += r.h + 8; }
+        if (rows?.length) for (const c of rows) { const r = svgRowComp(c, 72, cy, 344); body += r.svg; cy += r.h; }
         const h = Math.max(cy + 8, 52);
         return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${h}" width="${W}" height="${h}" class="dsvg" role="img"><rect width="${W}" height="${h}" fill="${DC.bg}"/>${body}</svg>`;
     };
@@ -837,10 +867,14 @@
 
     // Wires one card editor already rendered into `page`. Returns a
     // collector producing the saved embed/card object.
-    function setupCardEditor(page, p, e) {
+    function setupCardEditor(page, p, e, opts = {}) {
         // Working copy — edits never touch the settings object, so cancelling
         // (re-render from CTX.settings) restores the saved card.
         const list = (e.components || []).map((c) => ({ ...c }));
+        // Feature panels can attach fixed controls (voicemaster button grid,
+        // ticket topic picker…) — preview them exactly where the posted
+        // payload puts them.
+        const extras = opts.extras || [];
 
         const memberAv = dcdnAv(CTX.user.id, CTX.user.avatar);
         const guildIcon = dcdnIcon(CTX.guild.id, CTX.guild.icon);
@@ -876,19 +910,30 @@
             const el = $(`#${p}dprev`, page);
             if (!el) return;
             const f = formVals(page);
-            if (!f[`${p}e_on`]) { el.innerHTML = ''; return; }
             const b = { avatar: botAv, name: botName };
+            if (!f[`${p}e_on`]) {
+                // Card off — panels still post plain text + controls.
+                el.innerHTML = extras.length
+                    ? svgMessage({ ...b, content: sampleFill(f[`${p}e_desc`]) || opts.plain || '', rows: extras })
+                    : '';
+                return;
+            }
             const mode = f[`${p}e_colmode`];
             const acv = mode === 'dominant' ? (domCol || '') : f[`${p}e_color`];
             if (f[`${p}e_style`] === 'cv2') {
                 const comps = list.map((c) => ({ ...c, text: sampleFill(c.text), url: sampleFill(c.url), image: sampleFill(c.image), label: sampleFill(c.label) }));
-                el.innerHTML = comps.length ? svgMessage({ ...b, container: comps, accent: mode === 'none' ? '' : acv }) : '<p class="muted small">Add components to preview the card.</p>';
+                if (!comps.length && !extras.length) { el.innerHTML = '<p class="muted small">Add components to preview the card.</p>'; return; }
+                // Controls ride inside the container up to Discord's
+                // 10-per-container cap — a packed card spills them below,
+                // matching the posted payload.
+                const inside = comps.length + extras.length <= 10;
+                el.innerHTML = svgMessage({ ...b, container: [...comps, ...(inside ? extras : [])], accent: mode === 'none' ? '' : acv, rows: inside ? null : extras });
             } else {
                 el.innerHTML = svgMessage({ ...b, embed: {
                     title: sampleFill(f[`${p}e_title`]), description: sampleFill(f[`${p}e_desc`]),
                     footer: sampleFill(f[`${p}e_footer`]), color: mode === 'none' ? false : acv,
                     thumbUrl: f[`${p}e_thumb`] ? (sampleFill(f[`${p}e_thumburl`]) || memberAv) : '',
-                } });
+                }, rows: extras });
             }
         };
 
@@ -1033,6 +1078,16 @@
     }
 
     // ---------- pages ----------
+
+    // The VoiceMaster control grid as pseudo-comps — identical to the
+    // action rows utils/voicemaster.js attaches under the card.
+    const VM_EXTRAS = [
+        { type: 'buttons', labels: ['Lock', 'Unlock', 'Hide', 'Show', 'Rename'] },
+        { type: 'buttons', labels: ['Limit +', 'Limit −', 'Invite', 'Trust', 'Untrust'] },
+        { type: 'buttons', labels: ['Kick', 'Block', 'Unblock', 'Transfer', 'Claim'] },
+        { type: 'select', label: 'Select bitrate quality…' },
+    ];
+
     const PAGES = {
         async overview(page) {
             const s = CTX.settings;
@@ -1879,7 +1934,12 @@
             mountSelect(page, 'tklog', { options: [{ value: '', label: 'Off' }, ...chOpts(DATA.channels)], value: t.logChannel || '', placeholder: 'Off' });
             mountSelect(page, 'tkroles', { multi: true, options: roOpts(DATA.roles), value: t.supportRoles || [], placeholder: 'Support roles…' });
             mountSelect(page, 'tkpost', { options: chOpts(DATA.channels), placeholder: 'Pick a channel…' });
-            const card = setupCardEditor(page, 'tp', t.panel || {});
+            const card = setupCardEditor(page, 'tp', t.panel || {}, {
+                extras: t.topics?.length
+                    ? [{ type: 'select', label: 'Choose a topic…' }]
+                    : [{ type: 'buttons', labels: ['Open a ticket'], color: 'primary' }],
+                plain: 'Pick a topic below to open a ticket.',
+            });
 
             const tpEl = $('#topics', page);
             // Re-renders rebuild from `topics`, so typed-but-unsaved input
@@ -1946,7 +2006,10 @@
             mountSelect(page, 'cprole', { options: roOpts(DATA.roles), value: c.roleId || '', placeholder: 'Pick a role…' });
             mountSelect(page, 'cplog', { options: [{ value: '', label: 'Off' }, ...chOpts(DATA.channels)], value: c.logChannel || '', placeholder: 'Off' });
             mountSelect(page, 'cppost', { options: chOpts(DATA.channels), placeholder: 'Pick a channel…' });
-            const card = setupCardEditor(page, 'cp', c.panel || {});
+            const card = setupCardEditor(page, 'cp', c.panel || {}, {
+                extras: [{ type: 'buttons', labels: ['Verify'], color: 'success' }],
+                plain: 'Click **Verify** to prove you\'re human.',
+            });
 
             $('#post-panel', page).onclick = async (e) => {
                 const status = $('#post-status', page);
@@ -1994,7 +2057,10 @@
             mountSelect(page, 'vmtrig', { options: [{ value: '', label: 'Off' }, ...(DATA.voice || []).map((c) => ({ value: c.id, label: c.name, icon: '🔊' }))], value: v.triggerId || '', placeholder: 'Pick a voice channel…' });
             mountSelect(page, 'vmcat', { options: [{ value: '', label: 'Same as trigger' }, ...(DATA.categories || []).map((c) => ({ value: c.id, label: c.name, icon: '▤' }))], value: v.categoryId || '', placeholder: 'Same as trigger' });
             mountSelect(page, 'vmpost', { options: chOpts(DATA.channels), placeholder: 'Pick a channel…' });
-            const card = setupCardEditor(page, 'vmp', v.panel || {});
+            const card = setupCardEditor(page, 'vmp', v.panel || {}, {
+                extras: VM_EXTRAS,
+                plain: 'Join the trigger channel to get your own voice channel — manage it with the buttons below or by typing `.vc` in its chat.',
+            });
 
             $('#post-panel', page).onclick = async (e) => {
                 const status = $('#post-status', page);
