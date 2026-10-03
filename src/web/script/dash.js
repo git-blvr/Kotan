@@ -265,6 +265,8 @@
     let CTX = null;           // {guild, settings, modules, commands}
     const DATA = { channels: [], roles: [] };
     let rangeDays = 30;       // overview range pill selection
+    let actDays = 30;         // activity page range pill selection
+    const actFilter = { q: '', roles: [] }; // activity name/id search + role picks
     const pulseOn = new Set(['commands', 'joins', 'mod']);
 
     const fmtDelta = (cur, prev) => {
@@ -345,6 +347,7 @@
     const NAV = [
         { group: 'General', items: [
             ['overview', svg('<path d="M3 12h4l2.5-7 4 14 2.5-7H21"/>'), 'Overview'],
+            ['activity', svg('<circle cx="12" cy="13" r="8.5"/><path d="M12 9.5V13l2.5 2.5"/><path d="M9 2h6"/>'), 'Activity'],
             ['modules', svg('<rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/>'), 'Modules'],
             ['commands', svg('<path d="M5 7l4 4-4 4"/><path d="M12 17h7"/><rect x="3" y="4" width="18" height="16" rx="2"/>'), 'Commands'],
             ['triggers', svg('<path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z"/>'), 'Triggers'],
@@ -1106,6 +1109,110 @@
                 b.classList.toggle('on', s.on);
                 $('#pulse', page).innerHTML = pulseChart(PULSE);
             }));
+        },
+
+        // Activity leaderboards — messages, voice, channels and members.
+        // One fetch covers the range; filters re-render client-side.
+        async activity(page) {
+            const d = await api(`/api/guilds/${guildId}/activity?days=${actDays}`);
+            if (d.error) throw new Error(d.error);
+            const mem = d.members || {};
+            const users = d.users || {};
+            const chans = d.channels || {};
+
+            // Voice totals are stored as minutes — render "Xh Ym".
+            const fmtV = (mins) => (mins >= 60 ? `${Math.floor(mins / 60)}h${mins % 60 ? ` ${mins % 60}m` : ''}` : `${mins}m`);
+            const boards = {
+                messages: Object.entries(users).map(([id, u]) => ({ id, v: u.msg || 0 })).filter((e) => e.v > 0).sort((a, b) => b.v - a.v),
+                voice: Object.entries(users).map(([id, u]) => ({ id, v: u.voice || 0 })).filter((e) => e.v > 0).sort((a, b) => b.v - a.v),
+                members: Object.entries(users)
+                    .map(([id, u]) => ({ id, msg: u.msg || 0, voice: u.voice || 0, v: (u.msg || 0) + (u.voice || 0) }))
+                    .filter((e) => e.v > 0).sort((a, b) => b.v - a.v),
+                channels: Object.entries(chans).map(([id, v]) => ({ id, v })).sort((a, b) => b.v - a.v),
+            };
+
+            const memberOk = (id) => {
+                const q = actFilter.q.toLowerCase();
+                const m = mem[id];
+                if (actFilter.roles.length && !(m?.roles || []).some((r) => actFilter.roles.includes(r))) return false;
+                if (!q) return true;
+                return id.includes(q) || (m?.name || '').toLowerCase().includes(q) || (m?.user || '').toLowerCase().includes(q);
+            };
+            const chanOk = (id) => {
+                const q = actFilter.q.toLowerCase();
+                return !q || id.includes(q) || chName(id).toLowerCase().includes(q);
+            };
+
+            const avatar = (id) => {
+                const m = mem[id];
+                return m?.avatar
+                    ? `<img class="lbav" src="${m.avatar}" alt="" loading="lazy">`
+                    : `<span class="lbav no">${esc((m?.name || m?.user || '?')[0].toUpperCase())}</span>`;
+            };
+            const urow = (e, i, val) => {
+                const m = mem[e.id] || {};
+                const shown = m.name || m.user || e.id;
+                return `<div class="lbrow"><span class="rank">${i + 1}</span>${avatar(e.id)}
+                    <span class="lbname" title="${esc(e.id)}">${esc(shown)}${m.user && shown !== m.user ? `<span class="lbtag">@${esc(m.user)}</span>` : ''}</span>
+                    <span class="lbval">${val}</span></div>`;
+            };
+            const crow = (e, i) => `<div class="lbrow"><span class="rank">${i + 1}</span><span class="lbav chan">#</span>
+                <span class="lbname" title="${esc(e.id)}">${esc(chName(e.id))}</span>
+                <span class="lbval">${e.v.toLocaleString()} msgs</span></div>`;
+
+            const BOXES = [
+                { key: 'messages', title: 'Messages', rows: () => boards.messages.filter((e) => memberOk(e.id)), row: (e, i) => urow(e, i, e.v.toLocaleString()) },
+                { key: 'voice', title: 'Voice', rows: () => boards.voice.filter((e) => memberOk(e.id)), row: (e, i) => urow(e, i, fmtV(e.v)) },
+                { key: 'channels', title: 'Channels', rows: () => boards.channels.filter((e) => chanOk(e.id)), row: crow },
+                { key: 'members', title: 'Members', rows: () => boards.members.filter((e) => memberOk(e.id)), row: (e, i) => urow(e, i, `${e.msg.toLocaleString()} msgs · ${fmtV(e.voice)}`) },
+            ];
+
+            page.innerHTML = `
+                <div><div class="page-title">Activity</div>
+                    <p class="page-desc">Who's active and where — every message, voice minute, join and leave is counted live.</p></div>
+                <div class="card actbar">
+                    <input type="text" id="actq" placeholder="Filter by name or ID…" value="${esc(actFilter.q)}">
+                    ${selSlot('actroles')}
+                    <div class="rpills">${[7, 14, 30, 90].map((dd) => `<button class="rpill${dd === actDays ? ' on' : ''}" data-d="${dd}">${dd}d</button>`).join('')}</div>
+                </div>
+                <div class="actgrid">${BOXES.map((b) => `
+                    <div class="card actbox">
+                        <div class="ph"><h3>${b.title}</h3>${b.key === 'members' ? `<span class="muted small">+${d.joins || 0} joined · −${d.leaves || 0} left</span>` : ''}</div>
+                        <div class="lrows" data-box="${b.key}"></div>
+                        <button class="seeall" data-see="${b.key}">See all</button>
+                    </div>`).join('')}
+                </div>`;
+
+            const rolesel = mountSelect(page, 'actroles', { multi: true, options: roOpts(DATA.roles), value: actFilter.roles, placeholder: 'All roles' });
+
+            const renderBoxes = () => {
+                for (const b of BOXES) {
+                    const rows = b.rows();
+                    $(`[data-box="${b.key}"]`, page).innerHTML = rows.length
+                        ? rows.slice(0, 10).map(b.row).join('')
+                        : '<div class="empty-state">No activity in this range yet</div>';
+                    $(`[data-see="${b.key}"]`, page).textContent = `See all (${rows.length})`;
+                }
+            };
+
+            const seeAll = (key) => {
+                const b = BOXES.find((x) => x.key === key);
+                const rows = b.rows();
+                const ov = document.createElement('div');
+                ov.className = 'overlay';
+                ov.innerHTML = `<div class="modal actmodal">
+                    <div class="ph"><h3>${b.title} · last ${actDays} days</h3><span class="chip">${rows.length}</span></div>
+                    <div class="lrows modal-lrows">${rows.length ? rows.map(b.row).join('') : '<div class="empty-state">No activity in this range yet</div>'}</div>
+                    <div class="actions"><button class="btn" data-x>Close</button></div></div>`;
+                ov.addEventListener('click', (e) => { if (e.target === ov || e.target.hasAttribute('data-x')) ov.remove(); });
+                document.body.appendChild(ov);
+            };
+
+            $('#actq', page).oninput = (e) => { actFilter.q = e.target.value.trim(); renderBoxes(); };
+            rolesel?.addEventListener('change', () => { actFilter.roles = rolesel.get(); renderBoxes(); });
+            $$('.rpill', page).forEach((b) => (b.onclick = () => { actDays = +b.dataset.d; PAGES.activity(page); }));
+            $$('.seeall', page).forEach((b) => (b.onclick = () => seeAll(b.dataset.see)));
+            renderBoxes();
         },
 
         async modules(page) {

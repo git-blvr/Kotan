@@ -9,6 +9,7 @@ module.exports = {
     name: Events.GuildMemberRemove,
     async execute(member, client) {
         db.trackMemberCount(member.guild.id, member.guild.memberCount).catch(() => {});
+        db.trackMemberLeave(member.guild.id);
         const settings = await db.getGuildSettings(member.guild.id).catch(() => null);
         if (!settings) return;
 

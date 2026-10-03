@@ -33,6 +33,19 @@ function heartbeat(client) {
     db.writeHeartbeat(client).catch((err) => logger.warn('Heartbeat write failed:', err.message));
 }
 
+// Credits one voice minute to every member connected to a voice channel,
+// then flushes the activity buffer — one minute granularity for the
+// dashboard's voice leaderboard, no per-event bookkeeping needed.
+function sweepVoice(client) {
+    for (const guild of client.guilds.cache.values()) {
+        const ids = [];
+        for (const vs of guild.voiceStates.cache.values())
+            if (vs.channelId && !vs.member?.user.bot) ids.push(vs.id);
+        if (ids.length) db.trackVoiceMinutes(guild.id, ids);
+    }
+    db.flushActivity().catch(() => {});
+}
+
 function startTasks(client) {
     checkExpiredTempbans(client).catch((err) => logger.error('Tempban check failed', err));
     snapshotMemberCounts(client);
@@ -46,6 +59,9 @@ function startTasks(client) {
     memberSnap.unref?.();
     const hb = setInterval(() => heartbeat(client), 60_000);
     hb.unref?.();
+    sweepVoice(client);
+    const act = setInterval(() => sweepVoice(client), 60_000);
+    act.unref?.();
 }
 
 module.exports = { startTasks, checkExpiredTempbans };

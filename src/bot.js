@@ -16,6 +16,7 @@ const client = new Client({
         GatewayIntentBits.MessageContent, // privileged: required for prefix commands
         GatewayIntentBits.GuildModeration, // ban/unban events
         GatewayIntentBits.GuildMessageReactions, // reaction roles
+        GatewayIntentBits.GuildVoiceStates, // voice-state events + activity voice tracking
     ],
     // Reaction roles and delete/edit logging need events for uncached
     // messages too — partials deliver them with .fetch() on demand.
@@ -38,7 +39,6 @@ const client = new Client({
         },
         // unused managers — never cache
         ThreadManager: 0,
-        VoiceStateManager: 0,
         PresenceManager: 0,
         ReactionManager: 0,
         ReactionUserManager: 0,
@@ -112,6 +112,7 @@ async function shutdown(signal, code = 0) {
     logger.warn(`${signal} received — destroying client and flushing storage`);
     try {
         client.destroy();
+        await db.flushActivity().catch(() => {});
         await db.closeDatabase();
     } catch (err) {
         logger.error('Error during shutdown:', err);

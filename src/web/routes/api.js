@@ -207,6 +207,39 @@ module.exports = async (app) => {
             return reply.send({ usage, growth, mod, audit, recent, ping: req.client?.ws.ping ?? -1 });
         });
 
+        // Activity page leaderboards — per-user message/voice totals and
+        // per-channel message volume over the last `days` days. Member
+        // info comes along so the page can filter by name/id/role without
+        // a second round-trip per row.
+        gg.get('/activity', { preHandler: rateLimit({ max: 30 }) }, async (req, reply) => {
+            const days = Math.min(Math.max(parseInt(req.query.days, 10) || 30, 1), 90);
+            const data = await db.getActivity(req.guild.id, days);
+            const info = (m) => ({
+                name: m.displayName,
+                user: m.user?.username || '',
+                avatar: m.displayAvatarURL({ size: 64 }),
+                color: m.displayHexColor === '#000000' ? null : m.displayHexColor,
+                roles: m.roles.cache.map((r) => r.id).filter((id) => id !== req.guild.id),
+            });
+            const members = {};
+            const missing = [];
+            for (const id of Object.keys(data.users)) {
+                const m = req.guild.members.cache.get(id);
+                if (m) members[id] = info(m);
+                else missing.push(id);
+            }
+            // Resolve the rest — capped so a wide range can't turn one
+            // page load into hundreds of member requests. Rows left
+            // unresolved fall back to showing the raw ID client-side.
+            if (missing.length) {
+                const got = await req.guild.members
+                    .fetch({ user: missing.slice(0, 300), time: 15_000 })
+                    .catch(() => null);
+                if (got?.values) for (const m of got.values()) members[m.id] = info(m);
+            }
+            return reply.send({ days, ...data, members });
+        });
+
         gg.post('/settings', { preHandler: mutLimit }, async (req, reply) => {
             const { section, fields } = req.body || {};
             const result = await settings.applySection(req.guild.id, req.session.user.id, String(section || ''), fields);

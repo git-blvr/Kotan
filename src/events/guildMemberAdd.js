@@ -11,6 +11,7 @@ module.exports = {
     name: Events.GuildMemberAdd,
     async execute(member, client) {
         db.trackMemberCount(member.guild.id, member.guild.memberCount).catch(() => {});
+        db.trackMemberJoin(member.guild.id);
         const settings = await db.getGuildSettings(member.guild.id).catch(() => null);
         if (!settings) return;
 

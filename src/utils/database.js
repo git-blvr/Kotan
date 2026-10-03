@@ -65,10 +65,11 @@ const meta = createStore('meta'); // process heartbeat for the website's status 
 const sessions = createStore('sessions'); // website login sessions
 const tickets = createStore('tickets');   // open ticket channels per guild
 const afk = createStore('afk');           // per-member away status + ping log
+const activity = createStore('activity'); // per-day activity aggregates (dashboard Activity page)
 
 // A store error (Redis disconnect, disk failure) must never crash the process.
 // @keyv/redis reconnects automatically; SQLite is in-process and won't drop.
-for (const store of [profiles, warns, tempbans, guilds, usage, tags, audit, meta, sessions, tickets, afk]) {
+for (const store of [profiles, warns, tempbans, guilds, usage, tags, audit, meta, sessions, tickets, afk, activity]) {
     store.on('error', (err) => logger.error(`Storage error in "${store.namespace}":`, err));
 }
 if (sharedRedis) sharedRedis.on('error', (err) => logger.error('Redis error:', err));
@@ -402,6 +403,97 @@ async function getModActivity(guildId, days = 14) {
         tempbansWeek: t.week,
         tempbansPrevWeek: t.prevWeek,
     };
+}
+
+// ---------- member activity (dashboard Activity page) ----------
+
+// Per-day docs keyed `${guildId}:${YYYY-MM-DD}`:
+//   { msg: {userId: n}, chan: {channelId: n}, voice: {userId: minutes},
+//     joins: n, leaves: n }
+// Events land in an in-memory buffer flushed on a timer — a read-modify-
+// write per message would lose counts under concurrency and hammer the
+// store on busy guilds.
+const ACT_KEEP_DAYS = 90;
+const actBuf = new Map();   // `${guildId}:${day}` -> delta doc
+const actPruned = new Map(); // guildId -> dayKey it was last pruned
+
+const bump = (o, k, n = 1) => { o[k] = (o[k] || 0) + n; };
+const actSlot = (guildId) => {
+    const k = `${guildId}:${dayKey(Date.now())}`;
+    let d = actBuf.get(k);
+    if (!d) actBuf.set(k, (d = { msg: {}, chan: {}, voice: {}, joins: 0, leaves: 0 }));
+    return d;
+};
+
+function trackMessage(guildId, channelId, userId) {
+    const d = actSlot(guildId);
+    bump(d.msg, userId);
+    bump(d.chan, channelId);
+}
+
+// Each listed user gains one voice minute — called by the per-minute sweep.
+function trackVoiceMinutes(guildId, userIds) {
+    const d = actSlot(guildId);
+    for (const u of userIds) bump(d.voice, u);
+}
+
+function trackMemberJoin(guildId) { actSlot(guildId).joins++; }
+function trackMemberLeave(guildId) { actSlot(guildId).leaves++; }
+
+// Day docs older than retention are deleted — once per guild per day, run
+// off the flush so it costs nothing on the event path.
+async function pruneActivity(guildId) {
+    const today = dayKey(Date.now());
+    if (actPruned.get(guildId) === today) return;
+    actPruned.set(guildId, today);
+    const cutoff = dayKey(Date.now() - ACT_KEEP_DAYS * DAY);
+    for await (const [k] of activity.iterator())
+        if (k.startsWith(`${guildId}:`) && k.slice(guildId.length + 1) < cutoff) await activity.delete(k);
+}
+
+// Merges each buffered day-delta into its stored doc. Serialized via
+// actFlushing — a second timer tick while one is mid-write just returns.
+let actFlushing = false;
+async function flushActivity() {
+    if (actFlushing || !actBuf.size) return;
+    actFlushing = true;
+    try {
+        for (const [k, delta] of actBuf) {
+            actBuf.delete(k);
+            try {
+                const doc = (await activity.get(k)) || { msg: {}, chan: {}, voice: {}, joins: 0, leaves: 0 };
+                for (const [u, n] of Object.entries(delta.msg)) bump(doc.msg, u, n);
+                for (const [c, n] of Object.entries(delta.chan)) bump(doc.chan, c, n);
+                for (const [u, n] of Object.entries(delta.voice)) bump(doc.voice, u, n);
+                doc.joins = (doc.joins || 0) + delta.joins;
+                doc.leaves = (doc.leaves || 0) + delta.leaves;
+                await activity.set(k, doc);
+                await pruneActivity(k.slice(0, k.indexOf(':')));
+            } catch { /* stats — a lost delta is fine */ }
+        }
+    } finally { actFlushing = false; }
+}
+
+// Per-user and per-channel totals over the last `days` days (today counts).
+// `users` comes back as { userId: {msg, voice} } — the API layer resolves
+// names/roles against the guild. The unflushed buffer is folded in so the
+// dashboard never sits a flush-interval behind.
+async function getActivity(guildId, days = 30) {
+    const cutoff = dayKey(Date.now() - (days - 1) * DAY);
+    const out = { users: {}, channels: {}, joins: 0, leaves: 0 };
+    const merge = (doc) => {
+        if (!doc) return;
+        for (const [u, n] of Object.entries(doc.msg || {})) (out.users[u] ||= { msg: 0, voice: 0 }).msg += n;
+        for (const [u, n] of Object.entries(doc.voice || {})) (out.users[u] ||= { msg: 0, voice: 0 }).voice += n;
+        for (const [c, n] of Object.entries(doc.chan || {})) out.channels[c] = (out.channels[c] || 0) + n;
+        out.joins += doc.joins || 0;
+        out.leaves += doc.leaves || 0;
+    };
+    for await (const [k, doc] of activity.iterator())
+        if (k.startsWith(`${guildId}:`) && k.slice(guildId.length + 1) >= cutoff) merge(doc);
+    for (const [k, delta] of actBuf)
+        if (k.startsWith(`${guildId}:`) && k.slice(guildId.length + 1) >= cutoff) merge(delta);
+    return out;
 }
 
 // ---------- economy ----------
@@ -761,5 +853,12 @@ module.exports = {
     listBlacklistedGuilds,
     writeHeartbeat,
     getHeartbeat,
+    trackMessage,
+    trackVoiceMinutes,
+    trackMemberJoin,
+    trackMemberLeave,
+    flushActivity,
+    getActivity,
     sessions,
+    activity,
 };

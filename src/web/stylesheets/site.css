@@ -42,12 +42,14 @@ a:hover { color: var(--accent-2); text-decoration: underline; }
 .btn.js-cta.nav-cta { width: 36px; height: 36px; padding: 0; justify-content: center; justify-content: safe center; border-radius: 999px; }
 .nav-cta .cta-ic { width: 16px; height: 16px; }
 .nav-links a {
-    position: relative; width: 116px; height: 36px;
+    position: relative; width: 36px; height: 36px; flex: none;
     display: flex; align-items: center; justify-content: center; justify-content: safe center;
     color: var(--text-2); font-size: 14px; font-weight: 500;
-    background: var(--panel-2); border-radius: 999px;
-    transition: color 0.35s ease, background-color 0.35s ease, transform 0.3s var(--spring);
+    background: var(--panel-2); border-radius: 999px; overflow: hidden;
+    transition: width 0.55s cubic-bezier(0.22, 1, 0.36, 1), color 0.35s ease,
+                background-color 0.35s ease, transform 0.3s var(--spring);
 }
+.nav-links a:hover, .nav-links a:focus-visible { width: 116px; }
 .nav-ic {
     position: absolute; top: 50%; left: calc(50% - 9.5px);
     width: 19px; height: 19px; transform: translateY(-50%);

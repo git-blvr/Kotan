@@ -24,6 +24,16 @@ module.exports = {
         // even an error reply or tag expansion (silent by design).
         if (message.guild && db.isGuildBlacklisted(message.guild.id)) return;
 
+        // Activity tracking — feeds the dashboard's message/channel
+        // leaderboards. Buffered in memory: a sync counter bump, not a
+        // store write. Thread messages roll up to the parent channel.
+        if (message.guild)
+            db.trackMessage(
+                message.guild.id,
+                message.channel.isThread() ? message.channel.parentId || message.channel.id : message.channel.id,
+                message.author.id
+            );
+
         const content = message.content.trim();
 
         // Per-guild settings: prefix, module toggles, disabled
