@@ -59,7 +59,7 @@ async function destroy(guildId, ch) {
 // Creates the member's personal voice channel and moves them into it.
 // One channel per member — re-joining the trigger moves them back to the
 // channel they already own.
-async function createFor(member, vm, prefix) {
+async function createFor(member, vm) {
     const guild = member.guild;
     const data = await db.getVM(guild.id);
     for (const [chId, st] of Object.entries(data.channels)) {
@@ -94,9 +94,15 @@ async function createFor(member, vm, prefix) {
         await destroy(guild.id, ch);
         return null;
     }
-    // Voice channels are text-based — this lands in the channel's own chat.
+    // Voice channels are text-based — post the control panel (card +
+    // buttons, same interface as the pinned one) into the channel's own
+    // chat, pinging the new owner via content.
     await ch
-        .send(`🎧 ${member} — this is your channel. Manage it with \`${prefix}vc\` in this chat (try \`${prefix}vc help\`) or the control panel.`)
+        .send({
+            ...(await panelPayload(guild, vm)),
+            content: `${member}`,
+            allowedMentions: { users: [member.id], roles: [], everyone: false },
+        })
         .catch(() => {});
     return ch;
 }
@@ -111,7 +117,7 @@ async function handleVoiceUpdate(oldState, newState) {
     const s = await db.getGuildSettings(guild.id).catch(() => null);
     const vm = s?.voicemaster;
     if (vm?.enabled && vm.triggerId && joined === vm.triggerId)
-        await createFor(newState.member, vm, s.prefix || config.prefix)
+        await createFor(newState.member, vm)
             .catch((e) => logger.warn(`voicemaster create failed: ${e.message}`));
     if (left && left !== joined) {
         const ch = oldState.channel;
