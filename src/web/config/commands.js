@@ -42,4 +42,5 @@ module.exports = [
     { name: 'color', description: 'Extracts the dominant color of an image attachment or a user\'s avatar.', module: 'tools' },
     { name: 'ping', description: 'Shows the bot\'s response time and websocket latency.', module: 'tools' },
     { name: 'serverinfo', description: 'Shows information about this server.', module: 'tools' },
+    { name: 'voicemaster', description: 'Controls your personal voice channel — ".voicemaster help" lists every action.', module: 'tools' },
 ];

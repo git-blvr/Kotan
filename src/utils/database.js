@@ -66,10 +66,11 @@ const sessions = createStore('sessions'); // website login sessions
 const tickets = createStore('tickets');   // open ticket channels per guild
 const afk = createStore('afk');           // per-member away status + ping log
 const activity = createStore('activity'); // per-day activity aggregates (dashboard Activity page)
+const voicemaster = createStore('voicemaster'); // temp voice channels: owner, trusted/blocked lists
 
 // A store error (Redis disconnect, disk failure) must never crash the process.
 // @keyv/redis reconnects automatically; SQLite is in-process and won't drop.
-for (const store of [profiles, warns, tempbans, guilds, usage, tags, audit, meta, sessions, tickets, afk, activity]) {
+for (const store of [profiles, warns, tempbans, guilds, usage, tags, audit, meta, sessions, tickets, afk, activity, voicemaster]) {
     store.on('error', (err) => logger.error(`Storage error in "${store.namespace}":`, err));
 }
 if (sharedRedis) sharedRedis.on('error', (err) => logger.error('Redis error:', err));
@@ -223,6 +224,18 @@ const DEFAULT_SETTINGS = {
         // which stat cards show on Overview, in display order
         cards: ['members', 'commands', 'warns', 'tempbans'],
     },
+    // VoiceMaster — join-to-create voice channels. The trigger channel
+    // hands each member their own temporary channel; owners manage it from
+    // the panel's buttons or by typing .vc in the channel's chat.
+    voicemaster: {
+        enabled: false,
+        triggerId: null,        // "join to create" voice channel
+        categoryId: null,       // parent for created channels; null = trigger's category
+        naming: "{user}'s channel", // {user} {name} placeholders
+        userLimit: 0,           // default user limit for new channels; 0 = none
+        bitrate: 0,             // default kbps for new channels; 0 = server default
+        panel: { enabled: true, style: 'cv2', title: 'Voice channels', description: 'Join the trigger channel to get your own voice channel — manage it with the buttons below or by typing `.vc` in its chat.', color: '', colorMode: '', footer: '', thumbnail: false, thumb: '', components: [] },
+    },
     // Away-status system — .afk sets it, speaking clears it, mentioning an
     // AFK member announces it (and records the ping for `.afk pings`).
     afk: {
@@ -239,7 +252,7 @@ const DEFAULT_SETTINGS = {
 
 // Nested sections must merge key-by-key — a saved doc written before a new
 // sub-key existed shouldn't lose the defaults.
-const NESTED = ['automod', 'logging', 'welcome', 'roles', 'economy', 'leveling', 'access', 'overview', 'games', 'boosts', 'appearance', 'branding', 'shop', 'tickets', 'afk', 'captcha'];
+const NESTED = ['automod', 'logging', 'welcome', 'roles', 'economy', 'leveling', 'access', 'overview', 'games', 'boosts', 'appearance', 'branding', 'shop', 'tickets', 'afk', 'captcha', 'voicemaster'];
 
 async function getGuildSettings(guildId) {
     const hit = settingsCache.get(guildId);
@@ -785,6 +798,20 @@ async function clearAfkPings(guildId, userId) {
     await afk.set(k, rec);
 }
 
+// ---------- voicemaster ----------
+
+// Temp-channel state per guild: { channels: { chId -> { owner, trusted,
+// blocked, locked, hidden } } }. Persisted so a restart doesn't orphan
+// ownership — channel deletion is reconciled on boot by tasks.pruneVM.
+async function getVM(guildId) {
+    return (await voicemaster.get(guildId)) || { channels: {} };
+}
+
+async function saveVM(guildId, data) {
+    await voicemaster.set(guildId, data);
+    return data;
+}
+
 // ---------- tickets ----------
 
 // Open ticket state per guild: counter, channel records and a user->channel
@@ -842,6 +869,8 @@ module.exports = {
     useTag,
     getTickets,
     saveTickets,
+    getVM,
+    saveVM,
     getAfk,
     setAfk,
     clearAfk,

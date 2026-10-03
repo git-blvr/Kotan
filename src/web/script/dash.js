@@ -367,6 +367,7 @@
             ['shop', svg('<path d="M4 7l1.5-3h13L20 7"/><path d="M4 7h16v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7z"/><path d="M9 10a3 3 0 0 0 6 0"/>'), 'Shop'],
             ['games', svg('<rect x="2.5" y="7.5" width="19" height="11" rx="5.5"/><path d="M8 11v4M6 13h4"/><circle cx="15.5" cy="12" r="0.8" fill="currentColor" stroke="none"/><circle cx="18" cy="14" r="0.8" fill="currentColor" stroke="none"/>'), 'Games'],
             ['boosting', svg('<path d="M5 15c-1.5 1.3-2 5-2 5s3.7-.5 5-2"/><path d="M9 15l-2-2c.5-2.6 1.6-5.2 3.4-7C12.7 3.7 15.5 2.5 21 3c.5 5.5-.7 8.3-3 10.6-1.8 1.8-4.4 2.9-7 3.4z"/><circle cx="15" cy="9" r="1.6"/>'), 'Boosting'],
+            ['voicemaster', svg('<path d="M4 14v-2a8 8 0 0 1 16 0v2"/><rect x="3" y="14" width="4" height="6" rx="1.5"/><rect x="17" y="14" width="4" height="6" rx="1.5"/>'), 'VoiceMaster'],
         ] },
         { group: '', items: [
             ['settings', svg('<circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M4.9 4.9l2.2 2.2M16.9 16.9l2.2 2.2M2.5 12h3M18.5 12h3M4.9 19.1l2.2-2.2M16.9 7.1l2.2-2.2"/>'), 'Settings'],
@@ -1968,6 +1969,57 @@
             });
         },
 
+        async voicemaster(page) {
+            const v = CTX.settings.voicemaster || {};
+            page.innerHTML = `
+                <div><div class="page-title">VoiceMaster</div><p class="page-desc">Join-to-create voice channels — members who join the trigger channel get their own voice room and control it from the posted panel or by typing <code>.vc</code> in the channel's chat.</p></div>
+                <div class="card"><h3>Setup</h3>
+                    <div class="mb">${tgl('vm_on', 'Enable VoiceMaster', v.enabled)}</div>
+                    <div class="grid2">
+                        ${fldHtml('Trigger channel', selSlot('vmtrig'), 'joining this voice channel hands out a personal one')}
+                        ${fldHtml('Category', selSlot('vmcat'), 'new voice channels land here — empty = same as trigger')}
+                    </div>
+                    <div class="grid2">
+                        ${fldHtml('Channel naming', txtIn('vmname', v.naming, "{user}'s channel"), '{user} = username · {name} = display name')}
+                        ${fldHtml('Default user limit', numIn('vmlimit', v.userLimit, 0, 99), '0 = unlimited')}
+                    </div>
+                    ${fldHtml('Default bitrate (kbps)', numIn('vmbit', v.bitrate, 0, 384), '0 = server default — capped by the server\'s boost level')}
+                </div>
+                <div class="card"><h3>Control panel</h3><p class="sub mb">The message members control their channel from — the button grid and bitrate picker attach automatically. Owners can also type <code>.vc</code> in their channel's built-in chat.</p>
+                    ${cardEditorHtml('vmp', v.panel || {})}</div>
+                <div class="card"><h3>Post panel</h3>
+                    ${fldHtml('Channel', selSlot('vmpost'), 'sends the panel immediately — uses saved settings')}
+                    <div class="mt"><button class="btn" id="post-panel">Post panel</button> <span class="hint" id="post-status"></span></div></div>`;
+
+            mountSelect(page, 'vmtrig', { options: [{ value: '', label: 'Off' }, ...(DATA.voice || []).map((c) => ({ value: c.id, label: c.name, icon: '🔊' }))], value: v.triggerId || '', placeholder: 'Pick a voice channel…' });
+            mountSelect(page, 'vmcat', { options: [{ value: '', label: 'Same as trigger' }, ...(DATA.categories || []).map((c) => ({ value: c.id, label: c.name, icon: '▤' }))], value: v.categoryId || '', placeholder: 'Same as trigger' });
+            mountSelect(page, 'vmpost', { options: chOpts(DATA.channels), placeholder: 'Pick a channel…' });
+            const card = setupCardEditor(page, 'vmp', v.panel || {});
+
+            $('#post-panel', page).onclick = async (e) => {
+                const status = $('#post-status', page);
+                const channel = mounts.vmpost.get();
+                if (!channel) { status.textContent = '— pick a channel first'; return; }
+                e.target.disabled = true;
+                const r = await api(`/api/guilds/${guildId}/voicemaster/panel`, { body: { channel } }).catch(() => null);
+                e.target.disabled = false;
+                status.textContent = r?.ok ? '— posted!' : `— ${r?.error || 'failed (save your settings first)'}`;
+            };
+
+            bindSave(page, 'voicemaster', (el) => {
+                const f = formVals(el);
+                return {
+                    enabled: !!f.vm_on,
+                    triggerId: mounts.vmtrig.get() || null,
+                    categoryId: mounts.vmcat.get() || null,
+                    naming: f.vmname,
+                    userLimit: +f.vmlimit || 0,
+                    bitrate: +f.vmbit || 0,
+                    panel: card.collect(f),
+                };
+            });
+        },
+
         async boosting(page) {
             const b = CTX.settings.boosts;
             page.innerHTML = `
@@ -2154,6 +2206,7 @@
             const [ch, ro] = await Promise.all([api(`/api/guilds/${guildId}/channels`), api(`/api/guilds/${guildId}/roles`)]);
             DATA.channels = ch.channels || [];
             DATA.categories = ch.categories || [];
+            DATA.voice = ch.voice || [];
             DATA.roles = ro.roles || [];
         }
         // shell() rebuilds the sidebar — keep the nav's scroll position so

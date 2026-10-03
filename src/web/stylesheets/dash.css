@@ -680,3 +680,6 @@ html { scroll-behavior: smooth; }
 .modal.actmodal{max-width:560px}
 .modal-lrows{max-height:60vh;overflow-y:auto;margin:var(--s3) 0 var(--s4)}
 @media (max-width:1100px){.actgrid{grid-template-columns:1fr}}
+
+/* Inline code chips inside page copy (.vc, commands) — pill, matches chips. */
+.dpage .page-desc code,.dpage .card .sub code{font-family:var(--mono);font-size:.92em;color:var(--accent-2);background:var(--panel-2);border:1px solid var(--border-soft);padding:1px 7px;border-radius:999px}

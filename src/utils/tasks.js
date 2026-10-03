@@ -48,6 +48,12 @@ function sweepVoice(client) {
 
 function startTasks(client) {
     checkExpiredTempbans(client).catch((err) => logger.error('Tempban check failed', err));
+    // Reconcile voicemaster state after a restart — drop records for gone
+    // channels, delete empty managed ones. Delayed: voice states stream in
+    // via GUILD_CREATE after ready, so an early sweep would see occupied
+    // channels as empty and delete them.
+    const vmp = setTimeout(() => require('./voicemaster').prune(client).catch((err) => logger.warn(`voicemaster prune failed: ${err.message}`)), 20_000);
+    vmp.unref?.();
     snapshotMemberCounts(client);
     heartbeat(client);
     const interval = setInterval(

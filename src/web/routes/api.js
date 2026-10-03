@@ -12,6 +12,7 @@ const settings = require('../settings');
 const guildData = require('../guildData');
 const tickets = require('../../utils/tickets');
 const captcha = require('../../utils/captcha');
+const voicemaster = require('../../utils/voicemaster');
 const { dominantColor, toHex, ALLOWED_IMAGE_HOSTS } = require('../../utils/dominantColor');
 const commands = require('../config/commands');
 const modules = require('../config/modules');
@@ -149,7 +150,19 @@ module.exports = async (app) => {
         }));
 
         gg.get('/channels', (req, reply) =>
-            reply.send({ channels: guildData.guildChannels(req.guild), categories: guildData.guildCategories(req.guild) }));
+            reply.send({ channels: guildData.guildChannels(req.guild), categories: guildData.guildCategories(req.guild), voice: guildData.guildVoiceChannels(req.guild) }));
+
+        // Posts the voicemaster control panel — same "Post panel" pattern
+        // as tickets/captcha.
+        gg.post('/voicemaster/panel', { preHandler: mutLimit }, async (req, reply) => {
+            const ch = req.guild.channels.cache.get(String(req.body?.channel || ''));
+            if (!ch || !ch.isTextBased()) return reply.code(400).send({ error: 'Unknown channel' });
+            const v = (await settings.getSettings(req.guild.id)).voicemaster;
+            if (!v?.enabled) return reply.code(400).send({ error: 'VoiceMaster is disabled — enable and save first' });
+            if (!v.triggerId) return reply.code(400).send({ error: 'Pick a trigger channel first' });
+            await ch.send(await voicemaster.panelPayload(req.guild, v)).catch(() => {});
+            return reply.send({ ok: true });
+        });
 
         // Posts the ticket panel into a channel — used by the dashboard's
         // "Post panel" button so setup is fully web-side.

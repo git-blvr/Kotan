@@ -12,6 +12,20 @@ const { gateCommand } = require('../helpers/commandGate');
 module.exports = {
     name: Events.InteractionCreate,
     async execute(interaction, client) {
+        // Modal submits route by custom id just like components, into
+        // command.executeModal — e.g. the voicemaster rename modal.
+        if (interaction.isModalSubmit()) {
+            const command = client.commands.get(interaction.customId.split(':')[0]);
+            if (!command?.executeModal) return;
+            try {
+                await command.executeModal(interaction, client);
+            } catch (err) {
+                logger.error(`Modal "${interaction.customId}" failed:`, err);
+                sentry.capture(err);
+            }
+            return;
+        }
+
         // Component interactions (select menus etc.) route by custom id:
         // "<command>:<step>:<ownerId>:<data>" -> command.executeComponent.
         if (interaction.isMessageComponent()) {

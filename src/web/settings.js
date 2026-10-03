@@ -60,9 +60,14 @@ const DEFAULTS = {
         enabled: false, roleId: null, logChannel: null,
         panel: { enabled: true, style: 'cv2', title: 'Verification required', description: 'This server is protected — click **Verify** below and pick the characters you see.', color: '', colorMode: '', footer: '', thumbnail: false, thumb: '', components: [] },
     },
+    voicemaster: {
+        enabled: false, triggerId: null, categoryId: null,
+        naming: "{user}'s channel", userLimit: 0, bitrate: 0,
+        panel: { enabled: true, style: 'cv2', title: 'Voice channels', description: 'Join the trigger channel to get your own voice channel — manage it with the buttons below or by typing `.vc` in its chat.', color: '', colorMode: '', footer: '', thumbnail: false, thumb: '', components: [] },
+    },
 };
 
-const NESTED = ['automod', 'logging', 'welcome', 'roles', 'economy', 'leveling', 'access', 'overview', 'games', 'boosts', 'appearance', 'branding', 'shop', 'tickets', 'afk', 'captcha'];
+const NESTED = ['automod', 'logging', 'welcome', 'roles', 'economy', 'leveling', 'access', 'overview', 'games', 'boosts', 'appearance', 'branding', 'shop', 'tickets', 'afk', 'captcha', 'voicemaster'];
 
 async function getSettings(guildId) {
     const s = await db.getGuildSettings(guildId);
@@ -71,6 +76,7 @@ async function getSettings(guildId) {
     // Second level — the embed payloads inside `welcome` are objects too.
     merged.welcome.embed = { ...DEFAULTS.welcome.embed, ...(s.welcome?.embed || {}) };
     merged.welcome.goodbyeEmbed = { ...DEFAULTS.welcome.goodbyeEmbed, ...(s.welcome?.goodbyeEmbed || {}) };
+    merged.voicemaster.panel = { ...DEFAULTS.voicemaster.panel, ...(s.voicemaster?.panel || {}) };
     // Shop: translate the old fixed `categories` shape into `sections` on the
     // way out — the dashboard only ever sees the current shape.
     merged.shop = normalizeShop(merged.shop);
@@ -384,6 +390,26 @@ const SECTIONS = {
                 .filter((t) => t.name);
         if (f.panel) {
             const err = SECTIONS.welcomeEmbed(s.tickets.panel, f.panel, true);
+            if (err) return err;
+        }
+    },
+    voicemaster(s, f) {
+        if (f.enabled !== undefined) s.voicemaster.enabled = bool(f.enabled);
+        if (f.triggerId !== undefined) {
+            const v = optSnowflake(f.triggerId);
+            if (v === undefined) return 'Invalid trigger channel';
+            s.voicemaster.triggerId = v;
+        }
+        if (f.categoryId !== undefined) {
+            const v = optSnowflake(f.categoryId);
+            if (v === undefined) return 'Invalid category';
+            s.voicemaster.categoryId = v;
+        }
+        if (f.naming !== undefined) s.voicemaster.naming = str(f.naming, 60) || "{user}'s channel";
+        if (f.userLimit !== undefined) s.voicemaster.userLimit = num(f.userLimit, 0, 99, 0);
+        if (f.bitrate !== undefined) s.voicemaster.bitrate = num(f.bitrate, 0, 384, 0);
+        if (f.panel) {
+            const err = SECTIONS.welcomeEmbed(s.voicemaster.panel, f.panel, true);
             if (err) return err;
         }
     },
