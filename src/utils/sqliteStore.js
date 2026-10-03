@@ -40,9 +40,16 @@ function loadKey(dbFile) {
     return key;
 }
 
+// Lazily resolved so value encryption also works on the Redis backend, where
+// connect() never runs — same DB_KEY / data/.dbkey source either way.
+function getKey() {
+    if (!KEY) KEY = loadKey(path.join(__dirname, '..', '..', 'data', 'kotan.sqlite'));
+    return KEY;
+}
+
 function encrypt(plaintext) {
     const iv = crypto.randomBytes(12);
-    const cipher = crypto.createCipheriv('aes-256-gcm', KEY, iv);
+    const cipher = crypto.createCipheriv('aes-256-gcm', getKey(), iv);
     const data = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
     return PREFIX + Buffer.concat([iv, cipher.getAuthTag(), data]).toString('base64');
 }
@@ -53,7 +60,7 @@ function decrypt(stored) {
     const iv = raw.subarray(0, 12);
     const tag = raw.subarray(12, 28);
     const data = raw.subarray(28);
-    const decipher = crypto.createDecipheriv('aes-256-gcm', KEY, iv);
+    const decipher = crypto.createDecipheriv('aes-256-gcm', getKey(), iv);
     decipher.setAuthTag(tag);
     return Buffer.concat([decipher.update(data), decipher.final()]).toString('utf8');
 }
@@ -138,3 +145,8 @@ class SqliteStore {
 }
 
 module.exports = SqliteStore;
+// Value-layer crypto, shared with database.js so the Redis backend gets the
+// same AES-256-GCM at-rest encryption the SQLite adapter applies internally.
+module.exports.ENC_PREFIX = PREFIX;
+module.exports.encryptValue = encrypt;
+module.exports.decryptValue = decrypt;

@@ -12,7 +12,7 @@ const settings = require('../settings');
 const guildData = require('../guildData');
 const tickets = require('../../utils/tickets');
 const captcha = require('../../utils/captcha');
-const { dominantColor, toHex } = require('../../utils/dominantColor');
+const { dominantColor, toHex, ALLOWED_IMAGE_HOSTS } = require('../../utils/dominantColor');
 const commands = require('../config/commands');
 const modules = require('../config/modules');
 
@@ -47,8 +47,9 @@ const isWebp = (b) => b.length > 12 && b.toString('latin1', 0, 4) === 'RIFF' && 
 const magicOk = (ext, buf) => (ext === 'webp' ? isWebp(buf) : (MAGIC[ext] || []).every((v, i) => buf[i] === v));
 
 // Dominant-color extraction is a server-side fetch — the host allowlist
-// keeps it from becoming an open proxy (same hosts the dashboard CSP shows).
-const DOM_COLOR_HOSTS = /^(cdn\.discordapp\.com|media\.discordapp\.net|images-ext-\d+\.discordapp\.net|i\.imgur\.com)$/;
+// keeps it from becoming an open proxy (same hosts the dashboard CSP shows,
+// enforced again inside dominantColor against redirect escape).
+const DOM_COLOR_HOSTS = ALLOWED_IMAGE_HOSTS;
 
 module.exports = async (app) => {
     app.addHook('preHandler', rateLimit({ max: 240 }));
@@ -249,8 +250,11 @@ module.exports = async (app) => {
                 return reply.code(500).send({ ok: false, error: e.message });
             }
         };
-        gg.post('/branding/avatar', { preHandler: uploadLimit }, brandUpload('avatar'));
-        gg.post('/branding/banner', { preHandler: uploadLimit }, brandUpload('banner'));
+        // Upload routes carry multi-MB base64 bodies — the global 256KB
+        // bodyLimit would reject them, so they get their own caps. Keep the
+        // global tight everywhere else.
+        gg.post('/branding/avatar', { preHandler: uploadLimit, bodyLimit: 5_000_000 }, brandUpload('avatar'));
+        gg.post('/branding/banner', { preHandler: uploadLimit, bodyLimit: 5_000_000 }, brandUpload('banner'));
         gg.delete('/branding/avatar', { preHandler: uploadLimit }, brandClear('avatar'));
         gg.delete('/branding/banner', { preHandler: uploadLimit }, brandClear('banner'));
 
@@ -258,7 +262,7 @@ module.exports = async (app) => {
         // served back through /bg (kept out of src/web so uploads aren't source files).
         const BG_DIR = path.join(__dirname, '..', '..', '..', 'data', 'bgs');
         const bgFile = (gid) => (fs.existsSync(BG_DIR) ? fs.readdirSync(BG_DIR).find((f) => f.startsWith(`${gid}.`)) : null);
-        gg.post('/appearance/bg', { preHandler: uploadLimit }, async (req, reply) => {
+        gg.post('/appearance/bg', { preHandler: uploadLimit, bodyLimit: 9_000_000 }, async (req, reply) => {
             const dataUrl = String(req.body?.image || '');
             const m = /^data:image\/(png|jpe?g|webp|gif);base64,([a-z0-9+/=\s]+)$/i.exec(dataUrl);
             if (!m || dataUrl.length > 8_000_000)

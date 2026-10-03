@@ -54,7 +54,9 @@ async function startWebsite(client) {
         reply.headers({
             'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' https://cdn.discordapp.com https://i.imgur.com data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'",
             'X-Content-Type-Options': 'nosniff',
+            'X-Frame-Options': 'DENY', // legacy fallback for frame-ancestors
             'Referrer-Policy': 'same-origin',
+            'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
         });
         // HSTS only when the deployment actually serves HTTPS (COOKIE_SECURE
         // is the existing "production HTTPS" flag) — sending it on plain HTTP

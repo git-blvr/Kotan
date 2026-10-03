@@ -1,7 +1,9 @@
 const env = require('./env');
 const sessions = require('./sessionStore');
 
-const COOKIE = 'kotan_sid';
+// __Host- prefix when serving over HTTPS — it requires Secure + Path=/ and
+// no Domain, so a compromised sibling subdomain can't overwrite the session.
+const COOKIE = env.COOKIE_SECURE ? '__Host-kotan_sid' : 'kotan_sid';
 
 function cookieHeader(name, value, maxAgeMs) {
     const parts = [`${name}=${encodeURIComponent(value)}`, 'Path=/', 'SameSite=Lax', 'HttpOnly'];
@@ -42,6 +44,11 @@ async function requireAuthApi(req, reply) {
 // Origin/Referer would otherwise throw in new URL() and 500 the request.
 async function sameOriginOnly(req, reply) {
     if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return;
+    // Fetch Metadata marks cross-site submissions even when Origin is absent
+    // (old browsers, some fetch modes). SameSite=Lax is the primary defense —
+    // this is a hard fail for clients that volunteer the signal.
+    if (req.headers['sec-fetch-site'] === 'cross-site')
+        return reply.code(403).send({ ok: false, error: 'Cross-origin request rejected' });
     const origin = req.headers.origin || req.headers.referer;
     if (!origin) return; // same-site cookies already block cross-site POSTs
     let host;

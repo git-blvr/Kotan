@@ -265,6 +265,22 @@
 .toast.err { border-color: var(--danger); }
 @keyframes toast-in { from { transform: translateY(8px); opacity: 0; } }
 
+/* ---- unsaved-changes bar — slides up from bottom while edits pend ---- */
+.savebar {
+    position: fixed; left: 50%; bottom: var(--s5); z-index: 120;
+    display: flex; align-items: center; gap: var(--s4);
+    padding: 10px var(--s3) 10px var(--s4); max-width: calc(100vw - 24px);
+    background: var(--panel-solid); border: 1px solid var(--border);
+    border-radius: var(--r-md); box-shadow: var(--shadow-lg);
+    transform: translate(-50%, calc(100% + var(--s5) + 8px));
+    transition: transform .28s var(--ease-out);
+}
+.savebar.show { transform: translate(-50%, 0); }
+.savebar .sb-msg { font-size: 13.5px; color: var(--text-2); white-space: nowrap; }
+.savebar .sb-btns { display: flex; gap: var(--s2); flex: none; }
+/* keep the last card reachable above the floating bar */
+body.has-dirty .dpage { padding-bottom: 76px; }
+
 /* ---- modal ---- */
 .overlay {
     position: fixed; inset: 0; z-index: 150;
@@ -437,7 +453,7 @@
 
 @media (prefers-reduced-motion: reduce) {
     .dpage > *, .dnav a, .dnav-group > span, .srv, .srv img, .srv .noicon,
-    .overlay, .overlay .modal, .stat2, .modrow, .gsel {
+    .overlay, .overlay .modal, .stat2, .modrow, .gsel, .savebar {
         animation: none !important;
         transition: none !important;
         transform: none !important;
@@ -603,6 +619,7 @@ html { scroll-behavior: smooth; }
 [data-glass='1'] .pop .search,
 [data-glass='1'] .modal,
 [data-glass='1'] .toast,
+[data-glass='1'] .savebar,
 [data-glass='1'] .subnav {
     backdrop-filter: blur(18px) saturate(1.45);
     -webkit-backdrop-filter: blur(18px) saturate(1.45);

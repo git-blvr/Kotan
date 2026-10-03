@@ -13,14 +13,39 @@ const logger = require('./logger');
 let sharedRedis = null;
 let sharedDb = null;
 
+// The SQLite adapter encrypts values internally; Redis doesn't, so the Keyv
+// layer is wrapped here — values land in Redis as "v1:<base64>" AES-256-GCM
+// ciphertext under the same DB_KEY / data/.dbkey key. Keys stay plaintext
+// (namespace prefixes + snowflake ids — same trade-off as SQLite). Plaintext
+// values written before this wrapping are returned as-is; everything new is
+// encrypted, and decrypt failures surface as a miss rather than leaking.
+function wrapEncrypted(keyv) {
+    const unpack = (v) => {
+        if (typeof v !== 'string' || !v.startsWith(SqliteStore.ENC_PREFIX)) return v;
+        try { return JSON.parse(SqliteStore.decryptValue(v)); }
+        catch { return undefined; }
+    };
+    const realGet = keyv.get.bind(keyv);
+    const realSet = keyv.set.bind(keyv);
+    const realIterator = keyv.iterator?.bind(keyv);
+    keyv.get = async (k, o) => unpack(await realGet(k, o));
+    keyv.set = (k, v, ttl) => realSet(k, SqliteStore.encryptValue(JSON.stringify(v)), ttl);
+    if (realIterator) {
+        keyv.iterator = async function* (ns) {
+            for await (const [k, v] of realIterator(ns)) yield [k, unpack(v)];
+        };
+    }
+    return keyv;
+}
+
 function createStore(namespace) {
     if (process.env.REDIS_URL) {
         if (!sharedRedis) {
             const KeyvRedis = require('@keyv/redis').default;
             sharedRedis = new KeyvRedis(process.env.REDIS_URL);
-            logger.info('Database: using Redis backend');
+            logger.info('Database: using Redis backend (values encrypted at rest)');
         }
-        return new Keyv({ store: sharedRedis, namespace });
+        return wrapEncrypted(new Keyv({ store: sharedRedis, namespace }));
     }
     if (!sharedDb) {
         sharedDb = SqliteStore.connect(path.join(__dirname, '..', '..', 'data', 'kotan.sqlite'));
@@ -175,17 +200,16 @@ const DEFAULT_SETTINGS = {
         // (current behavior: only Discord-manageable users reach pages).
         sections: {},
     },
-    // CV2 item shop — homepage text plus three fixed-effect categories.
+    // CV2 item shop — storefront text plus free-form sections. Item `type`
+    // drives the effect; `id` is the item's public key (inventory entry,
+    // `shop buy <id>`, crate pool reference). Legacy `categories` docs are
+    // translated on read by helpers/inv.normalizeShop.
     shop: {
         enabled: true,
         title: 'Shop',
         description: 'Spend your coins on boosts and goodies.',
         color: '',              // accent hex; '' = brand color
-        categories: {
-            dynamic:     { name: 'Items',          items: [] }, // [{name,desc,price}]
-            multipliers: { name: 'Boosters',       items: [] }, // [{name,desc,price,kind:'coins'|'xp',mult,mins}]
-            roles:       { name: 'Roles & Crates', items: [] }, // [{name,desc,price,type:'role'|'crate',roleId|min,max}]
-        },
+        sections: [],           // [{id,name,items:[{id,name,desc,price,type,...}]}]
     },
     // Discord roles allowed to use each command module. Empty = everyone.
     moduleRoles: {},        // category -> [roleIds]

@@ -35,7 +35,20 @@ module.exports = {
     // SERVER_PORT (injected by panel hosts for the allocated public port) wins —
     // on those hosts it's the ONLY reachable port; WEB_PORT for local override.
     PORT: port,
-    COOKIE_SECURE: env.COOKIE_SECURE === 'true',
+    // Secure cookies default ON whenever SITE_URL is https — an https public
+    // URL means browsers reach the site over TLS, so a plaintext cookie can
+    // only leak. COOKIE_SECURE=false remains as an explicit escape hatch.
+    COOKIE_SECURE: (() => {
+        const v = env.COOKIE_SECURE;
+        const https = siteUrl.startsWith('https:');
+        if (v === 'true') return true;
+        if (v === 'false') {
+            if (https) console.warn('[env] SITE_URL is https but COOKIE_SECURE=false — session cookies will travel over plaintext');
+            return false;
+        }
+        if (https) console.warn('[env] COOKIE_SECURE unset — defaulting on because SITE_URL is https (set COOKIE_SECURE=false to override)');
+        return https;
+    })(),
     // How much Fastify trusts proxy headers (X-Forwarded-For → req.ip, which
     // rate limiting keys on). Default 'loopback' only trusts a proxy running
     // on this machine — a bare `true` lets ANY client spoof their IP.
@@ -44,7 +57,10 @@ module.exports = {
     TRUST_PROXY: (() => {
         const v = env.TRUST_PROXY;
         if (v == null || v === '') return 'loopback';
-        if (v === 'true') return true;
+        if (v === 'true') {
+            console.warn('[env] TRUST_PROXY=true — any client can spoof X-Forwarded-For and bypass per-IP rate limits; prefer a proxy IP/CIDR list or hop count');
+            return true;
+        }
         if (v === 'false') return false;
         if (/^\d+$/.test(v)) return Number(v);
         return v.split(',').map((s) => s.trim()).filter(Boolean);

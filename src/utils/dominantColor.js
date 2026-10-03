@@ -19,12 +19,27 @@ const SAMPLE_SIZE = 48; // image is downscaled to 48x48 before analysis — plen
 const CACHE_LIMIT = 512;
 const cache = new Map(); // url -> color int
 
+// Remote fetches only ever touch image hosts the dashboard can display —
+// enforced here (not just in the API route) because accentFor() also fetches
+// at message-send time from stored card config. Off-list URLs return null and
+// callers fall back to the card's custom hex.
+const ALLOWED_IMAGE_HOSTS = /^(cdn\.discordapp\.com|media\.discordapp\.net|images-ext-\d+\.discordapp\.net|i\.imgur\.com)$/;
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+
 async function toBuffer(input) {
     if (Buffer.isBuffer(input)) return input;
     if (typeof input === 'string' && /^https?:\/\//.test(input)) {
-        const res = await fetchRetry(input);
+        const u = new URL(input); // throws on garbage — the caller's catch maps to null
+        if (u.protocol !== 'https:' || !ALLOWED_IMAGE_HOSTS.test(u.hostname)) return null;
+        // redirect:'error' — the allowlist would be meaningless if a 30x could
+        // bounce the fetch to an internal address.
+        const res = await fetchRetry(input, { redirect: 'error', signal: AbortSignal.timeout(8_000) });
         if (!res.ok) throw new Error(`image fetch failed: ${res.status}`);
-        return Buffer.from(await res.arrayBuffer());
+        if (Number(res.headers.get('content-length')) > MAX_IMAGE_BYTES)
+            throw new Error('image too large');
+        const buf = Buffer.from(await res.arrayBuffer());
+        if (buf.length > MAX_IMAGE_BYTES) throw new Error('image too large');
+        return buf;
     }
     return input; // local path, stream, etc — loadImage handles these
 }
@@ -35,7 +50,9 @@ async function dominantColor(input) {
 
     let color = null;
     try {
-        const image = await loadImage(await toBuffer(input));
+        const buf = await toBuffer(input);
+        if (buf === null) return null;
+        const image = await loadImage(buf);
         const canvas = createCanvas(SAMPLE_SIZE, SAMPLE_SIZE);
         const ctx = canvas.getContext('2d');
         ctx.drawImage(image, 0, 0, SAMPLE_SIZE, SAMPLE_SIZE);
@@ -110,4 +127,4 @@ async function accentFor(card, src, fallback) {
     return Number.isFinite(n) ? n : fallback;
 }
 
-module.exports = { dominantColor, toHex, accentFor };
+module.exports = { dominantColor, toHex, accentFor, ALLOWED_IMAGE_HOSTS };

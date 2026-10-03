@@ -1,5 +1,6 @@
 const db = require('../utils/database');
 const { TYPES: LOG_TYPES } = require('../utils/eventlog');
+const { normalizeShop, poolTokens, slug: shopSlug } = require('../helpers/inv');
 
 // Mirrors DEFAULT_SETTINGS in src/utils/database.js — merged key-by-key so
 // docs written before a sub-key existed keep their defaults.
@@ -48,11 +49,7 @@ const DEFAULTS = {
     shop: {
         enabled: true, title: 'Shop',
         description: 'Spend your coins on boosts and goodies.', color: '',
-        categories: {
-            dynamic: { name: 'Items', items: [] },
-            multipliers: { name: 'Boosters', items: [] },
-            roles: { name: 'Roles & Crates', items: [] },
-        },
+        sections: [],
     },
     tickets: {
         enabled: false, categoryId: null, logChannel: null, supportRoles: [],
@@ -74,6 +71,9 @@ async function getSettings(guildId) {
     // Second level — the embed payloads inside `welcome` are objects too.
     merged.welcome.embed = { ...DEFAULTS.welcome.embed, ...(s.welcome?.embed || {}) };
     merged.welcome.goodbyeEmbed = { ...DEFAULTS.welcome.goodbyeEmbed, ...(s.welcome?.goodbyeEmbed || {}) };
+    // Shop: translate the old fixed `categories` shape into `sections` on the
+    // way out — the dashboard only ever sees the current shape.
+    merged.shop = normalizeShop(merged.shop);
     return merged;
 }
 
@@ -289,45 +289,56 @@ const SECTIONS = {
                 .filter((i) => i.id);
         }
     },
+    // Validates one shop item; returns the clean item or an error string.
+    // `id` is the item's public key — inventory entry, `shop buy <id>` lookup
+    // and crate-pool reference — unique across the whole shop.
+    shopItem(raw) {
+        const name = str(raw.name, 40);
+        if (!name) return 'A shop item is missing its name';
+        const type = ['item', 'role', 'multiplier', 'crate'].includes(raw.type) ? raw.type : 'item';
+        const it = {
+            id: shopSlug(raw.id || name),
+            name,
+            desc: str(raw.desc ?? raw.description, 140) || '',
+            price: num(raw.price, 0, 100_000_000, 0) ?? 0,
+            type,
+        };
+        if (type === 'role') {
+            const r = optSnowflake(raw.roleId);
+            if (!r) return `"${name}" — role items need a role`;
+            it.roleId = r;
+        } else if (type === 'multiplier') {
+            it.kind = raw.kind === 'xp' ? 'xp' : 'coins';
+            it.mult = num(raw.mult, 1.1, 25, 2);
+            it.mins = num(raw.mins, 1, 43200, 60);
+        } else if (type === 'crate') {
+            // Pool tokens: item ids, or coin amounts/ranges ("50", "50-200").
+            it.pool = poolTokens(raw.pool).slice(0, 10);
+            if (!it.pool.length) return `"${name}" — crates need at least one reward (item ids or coins like 50-200)`;
+        }
+        return it;
+    },
     shop(s, f) {
         if (f.enabled !== undefined) s.shop.enabled = bool(f.enabled);
         if (f.title !== undefined) s.shop.title = str(f.title, 80) || 'Shop';
         if (f.description !== undefined) s.shop.description = str(f.description, 500) ?? '';
         if (f.color !== undefined) s.shop.color = str(f.color, 20) ?? '';
-        const cats = f.categories;
-        if (!cats || typeof cats !== 'object') return;
-        const itemBase = (i) => ({
-            name: str(i.name, 40) || '',
-            desc: str(i.desc ?? i.description, 140) || '',
-            price: num(i.price, 0, 100_000_000, 0) ?? 0,
-        });
-        const out = {};
-        for (const id of ['dynamic', 'multipliers', 'roles']) {
-            const c = cats[id] || {};
-            const items = arr(c.items).filter((i) => i && typeof i === 'object').slice(0, 7)
-                .map((i) => {
-                    const it = itemBase(i);
-                    if (!it.name) return null;
-                    if (id === 'multipliers') {
-                        it.kind = i.kind === 'xp' ? 'xp' : 'coins';
-                        it.mult = num(i.mult, 1.1, 25, 2);
-                        it.mins = num(i.mins, 1, 43200, 60);
-                    } else if (id === 'roles') {
-                        it.type = i.type === 'crate' ? 'crate' : 'role';
-                        if (it.type === 'role') {
-                            it.roleId = optSnowflake(i.roleId);
-                            if (!it.roleId) return null; // role items need a valid role
-                        } else {
-                            it.min = num(i.min, 0, 100_000_000, 100) ?? 100;
-                            it.max = Math.max(it.min, num(i.max, 0, 100_000_000, 500) ?? 500);
-                        }
-                    }
-                    return it;
-                })
-                .filter(Boolean);
-            out[id] = { name: str(c.name, 40) || null, items };
+        if (f.sections === undefined) return;
+        const seen = new Set();
+        const secs = [];
+        for (const c of arr(f.sections).filter((c) => c && typeof c === 'object').slice(0, 10)) {
+            const name = str(c.name, 40) || 'Section';
+            const items = [];
+            for (const raw of arr(c.items).filter((i) => i && typeof i === 'object').slice(0, 7)) {
+                const it = SECTIONS.shopItem(raw);
+                if (typeof it === 'string') return it;
+                if (seen.has(it.id)) return `Duplicate item id "${it.id}" — ids must be unique across the shop`;
+                seen.add(it.id);
+                items.push(it);
+            }
+            secs.push({ id: shopSlug(c.id || name), name, items });
         }
-        s.shop.categories = out;
+        s.shop.sections = secs; // assign only after everything validated
     },
     games(s, f) {
         if (f.guessReward !== undefined) s.games.guessReward = num(f.guessReward, 0, 10_000_000, 150);

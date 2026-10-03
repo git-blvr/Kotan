@@ -80,7 +80,7 @@
             const av = d.user.avatar
                 ? `https://cdn.discordapp.com/avatars/${d.user.id}/${d.user.avatar}.png?size=64`
                 : 'https://cdn.discordapp.com/embed/avatars/0.png';
-            slot.innerHTML = `<img src="${av}" alt=""> <span>${esc(d.user.username)}</span> <a class="btn sm ghost" href="/auth/logout">Sign out</a>`;
+            slot.innerHTML = `<img src="${esc(av)}" alt=""> <span>${esc(d.user.username)}</span> <a class="btn sm ghost" href="/auth/logout">Sign out</a>`;
         } else {
             // logged out: drop the Dashboard link; CTAs become "Log in"
             $('[data-nav="dash"]')?.remove();

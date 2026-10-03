@@ -218,15 +218,22 @@ module.exports = {
             };
         };
 
+        // /eval is arbitrary code execution — enabling it while bound to a
+        // non-loopback address would be remote code execution for anyone who
+        // reaches the port, so it simply isn't registered there.
         if (process.env.DEV_API_EVAL === '1') {
-            routes['POST /eval'] = async (p, b) => {
-                try {
-                    const result = await eval(String(b.code || ''));
-                    return { ok: true, result: typeof result === 'object' ? JSON.parse(JSON.stringify(result)) : String(result) };
-                } catch (err) {
-                    return { ok: false, status: 400, error: String(err.stack || err).slice(0, 1000) };
-                }
-            };
+            if (!isLoopback) {
+                logger.error('DEV_API_EVAL=1 refused — /eval is arbitrary code execution and DEV_API_HOST is not loopback. Endpoint not registered.');
+            } else {
+                routes['POST /eval'] = async (p, b) => {
+                    try {
+                        const result = await eval(String(b.code || ''));
+                        return { ok: true, result: typeof result === 'object' ? JSON.parse(JSON.stringify(result)) : String(result) };
+                    } catch (err) {
+                        return { ok: false, status: 400, error: String(err.stack || err).slice(0, 1000) };
+                    }
+                };
+            }
         }
 
         const server = http.createServer(async (req, res) => {

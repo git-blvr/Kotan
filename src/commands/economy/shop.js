@@ -23,19 +23,21 @@ const accentOf = (shop) =>
 
 // One-line blurb under an item describing its effect.
 function itemBlurb(item, cur) {
-    switch (item.cat) {
-        case 'multipliers':
+    switch (item.type) {
+        case 'multiplier':
             return `×${item.mult || 2} ${item.kind === 'xp' ? 'XP' : 'coins'} for ${item.mins >= 60 ? `${Math.round(item.mins / 60)}h` : `${item.mins || 60}m`}`;
-        case 'roles':
-            return item.type === 'crate'
-                ? `Random payout: ${formatCoins(item.min ?? 0, cur)} – ${formatCoins(item.max ?? 0, cur)}`
-                : `Grants the <@&${item.roleId}> role`;
+        case 'role':
+            return `Grants the <@&${item.roleId}> role`;
+        case 'crate': {
+            const n = inv.poolTokens(item.pool).length;
+            return n ? `Random reward — one of ${n} possible drops` : 'Empty crate';
+        }
         default:
-            return 'Collectible — sits in your inventory.';
+            return `Collectible — sits in your inventory as \`${item.id}\`.`;
     }
 }
 
-const shopSelect = (uid, cats, placeholder = 'Browse categories…') =>
+const shopSelect = (uid, cats, placeholder = 'Browse sections…') =>
     new ActionRowBuilder().addComponents(
         new StringSelectMenuBuilder()
             .setCustomId(`shop:cat:${uid}`)
@@ -61,7 +63,7 @@ function homeView(uid, shop, cats, profile, cur) {
     return c;
 }
 
-// Category view — each item is a Section with a Buy button accessory.
+// Section view — each item is a Section with a Buy button accessory.
 // Kept under the 10-component container cap (1 header + 7 items + menu).
 function catView(uid, cats, cat, profile, cur, accent, notice, member, settings) {
     const c = new ContainerBuilder().setAccentColor(accent);
@@ -90,29 +92,32 @@ function catView(uid, cats, cat, profile, cur, accent, notice, member, settings)
                 )
         );
     }
-    c.addActionRowComponents(shopSelect(uid, cats, 'Switch category…'));
+    c.addActionRowComponents(shopSelect(uid, cats, 'Switch section…'));
     return c;
 }
 
 // Applies the purchased item's effect to the profile. Throws on delivery
 // failure (e.g. missing role perms) so the caller can refund.
 async function applyItem(member, guild, item, profile, cur) {
-    switch (item.cat) {
-        case 'multipliers': {
+    switch (item.type) {
+        case 'multiplier': {
             const kind = item.kind === 'xp' ? 'xp' : 'coins';
             const m = inv.activateMult(profile, kind, item.mult, item.mins);
             return `**${item.name}** — ${kind === 'xp' ? 'XP' : 'coin'} gains boosted ×${m.mult} for ${inv.fmtLeft(m.until)}.`;
         }
-        case 'roles': {
-            if (item.type === 'crate') {
-                const lo = Math.max(0, +item.min || 0);
-                const hi = Math.max(lo, +item.max || 0);
-                const win = lo + Math.floor(Math.random() * (hi - lo + 1));
-                profile.wallet += win;
-                return `**${item.name}** opened — it contained ${formatCoins(win, cur)}!`;
-            }
+        case 'role': {
             await member.roles.add(item.roleId, 'Kotan shop purchase');
             return `**${item.name}** — you received the <@&${item.roleId}> role.`;
+        }
+        case 'crate': {
+            const roll = inv.rollPool(item.pool);
+            if (!roll) throw new Error('crate has no configured rewards');
+            if (roll.kind === 'coins') {
+                profile.wallet += roll.amount;
+                return `**${item.name}** opened — it contained ${formatCoins(roll.amount, cur)}!`;
+            }
+            profile.inventory[roll.itemId] = (profile.inventory[roll.itemId] || 0) + 1;
+            return `**${item.name}** opened — it contained **${roll.itemId}**!`;
         }
         default:
             profile.inventory[item.id] = (profile.inventory[item.id] || 0) + 1;
@@ -189,8 +194,8 @@ async function executeComponent(i) {
         if (!item)
             return i.reply(ephemeral(cv2(error('That item no longer exists — the shop was updated.')))).catch(() => {});
         const res = await buy({ guild: i.guild, member: i.member, user: i.user, settings }, item, cur);
-        // Re-render the same category with the result pinned on top.
-        const cat = cats.find((c) => c.id === item.cat);
+        // Re-render the same section with the result pinned on top.
+        const cat = cats.find((c) => c.id === item.sec);
         const notice = res.err ? `⚠️ ${res.err}` : `✅ ${res.msg}`;
         const fresh = res.profile || (await db.getProfile(i.guildId, uid));
         return i
@@ -205,7 +210,7 @@ async function executeComponent(i) {
 
 module.exports = {
     name: 'shop',
-    description: 'Browse the item shop — categories, boosters, roles and crates.',
+    description: 'Browse the item shop — sections, boosters, roles and crates.',
     usage: '[buy <item>]',
     aliases: ['store', 'market'],
     triggers: ['shop'],

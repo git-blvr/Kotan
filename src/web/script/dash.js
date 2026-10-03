@@ -273,11 +273,17 @@
         return `<span class="delta ${pct >= 0 ? 'up' : 'dn'}">${pct >= 0 ? '▲' : '▼'} ${Math.abs(pct)}%</span>`;
     };
 
-    async function save(section, fields, btn) {
+    async function save(section, fields, btn, quiet) {
         btn && (btn.disabled = true);
         const r = await api(`/api/guilds/${guildId}/settings`, { body: { section, fields } });
         btn && (btn.disabled = false);
-        if (r.ok) { CTX.settings = r.settings; toast('Saved'); }
+        if (r.ok) {
+            CTX.settings = r.settings;
+            // What was sent becomes the section's new clean snapshot.
+            const s = saveSections.find((x) => x.section === section);
+            if (s) { s.baseline = JSON.stringify(fields); s.dirty = false; renderDirtyBar(); }
+            if (!quiet) toast('Saved');
+        }
         else toast(r.error || 'Save failed', 'err');
         return r.ok;
     }
@@ -426,8 +432,6 @@
             } else bg.style.background = '';
         }
     }
-
-    const saveBar = (section) => `<div class="flex mt"><button class="btn primary" data-save="${section}">Save changes</button></div>`;
 
     // In-page subnav — built automatically from each page's section headings.
     // Sits above the title, jump-scrolls to a section, and tracks scroll.
@@ -663,11 +667,67 @@
             </g></svg>`;
     };
 
+    // ---------- unsaved-changes bar ----------
+    // bindSave() registers a section collector — no per-section button is
+    // rendered. Each section's collected fields are snapshotted at bind time;
+    // edits are diffed against that snapshot, and the fixed bottom bar shows
+    // while any section differs. Save commits every dirty section, Cancel
+    // re-renders the page from CTX.settings.
+    let saveSections = [];
+    let dirtyBar = null;
+    let dirtyObs = null;
+    let dirtyQueued = false;
+
+    const secSnap = (s) => { try { return JSON.stringify(s.collect(s.container)); } catch { return null; } };
+
     function bindSave(container, section, collect) {
-        container.querySelector(`[data-save="${section}"]`)?.addEventListener('click', async (e) => {
-            const fields = collect(container);
-            await save(section, fields, e.target);
-        });
+        const s = { container, section, collect };
+        s.baseline = secSnap(s);
+        saveSections.push(s);
+    }
+
+    function renderDirtyBar() {
+        if (!dirtyBar && !saveSections.length) return;
+        if (!dirtyBar) {
+            dirtyBar = document.createElement('div');
+            dirtyBar.className = 'savebar';
+            dirtyBar.innerHTML = `<span class="sb-msg">You have unsaved changes!</span>
+                <div class="sb-btns"><button class="btn sm" data-x>Cancel</button>
+                <button class="btn primary sm" data-ok>Save</button></div>`;
+            dirtyBar.querySelector('[data-x]').onclick = () => router();
+            dirtyBar.querySelector('[data-ok]').onclick = (e) => saveDirty(e.target);
+            document.body.appendChild(dirtyBar);
+        }
+        const dirty = saveSections.some((s) => s.dirty);
+        dirtyBar.classList.toggle('show', dirty);
+        document.body.classList.toggle('has-dirty', dirty);
+    }
+
+    // Scans are microtask-coalesced — typing, preview re-renders and row
+    // re-draws each fire a burst of events/mutations per gesture.
+    const queueDirtyScan = () => {
+        if (dirtyQueued) return;
+        dirtyQueued = true;
+        queueMicrotask(() => { dirtyQueued = false; dirtyScan(); });
+    };
+
+    function dirtyScan() {
+        for (const s of saveSections) s.dirty = secSnap(s) !== s.baseline;
+        renderDirtyBar();
+    }
+
+    async function saveDirty(btn) {
+        const pending = saveSections.filter((s) => s.dirty);
+        if (!pending.length) return;
+        btn.disabled = true;
+        let ok = true;
+        for (const s of pending) {
+            try { ok = (await save(s.section, s.collect(s.container), null, true)) && ok; }
+            catch { ok = false; }
+        }
+        btn.disabled = false;
+        if (ok) toast('Saved');
+        renderDirtyBar();
     }
 
     const formVals = (el) => {
@@ -688,8 +748,8 @@
     ];
 
     // Markup for one card editor — prefix `p` namespaces every field/id so
-    // several editors can coexist on a page. Live component list is stored
-    // on `e.__list`.
+    // several editors can coexist on a page. The live component list is a
+    // clone held inside setupCardEditor, not on `e`.
     function cardEditorHtml(p, e, extraChips = []) {
         const chips = ['{user}', '{username}', '{server}', '{members}', '{avatar}', '{icon}', ...extraChips]
             .map((v) => `<button type="button" class="chip" data-ins="${v}">${v.slice(1, -1)}</button>`).join('');
@@ -774,8 +834,9 @@
     // Wires one card editor already rendered into `page`. Returns a
     // collector producing the saved embed/card object.
     function setupCardEditor(page, p, e) {
-        e.__list ||= [...(e.components || [])];
-        const list = e.__list;
+        // Working copy — edits never touch the settings object, so cancelling
+        // (re-render from CTX.settings) restores the saved card.
+        const list = (e.components || []).map((c) => ({ ...c }));
 
         const memberAv = dcdnAv(CTX.user.id, CTX.user.avatar);
         const guildIcon = dcdnIcon(CTX.guild.id, CTX.guild.icon);
@@ -1032,8 +1093,8 @@
                 </div>
                 <div class="trio">
                     <div class="card"><h3>Top commands</h3>${(stats.usage?.top || []).length ? stats.usage.top.map((t) => `<div class="qitem"><span class="grow mono">${esc(t.name)}</span><span class="chip">${t.count}</span></div>`).join('') : '<p class="muted small">No commands run yet.</p>'}</div>
-                    <div class="card"><h3>Recent activity</h3>${(stats.recent || []).length ? stats.recent.map((r) => `<div class="qitem"><span class="chip ${r.type === 'warn' ? 'warn' : 'danger'}">${r.type}</span><span class="grow muted">on <span class="mono">${r.userId}</span> — ${esc(r.reason || 'no reason')}</span><span class="muted small">${timeAgo(r.at)}</span></div>`).join('') : '<p class="muted small">No recent moderation actions.</p>'}</div>
-                    <div class="card"><h3>Settings audit</h3>${(stats.audit || []).length ? stats.audit.map((a) => `<div class="qitem"><span class="grow"><b>${esc(a.section)}</b> <span class="muted">edited by</span> <span class="mono">${a.userId}</span></span><span class="muted small">${timeAgo(a.at)}</span></div>`).join('') : '<p class="muted small">No changes recorded yet.</p>'}</div>
+                    <div class="card"><h3>Recent activity</h3>${(stats.recent || []).length ? stats.recent.map((r) => `<div class="qitem"><span class="chip ${r.type === 'warn' ? 'warn' : 'danger'}">${esc(r.type)}</span><span class="grow muted">on <span class="mono">${esc(r.userId)}</span> — ${esc(r.reason || 'no reason')}</span><span class="muted small">${timeAgo(r.at)}</span></div>`).join('') : '<p class="muted small">No recent moderation actions.</p>'}</div>
+                    <div class="card"><h3>Settings audit</h3>${(stats.audit || []).length ? stats.audit.map((a) => `<div class="qitem"><span class="grow"><b>${esc(a.section)}</b> <span class="muted">edited by</span> <span class="mono">${esc(a.userId)}</span></span><span class="muted small">${timeAgo(a.at)}</span></div>`).join('') : '<p class="muted small">No changes recorded yet.</p>'}</div>
                 </div>`;
 
             $$('.rpill', page).forEach((b) => (b.onclick = () => { rangeDays = +b.dataset.d; PAGES.overview(page); }));
@@ -1059,8 +1120,7 @@
                 <div class="card"><h3>Role gates</h3><p class="sub mb">Restrict a module to members holding specific roles. Empty = everyone.</p>
                     <div id="rolegates">${CTX.modules.map((m) => `<div class="modrow"><div class="mi"><b>${esc(m.label)}</b></div><div style="min-width:240px;flex:0 0 280px">${selSlot(`rg_${m.id}`)}</div></div>`).join('')}</div></div>
                 <div class="card"><h3>Channel gates</h3><p class="sub mb">Limit a module to specific channels. Empty = works everywhere.</p>
-                    <div id="changates">${CTX.modules.map((m) => `<div class="modrow"><div class="mi"><b>${esc(m.label)}</b></div><div style="min-width:240px;flex:0 0 280px">${selSlot(`cg_${m.id}`)}</div></div>`).join('')}</div></div>
-                ${saveBar('modules')}`;
+                    <div id="changates">${CTX.modules.map((m) => `<div class="modrow"><div class="mi"><b>${esc(m.label)}</b></div><div style="min-width:240px;flex:0 0 280px">${selSlot(`cg_${m.id}`)}</div></div>`).join('')}</div></div>`;
             CTX.modules.forEach((m) => mountSelect(page, `rg_${m.id}`, { multi: true, options: roOpts(DATA.roles), value: s.moduleRoles[m.id] || [], placeholder: 'Everyone' }));
             CTX.modules.forEach((m) => mountSelect(page, `cg_${m.id}`, { multi: true, options: chOpts(DATA.channels), value: s.moduleChannels?.[m.id] || [], placeholder: 'Everywhere' }));
             bindSave(page, 'modules', (el) => {
@@ -1074,7 +1134,7 @@
 
         async commands(page) {
             const s = CTX.settings;
-            const rules = s.commandRules || [];
+            const rules = [...(s.commandRules || [])];
             page.innerHTML = `
                 <div><div class="page-title">Commands</div><p class="page-desc">Toggle individual commands, or scope them by channel/time window.</p></div>
                 <div class="card"><h3>Enabled commands</h3><div class="cmd-grid" style="grid-template-columns:1fr">${CTX.commands.map((c) => `
@@ -1082,8 +1142,7 @@
                     ${tgl(`cmd_${c.name}`, '', !(s.disabledCommands || []).includes(c.name))}</div>`).join('')}</div></div>
                 <div class="card"><h3>Scoped rules</h3><p class="sub mb">Block a command in a channel and/or during a daily time window (HH:MM, server local time).</p>
                     <div id="rules"></div>
-                    <button class="btn sm mt" id="add-rule">+ Add rule</button></div>
-                ${saveBar('commands')}`;
+                    <button class="btn sm mt" id="add-rule">+ Add rule</button></div>`;
 
             const cmdOpts = CTX.commands.map((c) => ({ value: c.name, label: c.name }));
             const rulesEl = $('#rules', page);
@@ -1187,8 +1246,7 @@
                     <div class="grid2">
                         ${fldHtml('Exempt channels', selSlot('amch'), 'empty = all channels scanned')}
                         ${fldHtml('Exempt roles', selSlot('amroles'), 'empty = everyone checked')}
-                    </div></div>
-                ${saveBar('automod')}`;
+                    </div></div>`;
             mountSelect(page, 'amch', { multi: true, options: chOpts(DATA.channels), value: a.exemptChannels || [], placeholder: 'All channels' });
             mountSelect(page, 'amroles', { multi: true, options: roOpts(DATA.roles), value: a.exemptRoles || [], placeholder: 'Everyone' });
             bindSave(page, 'automod', (el) => {
@@ -1247,8 +1305,7 @@
                             <div class="evl">${tgl(`ev_${k}`, label, isOn(k))}</div>
                             <div class="evc">${selSlot(`lc_${k}`)}</div>
                         </div>`).join('')}
-                </div>`).join('')}
-                ${saveBar('logging')}`;
+                </div>`).join('')}`;
             mountSelect(page, 'logch', { options: [{ value: '', label: 'Off' }, ...chOpts(DATA.channels)], value: l.channel || '', placeholder: 'Off' });
             mountSelect(page, 'modlog', { options: [{ value: '', label: 'Disabled' }, ...chOpts(DATA.channels)], value: s.modlogChannel || '', placeholder: 'Disabled' });
             ALL_EVENTS.forEach(([k]) =>
@@ -1286,8 +1343,7 @@
                     ${fldHtml('Message', txtArea('gmsg', w.goodbyeMessage), 'sent when the card below is disabled')}
                     <div class="preview" id="gprev"></div>
                     ${embedEditor('g', w.goodbyeEmbed)}
-                </div>
-                ${saveBar('welcome')}`;
+                </div>`;
 
             mountSelect(page, 'wch', { options: [{ value: '', label: 'Off' }, ...chOpts(DATA.channels)], value: w.channel || '', placeholder: 'Off' });
             mountSelect(page, 'gch', { options: [{ value: '', label: 'Off' }, ...chOpts(DATA.channels)], value: w.goodbyeChannel || '', placeholder: 'Off' });
@@ -1327,8 +1383,7 @@
                 <div class="card"><h3>Announcement card</h3>
                     <p class="sub mb">Rich card replacing the plain announcement line — the same editor as Welcome.</p>
                     ${cardEditorHtml('afk', a.card || {})}
-                </div>
-                ${saveBar('afk')}`;
+                </div>`;
 
             mountSelect(page, 'a_roles', { multi: true, options: roOpts(DATA.roles), value: a.roles || [], placeholder: 'Everyone' });
             mountSelect(page, 'a_ch', { multi: true, options: chOpts(DATA.channels), value: a.exemptChannels || [], placeholder: 'None' });
@@ -1351,8 +1406,7 @@
                 <div><div class="page-title">Roles</div><p class="page-desc">Automatic and reaction-based role assignment.</p></div>
                 <div class="card"><h3>Autorole</h3>${fldHtml('Role granted on join', selSlot('autorole'), 'empty = off')}</div>
                 <div class="card"><h3>Reaction roles</h3><p class="sub mb">Members who react with the emoji get the role.</p>
-                    <div id="rrs"></div><button class="btn sm mt" id="add-rr">+ Add reaction role</button></div>
-                ${saveBar('roles')}`;
+                    <div id="rrs"></div><button class="btn sm mt" id="add-rr">+ Add reaction role</button></div>`;
             mountSelect(page, 'autorole', { options: [{ value: '', label: 'Off' }, ...roOpts(DATA.roles)], value: r.autorole || '', placeholder: 'Off' });
 
             const rrEl = $('#rrs', page);
@@ -1412,8 +1466,7 @@
                     ${fldHtml('Level-up channel', selSlot('lvch'), 'empty = the channel they leveled in')}
                     ${fldHtml('Level-up message', txtIn('lvmsg', s.leveling.message), '{user} {level}')}
                     <h4 class="mt mb">Level rewards</h4><div id="rewards"></div>
-                    <button class="btn sm mt" id="add-rw">+ Add reward</button>
-                    ${saveBar('leveling')}</div>`;
+                    <button class="btn sm mt" id="add-rw">+ Add reward</button></div>`;
             mountSelect(page, 'lvch', { options: [{ value: '', label: 'Same channel' }, ...chOpts(DATA.channels)], value: s.leveling.channel || '', placeholder: 'Same channel' });
             const rwEl = $('#rewards', page);
             const renderRw = () => {
@@ -1453,8 +1506,7 @@
                     ${fldHtml('Max streak bonus', numIn('dailyMaxStreak', s.economy.dailyMaxStreak, 0, 10000000), 'empty = 1000')}
                 </div></div>
                 <div class="card"><h3>Shop items</h3><p class="sub mb">Your server's catalog — empty uses the built-in shop (cookie, coffee, ticket, gem, VIP).</p>
-                    <div id="shopitems"></div><button class="btn sm mt" id="add-item">+ Add item</button></div>
-                ${saveBar('economy')}`;
+                    <div id="shopitems"></div><button class="btn sm mt" id="add-item">+ Add item</button></div>`;
             const siEl = $('#shopitems', page);
             const renderItems = () => {
                 siEl.innerHTML = items.map((x, i) => `
@@ -1479,16 +1531,20 @@
 
         async shop(page) {
             const s = CTX.settings.shop || {};
-            const cats = s.categories || {};
-            const PFX = { dynamic: 'd', multipliers: 'm', roles: 'r' };
-            const state = {
-                dynamic: { name: cats.dynamic?.name || '', items: [...(cats.dynamic?.items || [])] },
-                multipliers: { name: cats.multipliers?.name || '', items: [...(cats.multipliers?.items || [])] },
-                roles: { name: cats.roles?.name || '', items: [...(cats.roles?.items || [])] },
-            };
+            // Live editor model — DOM rows mirror this array; collect() reads
+            // the DOM back into payload shape so re-renders never lose input.
+            const state = { sections: (s.sections || []).map((c) => ({ name: c.name || '', items: (c.items || []).map((i) => ({ ...i })) })) };
+
+            const TYPE_OPTS = [
+                { value: 'item', label: 'Item — collectible (lands in inventory)' },
+                { value: 'role', label: 'Role — granted on buy' },
+                { value: 'multiplier', label: 'Booster — timed coins/XP multiplier' },
+                { value: 'crate', label: 'Crate — random drop per buy' },
+            ];
+
             page.innerHTML = `
-                <div><div class="page-title">Shop</div><p class="page-desc">The CV2 store — homepage text, categories, and what each item does.</p></div>
-                <div class="card"><h3>Homepage</h3>
+                <div><div class="page-title">Shop</div><p class="page-desc">Storefront text, custom sections, and per-item behavior.</p></div>
+                <div class="card"><h3>Storefront</h3>
                     <div class="mb">${tgl('shop_on', 'Enable the shop', s.enabled !== false)}</div>
                     <div class="grid2">
                         ${fldHtml('Title', txtIn('shop_title', s.title, 'Shop'))}
@@ -1496,100 +1552,146 @@
                     </div>
                     ${fldHtml('Description', txtIn('shop_desc', s.description), 'shown under the title when /shop opens')}
                 </div>
-                <div class="card"><h3>Dynamic Items</h3><p class="sub mb">Collectibles that land in the buyer's inventory — effects come later.</p>
-                    ${fldHtml('Category name', txtIn('catn_dynamic', state.dynamic.name, 'Items'))}
-                    <div id="si-dynamic"></div><button class="btn sm mt" id="add-dynamic">+ Add item</button></div>
-                <div class="card"><h3>Coin / Level Boosters</h3><p class="sub mb">Temporary multipliers — activated instantly on purchase, duration stacks.</p>
-                    ${fldHtml('Category name', txtIn('catn_multipliers', state.multipliers.name, 'Boosters'))}
-                    <div id="si-multipliers"></div><button class="btn sm mt" id="add-multipliers">+ Add booster</button></div>
-                <div class="card"><h3>Roles &amp; Crates</h3><p class="sub mb">Roles grant instantly on buy; crates pay out random coins.</p>
-                    ${fldHtml('Category name', txtIn('catn_roles', state.roles.name, 'Roles & Crates'))}
-                    <div id="si-roles"></div><button class="btn sm mt" id="add-roles">+ Add entry</button></div>
-                ${saveBar('shop')}`;
+                <div id="shopsecs"></div>
+                <button class="btn sm" id="add-sec">+ Add section</button>
+                <p class="muted small" style="margin-top:10px">Item ids are the shop's keys — <b>Item</b> entries land in inventory under their id
+                    (e.g. <code class="mono">cookie</code>), <code class="mono">.shop buy &lt;id&gt;</code> purchases directly, and crates drop ids from their pool.</p>`;
 
-            // color picker sync
             const pick = $('[name=shop_pick]', page), hex = $('[name=shop_color]', page);
             pick.oninput = () => (hex.value = pick.value);
             hex.oninput = () => { if (/^#[0-9a-fA-F]{6}$/.test(hex.value)) pick.value = hex.value; };
 
-            const baseRow = (cat, x, i, extra) => `
-                <div class="modrow shoprow">
-                    <input type="text" name="${PFX[cat]}n_${i}" value="${esc(x.name || '')}" placeholder="Item name" style="flex:0 0 150px">
-                    <input type="number" name="${PFX[cat]}p_${i}" value="${x.price ?? ''}" placeholder="Price" min="0" style="flex:0 0 90px">
-                    <input type="text" name="${PFX[cat]}d_${i}" value="${esc(x.desc || x.description || '')}" placeholder="Description" class="grow">
-                    ${extra}
-                    <button class="btn sm danger" data-del="${i}">✕</button></div>`;
-
-            const renders = {
-                dynamic: () => {
-                    const el = $('#si-dynamic', page);
-                    el.innerHTML = state.dynamic.items.map((x, i) => baseRow('dynamic', x, i, '')).join('')
-                        || '<p class="muted small">No items.</p>';
-                },
-                multipliers: () => {
-                    const el = $('#si-multipliers', page);
-                    el.innerHTML = state.multipliers.items.map((x, i) => baseRow('multipliers', x, i, `
-                        ${selSlot(`mk_${i}`)}
-                        <input type="number" name="mm_${i}" value="${x.mult ?? ''}" placeholder="×2" min="1" step="0.1" style="flex:0 0 70px">
-                        <input type="number" name="mt_${i}" value="${x.mins ?? ''}" placeholder="mins" min="1" style="flex:0 0 80px">`)).join('')
-                        || '<p class="muted small">No boosters.</p>';
-                    state.multipliers.items.forEach((x, i) =>
-                        mountSelect(page, `mk_${i}`, { options: [{ value: 'coins', label: 'Coins' }, { value: 'xp', label: 'XP/Levels' }], value: x.kind || 'coins' }));
-                },
-                roles: () => {
-                    const el = $('#si-roles', page);
-                    el.innerHTML = state.roles.items.map((x, i) => baseRow('roles', x, i, `
-                        ${selSlot(`rt_${i}`)}
-                        <span class="rr_${i}" ${x.type === 'crate' ? 'style="display:none"' : ''}>${selSlot(`rr_${i}`)}</span>
-                        <span class="rc_${i}" ${x.type === 'crate' ? '' : 'style="display:none"'}>
-                            <input type="number" name="rmin_${i}" value="${x.min ?? ''}" placeholder="Min" min="0" style="width:80px">
-                            <input type="number" name="rmax_${i}" value="${x.max ?? ''}" placeholder="Max" min="0" style="width:80px">
-                        </span>`)).join('')
-                        || '<p class="muted small">No entries.</p>';
-                    state.roles.items.forEach((x, i) => {
-                        mountSelect(page, `rt_${i}`, { options: [{ value: 'role', label: 'Role' }, { value: 'crate', label: 'Crate' }], value: x.type || 'role' });
-                        mountSelect(page, `rr_${i}`, { options: roOpts(DATA.roles), value: x.roleId, placeholder: 'Role…' });
-                        mounts[`rt_${i}`].addEventListener('change', () => {
-                            const isCrate = mounts[`rt_${i}`].get() === 'crate';
-                            $(`.rr_${i}`, page).style.display = isCrate ? 'none' : '';
-                            $(`.rc_${i}`, page).style.display = isCrate ? '' : 'none';
-                        });
-                    });
-                },
+            const itemRow = (x, si, ii) => {
+                const p = `it_${si}_${ii}`;
+                return `<div class="modrow shoprow" data-type="${esc(x.type || 'item')}">
+                    ${selSlot(`${p}_t`)}
+                    <input type="text" name="${p}_name" value="${esc(x.name || '')}" placeholder="Item name" style="flex:0 0 130px">
+                    <input type="number" name="${p}_price" value="${x.price ?? ''}" placeholder="Price" min="0" style="flex:0 0 80px">
+                    <input type="text" name="${p}_id" value="${esc(x.id || '')}" placeholder="id (auto)" title="Unique key — inventory entry, .shop buy <id>, crate pool reference" style="flex:0 0 110px">
+                    <input type="text" name="${p}_desc" value="${esc(x.desc || '')}" placeholder="Description" class="grow">
+                    <span data-fx="role">${selSlot(`${p}_role`)}</span>
+                    <span data-fx="multiplier" style="display:contents">
+                        ${selSlot(`${p}_kind`)}
+                        <input type="number" name="${p}_mult" value="${x.mult ?? ''}" placeholder="×2" min="1" step="0.1" style="width:70px" title="Multiplier">
+                        <input type="number" name="${p}_mins" value="${x.mins ?? ''}" placeholder="mins" min="1" style="width:80px" title="Duration (minutes)">
+                    </span>
+                    <span data-fx="crate" style="display:contents"><input type="text" name="${p}_pool" value="${esc(Array.isArray(x.pool) ? x.pool.join(', ') : x.pool || '')}" placeholder="cookie, gem, 50-200" style="min-width:180px" title="Comma-separated drops — item ids or coin amounts/ranges"></span>
+                    <button class="btn sm" data-mv="-1" title="Move up">↑</button>
+                    <button class="btn sm" data-mv="1" title="Move down">↓</button>
+                    <button class="btn sm danger" data-del title="Remove">✕</button>
+                </div>`;
             };
 
-            for (const cat of Object.keys(renders)) {
-                const rebind = () => {
-                    renders[cat]();
-                    $$(`#si-${cat} [data-del]`, page).forEach((b) =>
-                        (b.onclick = () => { state[cat].items.splice(+b.dataset.del, 1); rebind(); }));
-                };
-                rebind();
-                $(`#add-${cat}`, page).onclick = () => {
-                    if (state[cat].items.length >= 7) return; // CV2 container cap
-                    state[cat].items.push(cat === 'multipliers' ? { kind: 'coins', mult: 2, mins: 60 } : cat === 'roles' ? { type: 'role' } : {});
-                    rebind();
-                };
-            }
+            const secCard = (c, si) => `
+                <div class="card" data-sec="${si}">
+                    <div class="modrow" style="margin-bottom:10px">
+                        <input type="text" name="sec_${si}_name" value="${esc(c.name || '')}" placeholder="Section name" class="grow">
+                        <button class="btn sm" data-smv="-1" title="Move up">↑</button>
+                        <button class="btn sm" data-smv="1" title="Move down">↓</button>
+                        <button class="btn sm danger" data-sdel title="Delete section">✕</button>
+                    </div>
+                    ${c.items.map((x, ii) => itemRow(x, si, ii)).join('') || '<p class="muted small">No items in this section yet.</p>'}
+                    <button class="btn sm mt" data-additem>+ Add item</button>
+                </div>`;
 
-            bindSave(page, 'shop', (el) => {
-                const f = formVals(el);
-                const base = (cat, i) => ({ name: f[`${PFX[cat]}n_${i}`], price: +f[`${PFX[cat]}p_${i}`] || 0, desc: f[`${PFX[cat]}d_${i}`] });
+            const syncFx = (row) => {
+                const t = row.dataset.type;
+                row.querySelectorAll('[data-fx]').forEach((el) => { el.style.display = el.dataset.fx === t ? 'contents' : 'none'; });
+            };
+
+            const secsEl = $('#shopsecs', page);
+            const render = () => {
+                secsEl.innerHTML = state.sections.map(secCard).join('')
+                    || '<div class="card"><p class="muted small">No sections — add one below to start selling.</p></div>';
+                state.sections.forEach((c, si) => {
+                    const card = secsEl.querySelector(`[data-sec="${si}"]`);
+                    const rows = card.querySelectorAll('.shoprow');
+                    c.items.forEach((x, ii) => {
+                        const p = `it_${si}_${ii}`;
+                        const row = rows[ii];
+                        mountSelect(page, `${p}_t`, { options: TYPE_OPTS, value: x.type || 'item' });
+                        mounts[`${p}_t`].addEventListener('change', () => {
+                            row.dataset.type = mounts[`${p}_t`].get() || 'item';
+                            syncFx(row);
+                        });
+                        mountSelect(page, `${p}_role`, { options: roOpts(DATA.roles), value: x.roleId, placeholder: 'Role…' });
+                        mountSelect(page, `${p}_kind`, { options: [{ value: 'coins', label: 'Coins' }, { value: 'xp', label: 'XP / Levels' }], value: x.kind || 'coins' });
+                        syncFx(row);
+                    });
+                });
+            };
+
+            // Read the live DOM into payload shape — used both by bindSave and
+            // to checkpoint state before any structural re-render.
+            const collect = () => {
+                const f = formVals(page);
+                const sections = [];
+                $$('#shopsecs [data-sec]', page).forEach((card, si) => {
+                    const items = [];
+                    $$('.shoprow', card).forEach((row, ii) => {
+                        const p = `it_${si}_${ii}`;
+                        const type = mounts[`${p}_t`]?.get() || 'item';
+                        const it = {
+                            id: String(f[`${p}_id`] || '').trim(),
+                            name: f[`${p}_name`],
+                            desc: f[`${p}_desc`],
+                            price: +f[`${p}_price`] || 0,
+                            type,
+                        };
+                        if (type === 'role') it.roleId = mounts[`${p}_role`]?.get() || '';
+                        else if (type === 'multiplier') { it.kind = mounts[`${p}_kind`]?.get() || 'coins'; it.mult = +f[`${p}_mult`] || 2; it.mins = +f[`${p}_mins`] || 60; }
+                        else if (type === 'crate') it.pool = String(f[`${p}_pool`] || '').split(',').map((t) => t.trim()).filter(Boolean);
+                        items.push(it);
+                    });
+                    sections.push({ name: f[`sec_${si}_name`], items });
+                });
                 return {
                     enabled: !!f.shop_on, title: f.shop_title, description: f.shop_desc, color: f.shop_color,
-                    categories: {
-                        dynamic: { name: f.catn_dynamic, items: state.dynamic.items.map((x, i) => base('dynamic', i)) },
-                        multipliers: { name: f.catn_multipliers, items: state.multipliers.items.map((x, i) => ({ ...base('multipliers', i), kind: mounts[`mk_${i}`]?.get() || 'coins', mult: +f[`mm_${i}`] || 2, mins: +f[`mt_${i}`] || 60 })) },
-                        roles: { name: f.catn_roles, items: state.roles.items.map((x, i) => {
-                            const t = mounts[`rt_${i}`]?.get() || 'role';
-                            const it = { ...base('roles', i), type: t };
-                            if (t === 'role') it.roleId = mounts[`rr_${i}`]?.get();
-                            else { it.min = +f[`rmin_${i}`] || 0; it.max = +f[`rmax_${i}`] || 0; }
-                            return it;
-                        }) },
-                    },
+                    sections,
                 };
+            };
+            const sync = () => { state.sections = collect().sections; };
+
+            render();
+            $('#add-sec', page).onclick = () => {
+                sync();
+                if (state.sections.length >= 10) return; // sane cap — menu fits 25 but pages get unwieldy
+                state.sections.push({ name: '', items: [] });
+                render();
+            };
+            secsEl.addEventListener('click', (e) => {
+                const btn = e.target.closest('button');
+                if (!btn) return;
+                const card = btn.closest('[data-sec]');
+                const si = +card.dataset.sec;
+                if (btn.hasAttribute('data-additem')) {
+                    sync();
+                    if (state.sections[si].items.length >= 7) return; // CV2 container cap
+                    state.sections[si].items.push({ type: 'item' });
+                    render();
+                } else if (btn.hasAttribute('data-sdel')) {
+                    sync(); state.sections.splice(si, 1); render();
+                } else if (btn.hasAttribute('data-smv')) {
+                    sync();
+                    const j = si + +btn.dataset.smv;
+                    if (j < 0 || j >= state.sections.length) return;
+                    [state.sections[si], state.sections[j]] = [state.sections[j], state.sections[si]];
+                    render();
+                } else if (btn.hasAttribute('data-del')) {
+                    const ii = [...card.querySelectorAll('.shoprow')].indexOf(btn.closest('.shoprow'));
+                    sync(); state.sections[si].items.splice(ii, 1); render();
+                } else if (btn.hasAttribute('data-mv')) {
+                    const items = state.sections[si].items;
+                    const ii = [...card.querySelectorAll('.shoprow')].indexOf(btn.closest('.shoprow'));
+                    const j = ii + +btn.dataset.mv;
+                    if (j < 0 || j >= items.length) return;
+                    sync();
+                    [items[ii], items[j]] = [items[j], items[ii]];
+                    render();
+                }
             });
+
+            bindSave(page, 'shop', collect);
         },
 
         async games(page) {
@@ -1621,8 +1723,7 @@
                 ${REWARD.map(([k, label]) => `
                 <div class="card"><h3>${label}</h3><div class="grid2">
                     ${fldHtml('Reward', perIn(k, 'reward'), 'coins per win — empty = use default')}
-                </div></div>`).join('')}
-                ${saveBar('games')}`;
+                </div></div>`).join('')}`;
             bindSave(page, 'games', (el) => {
                 const f = formVals(el);
                 const perOut = {};
@@ -1664,8 +1765,7 @@
                     ${cardEditorHtml('tp', t.panel || {})}</div>
                 <div class="card"><h3>Post panel</h3>
                     ${fldHtml('Channel', selSlot('tkpost'), 'sends the panel immediately — uses saved settings')}
-                    <div class="mt"><button class="btn" id="post-panel">Post panel</button> <span class="hint" id="post-status"></span></div></div>
-                ${saveBar('tickets')}`;
+                    <div class="mt"><button class="btn" id="post-panel">Post panel</button> <span class="hint" id="post-status"></span></div></div>`;
 
             mountSelect(page, 'tkcat', { options: [{ value: '', label: 'No category' }, ...(DATA.categories || []).map((c) => ({ value: c.id, label: c.name, icon: '▤' }))], value: t.categoryId || '', placeholder: 'No category' });
             mountSelect(page, 'tklog', { options: [{ value: '', label: 'Off' }, ...chOpts(DATA.channels)], value: t.logChannel || '', placeholder: 'Off' });
@@ -1727,8 +1827,7 @@
                     ${cardEditorHtml('cp', c.panel || {})}</div>
                 <div class="card"><h3>Post panel</h3>
                     ${fldHtml('Channel', selSlot('cppost'), 'sends the panel immediately — uses saved settings')}
-                    <div class="mt"><button class="btn" id="post-panel">Post panel</button> <span class="hint" id="post-status"></span></div></div>
-                ${saveBar('captcha')}`;
+                    <div class="mt"><button class="btn" id="post-panel">Post panel</button> <span class="hint" id="post-status"></span></div></div>`;
 
             mountSelect(page, 'cprole', { options: roOpts(DATA.roles), value: c.roleId || '', placeholder: 'Pick a role…' });
             mountSelect(page, 'cplog', { options: [{ value: '', label: 'Off' }, ...chOpts(DATA.channels)], value: c.logChannel || '', placeholder: 'Off' });
@@ -1775,8 +1874,7 @@
                         ${fldHtml('XP gain ×', txtIn('pxp', b.perks?.xp ?? 1), 'multiplier on message XP — 1 = off')}
                         ${fldHtml('Shop discount %', txtIn('pshop', b.perks?.shop ?? 0), '0–90 — 0 = off')}
                     </div>
-                </div>
-                ${saveBar('boosts')}`;
+                </div>`;
             mountSelect(page, 'bch', { options: [{ value: '', label: 'Off' }, ...chOpts(DATA.channels)], value: b.channel || '', placeholder: 'Off' });
             mountSelect(page, 'brole', { options: [{ value: '', label: 'None' }, ...roOpts(DATA.roles)], value: b.roleId || '', placeholder: 'None' });
             const card = setupCardEditor(page, 'bc', b.card || {});
@@ -1797,21 +1895,20 @@
             const overviewCards = ['members', 'commands', 'warns', 'tempbans', 'ping'];
             page.innerHTML = `
                 <div><div class="page-title">Settings</div><p class="page-desc">Prefix, access, dashboard appearance and bot profile.</p></div>
-                <div class="card"><h3>General</h3>${fldHtml('Command prefix', txtIn('prefix', s.prefix || ''), 'empty = default')} ${saveBar('general')}</div>
+                <div class="card"><h3>General</h3>${fldHtml('Command prefix', txtIn('prefix', s.prefix || ''), 'empty = default')}</div>
                 <div class="card"><h3>Access roles</h3><p class="sub mb">Mod/admin role lists stored with this guild's config.</p>
                     <div class="grid2">
                         ${fldHtml('Mod roles', selSlot('modroles'))}
                         ${fldHtml('Admin roles', selSlot('adminroles'))}
-                    </div>${saveBar('access')}</div>
+                    </div></div>
                 <div class="card"><h3>Overview cards</h3><p class="sub mb">Which stats show on the Overview page.</p>
-                    <div class="flex">${overviewCards.map((c) => tgl(`oc_${c}`, c, (s.overview.cards || []).includes(c))).join('')}</div>
-                    ${saveBar('overview')}</div>
+                    <div class="flex">${overviewCards.map((c) => tgl(`oc_${c}`, c, (s.overview.cards || []).includes(c))).join('')}</div></div>
                 <div class="card"><h3>Dashboard appearance</h3><p class="sub mb">Only affects this server's dashboard — accent color and a background image behind the panel.</p>
                     <div class="grid2">
                         ${fldHtml('Accent color', `<div class="clrrow"><input type="color" id="accentpick" value="${esc(/^#?[0-9a-f]{6}$/i.test(s.appearance.accent || '') ? '#' + s.appearance.accent.replace(/^#/, '') : '#f0a050')}"><input type="text" name="accent" value="${esc(s.appearance.accent || '')}" placeholder="#f0a050" maxlength="7"></div>`, 'hex — empty = default')}
                         ${fldHtml('Background image', `<div class="clrrow"><input type="text" name="bgimg" value="${esc(s.appearance.background || '')}" placeholder="https://…"><button type="button" class="btn sm" id="pick-bg">Browse…</button><input type="file" id="bgfile" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none"></div>`, 'URL or a file upload — empty = none')}
                         ${fldHtml('Theme', selSlot('theme'), 'glass = translucent blurred panels — pairs well with a background image')}
-                    </div>${saveBar('appearance')}</div>
+                    </div></div>
                 <div class="card"><h3>Bot profile</h3><p class="sub mb">Everything here is per-server — nickname, avatar and banner change how Kotan looks in this guild only. Click the preview to change them.</p>
                     <div class="bpgrid">
                         <div>
@@ -1825,7 +1922,6 @@
                                 <button class="btn sm danger" id="rm-banner">Remove banner</button>
                             </div>
                             <span class="muted small" id="avatar-status"></span>
-                            ${saveBar('branding')}
                         </div>
                         <div class="dprev prof" id="profprev"></div>
                     </div></div>`;
@@ -1911,7 +2007,9 @@
                 const r = await api(`/api/guilds/${guildId}/appearance/bg`, { body: { image: dataUrl } });
                 if (r.ok) {
                     $('[name=bgimg]', page).value = r.url;
-                    if (await save('appearance', { accent: accentIn.value, background: r.url })) applyAppearance();
+                    // Same fields (and key order) as the appearance collect()
+                    // — save() rebaselines the section so the bar stays hidden.
+                    if (await save('appearance', { accent: accentIn.value, background: r.url, theme: mounts.theme?.get() || '' })) applyAppearance();
                 } else toast(r.error || 'Upload failed', 'err');
                 e.target.value = '';
             };
@@ -1958,9 +2056,23 @@
         // <body> outlive their triggers, so sweep them too.
         for (const k in mounts) delete mounts[k];
         $$('.dselpop').forEach((p) => p.remove());
+        // Reset unsaved-changes tracking — registered sections and their
+        // baselines belong to the page being replaced.
+        saveSections = [];
+        dirtyObs?.disconnect();
+        dirtyObs = null;
+        renderDirtyBar();
         try {
             await render(page);
             bindSubnav(page);
+            // Watch for edits: input/change cover field values, childList
+            // mutations cover rows/components added, removed or reordered.
+            if (saveSections.length) {
+                page.addEventListener('input', queueDirtyScan);
+                page.addEventListener('change', queueDirtyScan);
+                dirtyObs = new MutationObserver(queueDirtyScan);
+                dirtyObs.observe(page, { childList: true, subtree: true });
+            }
         } catch (e) {
             page.innerHTML = `<div class="card"><h3>Something went wrong</h3><p class="sub">${esc(e.message)}</p></div>`;
         }

@@ -43,6 +43,10 @@ module.exports = async (app) => {
     });
 
     app.get('/auth/logout', async (req, reply) => {
+        // GET logout + SameSite=Lax means a cross-site navigation still sends
+        // the session cookie — a hostile link could force-logout. Refuse the
+        // whole action (don't destroy, don't clear) when the browser flags it.
+        if (req.headers['sec-fetch-site'] === 'cross-site') return reply.redirect('/');
         if (req.sid) await sessions.destroy(req.sid);
         return reply.header('Set-Cookie', cookieHeader(COOKIE, '', 0)).redirect('/');
     });
