@@ -11,6 +11,7 @@
     "deploy": "node scripts/deploySlash.js",
     "smallify": "node scripts/smallify.js",
     "s": "node scripts/smallify.js",
+    "preview": "node scripts/preview.js",
     "ai": "node scripts/openrouter.js"
   },
   "keywords": [

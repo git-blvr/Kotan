@@ -683,3 +683,8 @@ html { scroll-behavior: smooth; }
 
 /* Inline code chips inside page copy (.vc, commands) — pill, matches chips. */
 .dpage .page-desc code,.dpage .card .sub code{font-family:var(--mono);font-size:.92em;color:var(--accent-2);background:var(--panel-2);border:1px solid var(--border-soft);padding:1px 7px;border-radius:999px}
+
+/* ---- card editor import/export ---- */
+.ceio{display:flex;align-items:center;justify-content:space-between;gap:var(--s2)}
+.ceio-btns{display:flex;gap:6px;flex:none}
+.ceimp{width:100%;box-sizing:border-box;resize:vertical;min-height:120px;margin:var(--s2) 0;background:var(--panel-2);border:1px solid var(--border-soft);border-radius:var(--r-sm);color:var(--text);padding:8px 10px;font-size:12.5px}

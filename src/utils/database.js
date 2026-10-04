@@ -67,10 +67,11 @@ const tickets = createStore('tickets');   // open ticket channels per guild
 const afk = createStore('afk');           // per-member away status + ping log
 const activity = createStore('activity'); // per-day activity aggregates (dashboard Activity page)
 const voicemaster = createStore('voicemaster'); // temp voice channels: owner, trusted/blocked lists
+const lastfm = createStore('lastfm');           // discord user id -> last.fm username (global, not per-guild)
 
 // A store error (Redis disconnect, disk failure) must never crash the process.
 // @keyv/redis reconnects automatically; SQLite is in-process and won't drop.
-for (const store of [profiles, warns, tempbans, guilds, usage, tags, audit, meta, sessions, tickets, afk, activity, voicemaster]) {
+for (const store of [profiles, warns, tempbans, guilds, usage, tags, audit, meta, sessions, tickets, afk, activity, voicemaster, lastfm]) {
     store.on('error', (err) => logger.error(`Storage error in "${store.namespace}":`, err));
 }
 if (sharedRedis) sharedRedis.on('error', (err) => logger.error('Redis error:', err));
@@ -812,6 +813,24 @@ async function saveVM(guildId, data) {
     return data;
 }
 
+// ---------- last.fm ----------
+
+// One record per Discord user, global across guilds like fmbot's link.
+async function getLastfm(userId) {
+    return (await lastfm.get(userId))?.name || null;
+}
+async function setLastfm(userId, name) {
+    await lastfm.set(userId, { name, at: Date.now() });
+}
+async function clearLastfm(userId) {
+    return lastfm.delete(userId);
+}
+// Yields [discordUserId, lastfmName] pairs — whoknows intersects them with
+// guild membership.
+async function* iterateLastfm() {
+    for await (const [k, v] of lastfm.iterator()) if (v?.name) yield [k, v.name];
+}
+
 // ---------- tickets ----------
 
 // Open ticket state per guild: counter, channel records and a user->channel
@@ -871,6 +890,10 @@ module.exports = {
     saveTickets,
     getVM,
     saveVM,
+    getLastfm,
+    setLastfm,
+    clearLastfm,
+    iterateLastfm,
     getAfk,
     setAfk,
     clearAfk,

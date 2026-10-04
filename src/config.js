@@ -11,6 +11,10 @@ module.exports = {
         .map((id) => id.trim())
         .filter(Boolean),
 
+    // Last.fm API key — powers the .fm command. Get one at
+    // https://www.last.fm/api/account/create
+    lastfmApiKey: process.env.LASTFM_API_KEY || '',
+
     colors: {
         main: 0x5865f2,
         success: 0x57f287,

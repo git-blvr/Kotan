@@ -834,7 +834,11 @@
                     </div>
                 </div>
                 <div class="cedit-prev">
-                    <span class="cepv-t">Live Discord preview</span>
+                    <div class="ceio"><span class="cepv-t">Live Discord preview</span>
+                        <span class="ceio-btns">
+                            <button type="button" class="btn sm" id="${p}e_imp" title="Paste a card export or raw Discord message JSON">⇪ Import</button>
+                            <button type="button" class="btn sm" id="${p}e_exp" title="Copy + download this card as JSON">⇩ Export</button>
+                        </span></div>
                     <p class="sub mb">Matches the message Discord will post.</p>
                     <div class="dprev" id="${p}dprev"></div>
                 </div>
@@ -1065,16 +1069,148 @@
             renderComps();
         }));
 
-        return {
-            collect: (f) => ({
-                enabled: !!f[`${p}e_on`],
-                style: f[`${p}e_style`],
-                title: f[`${p}e_title`], description: f[`${p}e_desc`],
-                color: f[`${p}e_color`], colorMode: f[`${p}e_colmode`], footer: f[`${p}e_footer`],
-                thumbnail: !!f[`${p}e_thumb`], thumb: f[`${p}e_thumburl`],
-                components: f[`${p}e_style`] === 'cv2' ? list : [],
-            }),
+        const collect = (f) => ({
+            enabled: !!f[`${p}e_on`],
+            style: f[`${p}e_style`],
+            title: f[`${p}e_title`], description: f[`${p}e_desc`],
+            color: f[`${p}e_color`], colorMode: f[`${p}e_colmode`], footer: f[`${p}e_footer`],
+            thumbnail: !!f[`${p}e_thumb`], thumb: f[`${p}e_thumburl`],
+            components: f[`${p}e_style`] === 'cv2' ? list.map((c) => ({ ...c })) : [],
+        });
+
+        // ---------- payload import/export ----------
+        // Export shape: { kotan: 'card', card: <collect()> } — the marker lets
+        // import tell kotan exports from raw Discord message payloads, which
+        // get converted into our component schema on the way in.
+        const COMP_KEYS = {
+            text: ['text'], heading: ['text', 'big'], separator: ['size'],
+            image: ['url'], section: ['text', 'image', 'btnLabel', 'btnUrl', 'big'], link: ['label', 'url'],
         };
+        const sanitizeComp = (c) => {
+            if (!c || typeof c !== 'object' || !COMP_KEYS[c.type]) return null;
+            const o = { type: c.type };
+            for (const k of COMP_KEYS[c.type]) if (c[k] !== undefined) o[k] = c[k];
+            return o;
+        };
+        const hexCol = (n) => (/^\d+$/.test(String(n)) ? `#${Number(n).toString(16).padStart(6, '0')}` : /^#?[0-9a-f]{6}$/i.test(String(n || '')) ? `#${String(n).replace(/^#/, '')}` : '');
+
+        // One raw Discord component object → our schema (null = drop).
+        const fromDiscordComp = (c) => {
+            switch (c?.type) {
+                case 10: return { type: 'text', text: c.content || '' };
+                case 9: {
+                    const text = (c.components || []).filter((x) => x.type === 10).map((x) => x.content).join('\n');
+                    const acc = c.accessory;
+                    if (acc?.type === 11) return { type: 'section', text, image: acc.media?.url || '' };
+                    if (acc?.type === 2 && acc.style === 5) return { type: 'section', text, btnLabel: acc.label || '', btnUrl: acc.url || '' };
+                    return { type: 'section', text, image: '' };
+                }
+                case 12: return { type: 'image', url: c.items?.[0]?.media?.url || '' };
+                case 13: return { type: 'image', url: c.file?.url || '' };
+                case 14: return { type: 'separator', size: c.spacing === 2 ? 'large' : 'small' };
+                default: return null;
+            }
+        };
+
+        // Accepts a kotan export ({kotan:'card',card}), a bare card object, a
+        // Discord message payload (embeds/CV2 container), or a lone embed —
+        // returns our card shape or null when nothing recognizable.
+        const cardFromPayload = (raw) => {
+            if (!raw || typeof raw !== 'object') return null;
+            if (raw.kotan === 'card' && raw.card && typeof raw.card === 'object') return raw.card;
+            if (raw.card && typeof raw.card === 'object' && raw.card.style) return raw.card;
+            if (typeof raw.style === 'string' && (raw.components !== undefined || raw.title !== undefined)) return raw;
+            const card = { enabled: true, style: 'embed', components: [] };
+            const cont = raw.type === 17 ? raw : (raw.components || []).find((c) => c.type === 17);
+            if (cont) {
+                card.style = 'cv2';
+                card.color = hexCol(cont.accent_color);
+                for (const c of cont.components || []) {
+                    if (c.type === 1)
+                        for (const b of c.components || [])
+                            if (b.type === 2 && b.style === 5) card.components.push({ type: 'link', label: b.label || '', url: b.url || '' });
+                    if (c.type === 17) { const inner = cardFromPayload({ components: [c] }); if (inner) card.components.push(...inner.components); }
+                    const s = fromDiscordComp(c);
+                    if (s) card.components.push(s);
+                }
+                return card;
+            }
+            const emb = raw.embeds?.[0] || (raw.title !== undefined || raw.description !== undefined ? raw : null);
+            if (emb) {
+                card.title = emb.title || '';
+                card.description = emb.description || '';
+                card.color = hexCol(emb.color);
+                card.footer = emb.footer?.text || '';
+                if (emb.thumbnail?.url) { card.thumbnail = true; card.thumb = emb.thumbnail.url; }
+                return card;
+            }
+            if (typeof raw.content === 'string' && raw.content) { card.description = raw.content; return card; }
+            return null;
+        };
+
+        const applyCard = (c) => {
+            on.checked = c.enabled !== false;
+            if (c.style) styleSel.value = c.style === 'cv2' ? 'cv2' : 'embed';
+            modeSel.value = c.colorMode === 'dominant' || c.colorMode === 'none' ? c.colorMode : '';
+            colIn.value = c.color || '';
+            if (/^#?[0-9a-f]{6}$/i.test(colIn.value.trim())) colPick.value = `#${colIn.value.trim().replace(/^#/, '')}`;
+            $(`[name=${p}e_title]`, page).value = c.title || '';
+            $(`[name=${p}e_desc]`, page).value = c.description || '';
+            $(`[name=${p}e_footer]`, page).value = c.footer || '';
+            $(`[name=${p}e_thumb]`, page).checked = !!c.thumbnail;
+            $(`[name=${p}e_thumburl]`, page).value = c.thumb || '';
+            list.splice(0, list.length, ...(Array.isArray(c.components) ? c.components.map(sanitizeComp).filter(Boolean).slice(0, 10) : []));
+            sync();
+            renderComps();
+            maybeFetchDom();
+        };
+
+        $(`#${p}e_exp`, page).onclick = async () => {
+            const text = JSON.stringify({ kotan: 'card', card: collect(formVals(page)) }, null, 2);
+            try { await navigator.clipboard.writeText(text); } catch { /* clipboard needs https — download still works */ }
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+            a.download = 'kotan-card.json';
+            a.click();
+            URL.revokeObjectURL(a.href);
+            toast('Card exported — copied to clipboard and downloaded');
+        };
+
+        $(`#${p}e_imp`, page).onclick = () => {
+            const ov = document.createElement('div');
+            ov.className = 'overlay';
+            ov.innerHTML = `<div class="modal">
+                <h3>Import card payload</h3>
+                <p>Paste a kotan card export or a raw Discord message JSON, or load a .json file.</p>
+                <textarea class="mono ceimp" rows="9" placeholder='{"kotan":"card","card":{…}}'></textarea>
+                <div class="actions"><button class="btn" data-x>Cancel</button>
+                    <button class="btn" data-file>Choose file…</button>
+                    <button class="btn" data-ok>Import</button></div></div>`;
+            const ta = ov.querySelector('.ceimp');
+            const doImport = (text) => {
+                let raw;
+                try { raw = JSON.parse(text); } catch { return toast('Not valid JSON', 'err'); }
+                const card = cardFromPayload(raw);
+                if (!card) return toast('No card or message payload found in that JSON', 'err');
+                applyCard(card);
+                ov.remove();
+                toast('Card imported — review it, then save');
+            };
+            ov.addEventListener('click', (e) => {
+                if (e.target === ov || e.target.hasAttribute('data-x')) ov.remove();
+                if (e.target.hasAttribute('data-ok')) doImport(ta.value.trim());
+                if (e.target.hasAttribute('data-file')) {
+                    const inp = document.createElement('input');
+                    inp.type = 'file'; inp.accept = '.json,application/json';
+                    inp.onchange = () => inp.files[0]?.text().then(doImport);
+                    inp.click();
+                }
+            });
+            document.body.appendChild(ov);
+            ta.focus();
+        };
+
+        return { collect };
     }
 
     // ---------- pages ----------

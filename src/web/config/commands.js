@@ -43,4 +43,5 @@ module.exports = [
     { name: 'ping', description: 'Shows the bot\'s response time and websocket latency.', module: 'tools' },
     { name: 'serverinfo', description: 'Shows information about this server.', module: 'tools' },
     { name: 'voicemaster', description: 'Controls your personal voice channel — ".voicemaster help" lists every action.', module: 'tools' },
+    { name: 'lastfm', description: 'Last.fm stats — now playing, recent tracks, top charts, profile and whoknows.', module: 'tools' },
 ];
