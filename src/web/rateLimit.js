@@ -11,10 +11,11 @@ function sweep(force = false) {
 }
 
 // Fastify preHandler — send+return inside a hook ends the request.
-function rateLimit({ windowMs = 60_000, max = 60 } = {}) {
+// global:true keys on the IP alone — one shared bucket across all routes.
+function rateLimit({ windowMs = 60_000, max = 60, global = false } = {}) {
     return async (req, reply) => {
         sweep();
-        const key = `${req.ip}|${req.routeOptions?.url || req.url.split('?')[0]}`;
+        const key = global ? req.ip : `${req.ip}|${req.routeOptions?.url || req.url.split('?')[0]}`;
         const now = Date.now();
         let b = buckets.get(key);
         if ((!b || b.reset < now) && buckets.size >= MAX_BUCKETS) {

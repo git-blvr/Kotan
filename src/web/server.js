@@ -48,6 +48,10 @@ async function startWebsite(client) {
     // Request decorators can't hold object values — attach via hook instead.
     app.addHook('preHandler', async (req) => { req.client = client; });
 
+    // Global per-IP cap — one shared bucket across every route, running
+    // before the per-route limits below.
+    app.addHook('onRequest', rateLimit({ windowMs: 60_000, max: 50, global: true }));
+
     // Security headers — the design uses inline styles in places, so CSP
     // permits 'unsafe-inline' for style only; scripts stay self-hosted.
     app.addHook('onSend', async (req, reply) => {

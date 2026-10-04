@@ -23,7 +23,7 @@ const cache = new Map(); // url -> color int
 // enforced here (not just in the API route) because accentFor() also fetches
 // at message-send time from stored card config. Off-list URLs return null and
 // callers fall back to the card's custom hex.
-const ALLOWED_IMAGE_HOSTS = /^(cdn\.discordapp\.com|media\.discordapp\.net|images-ext-\d+\.discordapp\.net|i\.imgur\.com|lastfm\.freetls\.fastly\.net|lastfm-img\d*\.akamaized\.net|[\w-]+\.last\.fm)$/;
+const ALLOWED_IMAGE_HOSTS = /^(cdn\.discordapp\.com|media\.discordapp\.net|images-ext-\d+\.discordapp\.net|i\.imgur\.com|lastfm[\w-]*\.freetls\.fastly\.net|lastfm-img\d*\.akamaized\.net|[\w-]+\.last\.fm)$/;
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
 async function toBuffer(input) {
