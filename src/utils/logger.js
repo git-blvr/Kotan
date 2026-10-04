@@ -6,6 +6,7 @@ const colors = {
     red: '\x1b[31m',
     green: '\x1b[32m',
     yellow: '\x1b[33m',
+    magenta: '\x1b[35m',
     cyan: '\x1b[36m',
 };
 
@@ -22,6 +23,7 @@ module.exports = {
     success: (...args) => console.log(...line(colors.green, 'DONE ', args)),
     warn: (...args) => console.warn(...line(colors.yellow, 'WARN ', args)),
     error: (...args) => console.error(...line(colors.red, 'ERROR', args)),
-    debug: (...args) => console.log(...line(colors.gray, 'DEBUG', args)), 
-    bot: (...args) => console.log(...line(colors.cyan, 'BOT ', args)), 
+    debug: (...args) => console.log(...line(colors.gray, 'DEBUG', args)),
+    bot: (...args) => console.log(...line(colors.cyan, 'BOT ', args)),
+    sentry: (...args) => console.log(...line(colors.magenta, 'SENTRY', args)),
 };

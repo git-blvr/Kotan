@@ -21,7 +21,10 @@ module.exports = {
                 await command.executeModal(interaction, client);
             } catch (err) {
                 logger.error(`Modal "${interaction.customId}" failed:`, err);
-                sentry.capture(err);
+                sentry.capture(err, {
+                    kind: 'modal', command: command.name, customId: interaction.customId,
+                    user: interaction.user?.id, guild: interaction.guild?.id,
+                });
             }
             return;
         }
@@ -35,7 +38,10 @@ module.exports = {
                 await command.executeComponent(interaction, client);
             } catch (err) {
                 logger.error(`Component "${interaction.customId}" failed:`, err);
-                sentry.capture(err);
+                sentry.capture(err, {
+                    kind: 'component', command: command.name, customId: interaction.customId,
+                    user: interaction.user?.id, guild: interaction.guild?.id,
+                });
             }
             return;
         }
@@ -57,7 +63,12 @@ module.exports = {
             await command.executeSlash(interaction, client);
         } catch (err) {
             logger.error(`Slash command "/${command.name}" failed:`, err);
-            sentry.capture(err);
+            sentry.capture(err, {
+                kind: 'slash', command: command.name,
+                subcommand: interaction.options?.getSubcommand(false) || undefined,
+                user: interaction.user?.id, guild: interaction.guild?.id,
+                channel: interaction.channel?.id,
+            });
             await sendError(interaction, 'Something went wrong while running that command.');
         }
     },

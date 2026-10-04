@@ -97,14 +97,14 @@ client.once(Events.ClientReady, () => {
 
 process.on('unhandledRejection', (err) => {
     logger.error('Unhandled rejection:', err);
-    sentry.capture(err);
+    sentry.capture(err, { kind: 'process', source: 'unhandledRejection' });
 });
 
 process.on('uncaughtException', (err) => {
     // Unrecoverable — log it, flush storage, exit. PM2 (ecosystem.config.js)
     // or the host's supervisor is responsible for restarting the process.
     logger.error('Uncaught exception:', err);
-    sentry.capture(err);
+    sentry.capture(err, { kind: 'process', source: 'uncaughtException' });
     shutdown('uncaughtException', 1);
 });
 
@@ -114,6 +114,7 @@ async function shutdown(signal, code = 0) {
         client.destroy();
         await db.flushActivity().catch(() => {});
         await db.closeDatabase();
+        await sentry.close(2000); // flush pending Sentry events before exit
     } catch (err) {
         logger.error('Error during shutdown:', err);
     }

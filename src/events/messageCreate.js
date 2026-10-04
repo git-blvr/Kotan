@@ -113,7 +113,12 @@ module.exports = {
             await command.execute(message, args, client);
         } catch (err) {
             logger.error(`Command "${command.name}" failed:`, err);
-            sentry.capture(err);
+            sentry.capture(err, {
+                kind: 'command', command: command.name,
+                args: args.join(' ').slice(0, 200),
+                user: message.author?.id, guild: message.guild?.id,
+                channel: message.channel?.id,
+            });
             await sendError(message, 'Something went wrong while running that command.');
         }
     },

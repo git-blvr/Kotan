@@ -87,7 +87,7 @@
         transition: width 0.55s cubic-bezier(0.22, 1, 0.36, 1), color 0.35s ease,
                     background-color 0.35s ease, transform 0.3s var(--spring);
     }
-    .nav-links a:hover, .nav-links a:focus-visible { width: 122px; }
+    .nav-links a:hover, .nav-links a:focus-visible { width: 132px; }
     .nav-ic {
         position: absolute; top: 50%; left: calc(50% - 9.5px);
         width: 19px; height: 19px; transform: translateY(-50%);
@@ -95,11 +95,12 @@
     }
     .nav-label {
         position: absolute; top: 50%; left: 27px; white-space: nowrap;
+        max-width: calc(100% - 58px); overflow: hidden;
         opacity: 0; transform: translateY(-50%);
         transition: opacity 0.3s ease 0.06s, left 0.5s cubic-bezier(0.22, 1, 0.36, 1);
     }
     .nav-links a:hover .nav-ic, .nav-links a:focus-visible .nav-ic {
-        left: calc(100% - 32px);
+        left: calc(100% - 30px);
     }
     .nav-links a:hover .nav-label, .nav-links a:focus-visible .nav-label {
         opacity: 1; left: 17px;
