@@ -550,10 +550,10 @@ async function execute(message, args, client) {
 const USER_OPT = { name: 'user', description: 'Whose stats to show (default: you)', type: Opt.User };
 
 module.exports = {
-    name: 'fm',
+    name: 'lastfm',
     description: 'Last.fm stats — now playing, charts, recents and whoknows.',
     usage: '[set|unset|recent|top|profile|whoknows] […]',
-    aliases: ['lastfm', 'lfm', 'scrobbles'],
+    aliases: ['lfm'],
     cooldown: 3,
     guildOnly: true,
     slash: [
@@ -634,6 +634,6 @@ module.exports = {
         }
     },
 
-    // Shared with the standalone .w/.wkt/.wka fmbot-parity commands.
-    internal: { whoKnows, parsePair },
+    // Shared with the standalone .w/.wkt/.wka and /fm commands.
+    internal: { whoKnows, parsePair, nowPlaying, execute },
 };
