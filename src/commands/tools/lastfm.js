@@ -550,10 +550,10 @@ async function execute(message, args, client) {
 const USER_OPT = { name: 'user', description: 'Whose stats to show (default: you)', type: Opt.User };
 
 module.exports = {
-    name: 'lastfm',
+    name: 'fm',
     description: 'Last.fm stats — now playing, charts, recents and whoknows.',
     usage: '[set|unset|recent|top|profile|whoknows] […]',
-    aliases: ['fm', 'scrobbles'],
+    aliases: ['lastfm', 'lfm', 'scrobbles'],
     cooldown: 3,
     guildOnly: true,
     slash: [

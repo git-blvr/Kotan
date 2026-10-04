@@ -43,7 +43,7 @@ module.exports = [
     { name: 'ping', description: 'Shows the bot\'s response time and websocket latency.', module: 'tools' },
     { name: 'serverinfo', description: 'Shows information about this server.', module: 'tools' },
     { name: 'voicemaster', description: 'Controls your personal voice channel — ".voicemaster help" lists every action.', module: 'tools' },
-    { name: 'lastfm', description: 'Last.fm stats — now playing, recent tracks, top charts, profile and whoknows.', module: 'tools' },
+    { name: 'fm', description: 'Last.fm stats — now playing, recent tracks, top charts, profile and whoknows.', module: 'tools' },
     { name: 'w', description: 'Server leaderboard for an artist\'s listeners (last.fm).', module: 'tools' },
     { name: 'wkt', description: 'Server leaderboard for a track\'s listeners (last.fm).', module: 'tools' },
     { name: 'wka', description: 'Server leaderboard for an album\'s listeners (last.fm).', module: 'tools' },
