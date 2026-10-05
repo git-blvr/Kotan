@@ -16,6 +16,7 @@ const inv = require('../../helpers/inv');
 const db = require('../../utils/database');
 const config = require('../../config');
 const logger = require('../../utils/logger');
+const E = require('../../utils/emojis');
 
 const text = (c) => new TextDisplayBuilder().setContent(c);
 const accentOf = (shop) =>
@@ -196,7 +197,7 @@ async function executeComponent(i) {
         const res = await buy({ guild: i.guild, member: i.member, user: i.user, settings }, item, cur);
         // Re-render the same section with the result pinned on top.
         const cat = cats.find((c) => c.id === item.sec);
-        const notice = res.err ? `⚠️ ${res.err}` : `✅ ${res.msg}`;
+        const notice = `${res.err ? E.warn : E.check} ${res.err || res.msg}`.trim();
         const fresh = res.profile || (await db.getProfile(i.guildId, uid));
         return i
             .update(

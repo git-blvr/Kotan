@@ -13,6 +13,7 @@ const { accentFor } = require('./dominantColor');
 const db = require('./database');
 const config = require('../config');
 const logger = require('./logger');
+const E = require('./emojis');
 
 // VoiceMaster — a configured "trigger" voice channel hands each member
 // their own temporary voice channel. Owners manage it from the posted
@@ -298,7 +299,7 @@ async function run(guild, member, action, arg) {
             return finish(
                 true,
                 `**${ch.name}** — owner <@${st.owner}> · ${ch.members.size}${ch.userLimit ? `/${ch.userLimit}` : ''} connected · ` +
-                    `${st.locked ? '🔒' : '🔓'} ${st.hidden ? '🙈 hidden' : 'visible'} · ` +
+                    `${st.locked ? E.lock : E.unlock} ${st.hidden ? `${E.hide} hidden`.trim() : 'visible'} · ` +
                     `${st.trusted.length} trusted · ${st.blocked.length} blocked`
             );
         default:

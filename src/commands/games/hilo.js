@@ -7,9 +7,10 @@ const { betCapped, scaled } = require('../../helpers/gamecfg')
 const { winAmount } = require('../../helpers/inv');
 const db = require('../../utils/database');
 const config = require('../../config');
+const E = require('../../utils/emojis');
 
 const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
-const SUITS = ['♠', '♥', '♦', '♣'];
+const SUITS = [E.spade, E.heart, E.diamond, E.club];
 
 const draw = () => Math.floor(Math.random() * 13); // 0..12 -> A..K
 const show = (card) => `${RANKS[card]}${SUITS[Math.floor(Math.random() * SUITS.length)]}`;

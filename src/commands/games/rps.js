@@ -6,10 +6,11 @@ const { betCapped, scaled } = require('../../helpers/gamecfg')
 const { winAmount } = require('../../helpers/inv');
 const db = require('../../utils/database');
 const config = require('../../config');
+const E = require('../../utils/emojis');
 
 const MOVES = { r: 'rock', rock: 'rock', p: 'paper', paper: 'paper', s: 'scissors', scissors: 'scissors' };
 const BEATS = { rock: 'scissors', paper: 'rock', scissors: 'paper' };
-const EMOJI = { rock: '🪨', paper: '📄', scissors: '✂️' };
+const EMOJI = { rock: E.rock, paper: E.paper, scissors: E.scissors };
 
 async function run(ctx, move, betInput) {
     if (!move)

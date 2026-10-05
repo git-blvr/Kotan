@@ -6,6 +6,7 @@ const { gameCfg } = require('../../helpers/gamecfg')
 const { winAmount } = require('../../helpers/inv');
 const db = require('../../utils/database');
 const config = require('../../config');
+const E = require('../../utils/emojis');
 
 const WORDS = [
     'discord', 'keyboard', 'universe', 'midnight', 'journey', 'diamond', 'thunder',
@@ -55,7 +56,7 @@ async function run(ctx) {
         cv2(
             base({
                 color: config.colors.success,
-                description: `⚡ **${winner.author.username}** unscrambled **${word}** and won ${formatCoins(reward, cur)}!`,
+                description: `${E.bolt} **${winner.author.username}** unscrambled **${word}** and won ${formatCoins(reward, cur)}!`.trim(),
             })
         )
     );

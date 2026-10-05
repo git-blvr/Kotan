@@ -6,6 +6,7 @@ const { gameCfg } = require('../../helpers/gamecfg')
 const { winAmount } = require('../../helpers/inv');
 const db = require('../../utils/database');
 const config = require('../../config');
+const E = require('../../utils/emojis');
 
 const MAX_NUMBER = 50;
 const TRIES = 4;
@@ -43,7 +44,7 @@ async function run(ctx) {
                 cv2(
                     base({
                         color: config.colors.success,
-                        description: `🎯 **${ctx.user.username}** got it — **${target}**! Won ${formatCoins(reward, cur)}.`,
+                        description: `${E.target} **${ctx.user.username}** got it — **${target}**! Won ${formatCoins(reward, cur)}.`.trim(),
                     })
                 )
             );

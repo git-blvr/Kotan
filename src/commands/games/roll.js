@@ -6,6 +6,7 @@ const { betCapped, scaled } = require('../../helpers/gamecfg')
 const { winAmount } = require('../../helpers/inv');
 const db = require('../../utils/database');
 const config = require('../../config');
+const E = require('../../utils/emojis');
 
 async function run(ctx, sides, betInput) {
     if (!Number.isInteger(sides) || sides < 2 || sides > 1000)
@@ -16,7 +17,7 @@ async function run(ctx, sides, betInput) {
     // No bet — plain fun roll.
     if (!betInput)
         return ctx.reply(
-            cv2(base({ title: 'Dice roll', description: `🎲 You rolled a **${you}** (d${sides}).` }))
+            cv2(base({ title: 'Dice roll', description: `${E.dice} You rolled a **${you}** (d${sides}).`.trim() }))
         );
 
     const cur = ctx.settings?.economy?.currency;
@@ -43,7 +44,7 @@ async function run(ctx, sides, betInput) {
                           ? config.colors.error
                           : config.colors.warning,
                 description:
-                    `🎲 You: **${you}**   —   Kotan: **${botRoll}**\n` +
+                    `${E.dice} You: **${you}**   —   Kotan: **${botRoll}**\n` +
                     (outcome === 'tie'
                         ? `Tie — your ${formatCoins(bet, cur)} is back.`
                         : `You ${outcome === 'win' ? 'won' : 'lost'} ${formatCoins(bet, cur)}.\n` +

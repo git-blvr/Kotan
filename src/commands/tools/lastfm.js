@@ -99,14 +99,14 @@ async function nowPlaying(ctx, user) {
 
     const c = base({
         color: await accentOf(t),
-        author: `${playing ? `${E.music || '🎧'} Now playing` : 'Last track'} — ${user.username}`,
+        author: `${playing ? 'Now playing' : 'Last track'} — ${user.username}`,
         title: t.name,
         url: t.url,
         description: `**${artist}**${album ? ` — *${album}*` : ''}`,
         thumbnail: fm.img(t),
         fields: [
             ...(plays ? [{ name: 'Your plays', value: plays, inline: true }] : []),
-            ...(t.loved === '1' ? [{ name: 'Loved', value: '❤️', inline: true }] : []),
+            ...(t.loved === '1' ? [{ name: 'Loved', value: E.heart || 'yes', inline: true }] : []),
             ...(info.user?.playcount
                 ? [{ name: 'Total scrobbles', value: fm.num(info.user.playcount), inline: true }]
                 : []),
@@ -128,7 +128,7 @@ async function recentTracks(ctx, user, count = 10) {
 
     const lines = tracks.map((t, i) => {
         const np = t['@attr']?.nowplaying === 'true' || t['@attr']?.nowplaying === true;
-        const when = np ? '🎧 now' : t.date?.uts ? timestamp(t.date.uts * 1000) : '';
+        const when = np ? 'now' : t.date?.uts ? timestamp(t.date.uts * 1000) : '';
         return `**${i + 1}.** [${t.name}](${t.url}) — ${t.artist['#text']}${when ? ` · ${when}` : ''}`;
     });
     return ctx.reply(
@@ -302,7 +302,7 @@ async function trackInfo(ctx, query) {
                     { name: 'Global plays', value: fm.num(t.playcount), inline: true },
                     ...(t.userplaycount ? [{ name: 'Your plays', value: fm.num(t.userplaycount), inline: true }] : []),
                     ...(dur ? [{ name: 'Length', value: dur, inline: true }] : []),
-                    ...(t.loved === '1' ? [{ name: 'Loved', value: '❤️', inline: true }] : []),
+                    ...(t.loved === '1' ? [{ name: 'Loved', value: E.heart || 'yes', inline: true }] : []),
                 ],
                 footer: 'last.fm track info',
             })

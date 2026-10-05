@@ -11,6 +11,7 @@ const { sendError } = require('../../helpers/embeds');
 const { resolveMember } = require('../../helpers/resolve');
 const vm = require('../../utils/voicemaster');
 const db = require('../../utils/database');
+const E = require('../../utils/emojis');
 
 // VoiceMaster command — the chat side of the feature. `.vc <action>` in a
 // voice channel's built-in chat (or anywhere) controls your channel; the
@@ -64,11 +65,11 @@ async function execute(message, args) {
         const target = await resolveMember(message, args[1]);
         if (!target) return sendError(message, `Mention the member — e.g. \`vc ${act} @user\`.`);
         const r = await vm.run(message.guild, message.member, act, target.id);
-        return message.reply({ content: `${r.ok ? '✅' : '⚠️'} ${r.msg}`, allowedMentions: { parse: [] } }).catch(() => {});
+        return message.reply({ content: `${r.ok ? E.check : E.warn} ${r.msg}`.trim(), allowedMentions: { parse: [] } }).catch(() => {});
     }
 
     const r = await vm.run(message.guild, message.member, act, args.slice(1).join(' '));
-    return message.reply({ content: `${r.ok ? '✅' : '⚠️'} ${r.msg}`, allowedMentions: { parse: [] } }).catch(() => {});
+    return message.reply({ content: `${r.ok ? E.check : E.warn} ${r.msg}`.trim(), allowedMentions: { parse: [] } }).catch(() => {});
 }
 
 // "voicemaster:<action>" buttons/selects and "voicemaster:pick:<action>"
@@ -78,7 +79,7 @@ async function executeComponent(i) {
     const member = i.member;
     if (!member) return;
     const eph = (msg, extra = {}) => ({ content: msg, ephemeral: true, ...extra });
-    const done = (r) => `${r.ok ? '✅' : '⚠️'} ${r.msg}`;
+    const done = (r) => `${r.ok ? E.check : E.warn} ${r.msg}`.trim();
 
     if (act === 'pick') {
         const target = i.values?.[0];
@@ -112,11 +113,11 @@ async function executeComponent(i) {
     if (PICK_ACTIONS.includes(act)) {
         if (act === 'kick' || act === 'transfer') {
             const { ch } = await vm.ownedChannel(i.guild, member);
-            if (!ch) return i.reply(eph("⚠️ You don't have a channel — join the trigger channel to make one.")).catch(() => {});
+            if (!ch) return i.reply(eph(`${E.warn} You don't have a channel — join the trigger channel to make one.`.trim())).catch(() => {});
             const opts = ch.members
                 .filter((m) => !m.user.bot && m.id !== member.id)
                 .map((m) => ({ label: m.displayName.slice(0, 100), value: m.id }));
-            if (!opts.length) return i.reply(eph('⚠️ Nobody else is in your channel.')).catch(() => {});
+            if (!opts.length) return i.reply(eph(`${E.warn} Nobody else is in your channel.`.trim())).catch(() => {});
             const row = new ActionRowBuilder().addComponents(
                 new StringSelectMenuBuilder()
                     .setCustomId(`voicemaster:pick:${act}`)
@@ -141,7 +142,7 @@ async function executeComponent(i) {
 async function executeModal(i) {
     if (i.customId !== 'voicemaster:rename') return;
     const r = await vm.run(i.guild, i.member, 'rename', i.fields.getTextInputValue('name'));
-    return i.reply({ content: `${r.ok ? '✅' : '⚠️'} ${r.msg}`, ephemeral: true }).catch(() => {});
+    return i.reply({ content: `${r.ok ? E.check : E.warn} ${r.msg}`.trim(), ephemeral: true }).catch(() => {});
 }
 
 module.exports = {

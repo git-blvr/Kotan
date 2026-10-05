@@ -2,6 +2,7 @@ const { ApplicationCommandOptionType: Opt } = require('discord.js');
 const { base, sendError, cv2 } = require('../../helpers/embeds');
 const { fromMessage, fromInteraction } = require('../../helpers/ctx');
 const config = require('../../config');
+const E = require('../../utils/emojis');
 
 const ANSWERS = [
     { text: 'Yes, definitely.', tone: 'success' },
@@ -26,7 +27,7 @@ async function run(ctx, question) {
     return ctx.reply(
         cv2(
             base({
-                title: '🎱 8-ball',
+                title: `${E.eightball} 8-ball`.trim(),
                 color: config.colors[answer.tone],
                 description: `**${question}**\n${answer.text}`,
             })

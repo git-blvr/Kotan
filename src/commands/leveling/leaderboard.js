@@ -2,8 +2,9 @@ const { base, cv2 } = require('../../helpers/embeds');
 const { fromMessage, fromInteraction } = require('../../helpers/ctx');
 const db = require('../../utils/database');
 const config = require('../../config');
+const E = require('../../utils/emojis');
 
-const MEDALS = ['🥇', '🥈', '🥉'];
+const MEDALS = [E.medal1, E.medal2, E.medal3];
 
 async function run(ctx) {
     const rows = await db.getTopLevels(ctx.guild.id, 10);

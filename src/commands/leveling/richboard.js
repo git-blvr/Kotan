@@ -3,8 +3,9 @@ const { formatCoins } = require('../../helpers/format');
 const { fromMessage, fromInteraction } = require('../../helpers/ctx');
 const db = require('../../utils/database');
 const config = require('../../config');
+const E = require('../../utils/emojis');
 
-const MEDALS = ['🥇', '🥈', '🥉'];
+const MEDALS = [E.medal1, E.medal2, E.medal3];
 
 async function run(ctx) {
     const cur = ctx.settings?.economy?.currency;

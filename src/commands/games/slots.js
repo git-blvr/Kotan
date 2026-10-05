@@ -6,10 +6,11 @@ const { betCapped, gameCfg } = require('../../helpers/gamecfg')
 const { winAmount } = require('../../helpers/inv');
 const db = require('../../utils/database');
 const config = require('../../config');
+const E = require('../../utils/emojis');
 
-// 💎 jackpot x10 · ⭐ triple x6 · other triples x4 · a pair refunds half.
-const REELS = ['🍒', '🍋', '🍇', '🍉', '⭐', '💎'];
-const TRIPLE = { '💎': 10, '⭐': 6 };
+// coin jackpot x10 · star triple x6 · other triples x4 · a pair refunds half.
+const REELS = [E.cherry, E.lemon, E.bolt, E.melon, E.star, E.coin];
+const TRIPLE = { [E.coin]: 10, [E.star]: 6 };
 
 async function run(ctx, betInput) {
     const cur = ctx.settings?.economy?.currency;

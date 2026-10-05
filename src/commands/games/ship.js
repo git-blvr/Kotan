@@ -5,6 +5,7 @@ const { base, sendError, cv2 } = require('../../helpers/embeds');
 const { resolveMember, resolveUser } = require('../../helpers/resolve');
 const { fromMessage, fromInteraction } = require('../../helpers/ctx');
 const { fetchRetry } = require('../../utils/http');
+const E = require('../../utils/emojis');
 
 // Bundled so the % renders even on hosts with no system fonts.
 const FONT = (() => {
@@ -150,7 +151,7 @@ async function run(ctx, userA, userB) {
 
     const container = base({
         color: pct >= 30 ? 0xff6b9d : 0x8a93a8,
-        title: `💞 ${a.username} × ${b.username}`,
+        title: `${E.lovehearts} ${a.username} × ${b.username}`.trim(),
         description: shipLine(pct),
         image: 'attachment://ship.png',
     });

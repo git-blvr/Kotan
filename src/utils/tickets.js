@@ -16,6 +16,7 @@ const { accentFor } = require('./dominantColor');
 const db = require('./database');
 const config = require('../config');
 const logger = require('./logger');
+const E = require('./emojis');
 
 // Guild-level placeholders — panels aren't member events, so only server
 // fields resolve (component image fields accept {icon}).
@@ -177,7 +178,7 @@ async function openTicket(guild, member, topicIdx, settings, client) {
         })
         .catch((e) => logger.warn(`ticket opener failed: ${e.message}`));
 
-    await tlog(guild, t, `📥 **#${data.count}** opened by ${member}${topic ? ` — topic: **${topic.name}**` : ''} → <#${channel.id}>`);
+    await tlog(guild, t, `${E.inbox} **#${data.count}** opened by ${member}${topic ? ` — topic: **${topic.name}**` : ''} → <#${channel.id}>`);
     return { channel };
 }
 
@@ -195,7 +196,7 @@ async function closeTicket(channel, guild, by, settings) {
         await tlog(
             guild,
             t,
-            `📤 **#${rec.number}** closed by ${by} — opened by <@${rec.user}>${rec.topic ? ` · **${rec.topic}**` : ''}`
+            `${E.outbox} **#${rec.number}** closed by ${by} — opened by <@${rec.user}>${rec.topic ? ` · **${rec.topic}**` : ''}`
         );
     setTimeout(() => channel.delete('Kotan ticket closed').catch(() => {}), 5000);
 }

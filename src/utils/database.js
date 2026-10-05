@@ -2,6 +2,7 @@ const path = require('path');
 const { Keyv } = require('keyv');
 const SqliteStore = require('./sqliteStore');
 const logger = require('./logger');
+const E = require('./emojis');
 
 // Storage layer for Kotan.
 //
@@ -147,7 +148,7 @@ const DEFAULT_SETTINGS = {
     // Server-boost perks — fires on premium_since appearing.
     boosts: {
         channel: null,      // boost announcement channel; null = off
-        message: '{user} just boosted {server}! 🚀',
+        message: `{user} just boosted {server}! ${E.rocket}`.trim(),
         roleId: null,       // role granted to boosters
         // Passive perks while a member is boosting (premium_since set).
         perks: { games: 1.0, coins: 1.0, xp: 1.0, shop: 0 },

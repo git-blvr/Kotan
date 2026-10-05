@@ -2,6 +2,7 @@ const { PermissionFlagsBits, MessageFlags } = require('discord.js');
 const { success, error, sendError, cv2 } = require('../../helpers/embeds');
 const cap = require('../../utils/captcha');
 const db = require('../../utils/database');
+const E = require('../../utils/emojis');
 
 // CAPTCHA verification — configured on the dashboard (CAPTCHA page), the
 // panel's Verify button routes here as `verify:start`; the three answer
@@ -46,7 +47,7 @@ async function executeComponent(i) {
         const ok = await i.member.roles.add(c.roleId, 'Kotan CAPTCHA passed').then(() => true).catch(() => false);
         if (!ok)
             return i.update({ ...cv2(error('You passed, but I couldn\'t give you the role — check my role position/permissions.')) }).catch(() => {});
-        cap.clog(i.guild, c, `✅ ${i.user} (${i.user.tag}) passed verification — role granted.`).catch(() => {});
+        cap.clog(i.guild, c, `${E.check} ${i.user} (${i.user.tag}) passed verification — role granted.`.trim()).catch(() => {});
         return i.update({ ...cv2(success('Verified — welcome to the server!', 'CAPTCHA')), attachments: [] }).catch(() => {});
     }
 }
