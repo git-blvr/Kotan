@@ -68,10 +68,11 @@ const afk = createStore('afk');           // per-member away status + ping log
 const activity = createStore('activity'); // per-day activity aggregates (dashboard Activity page)
 const voicemaster = createStore('voicemaster'); // temp voice channels: owner, trusted/blocked lists
 const lastfm = createStore('lastfm');           // discord user id -> last.fm username (global, not per-guild)
+const bank = createStore('bank');               // discord user id -> global bank account + deposit windows
 
 // A store error (Redis disconnect, disk failure) must never crash the process.
 // @keyv/redis reconnects automatically; SQLite is in-process and won't drop.
-for (const store of [profiles, warns, tempbans, guilds, usage, tags, audit, meta, sessions, tickets, afk, activity, voicemaster, lastfm]) {
+for (const store of [profiles, warns, tempbans, guilds, usage, tags, audit, meta, sessions, tickets, afk, activity, voicemaster, lastfm, bank]) {
     store.on('error', (err) => logger.error(`Storage error in "${store.namespace}":`, err));
 }
 if (sharedRedis) sharedRedis.on('error', (err) => logger.error('Redis error:', err));
@@ -578,6 +579,54 @@ async function getRecentModActions(guildId, limit = 5) {
     return out.sort((a, b) => b.at - a.at).slice(0, limit);
 }
 
+// ---------- bank (global, cross-guild) ----------
+// One bank account per Discord user, shared by every guild — wallets stay
+// per-guild, the vault is global. Deposits are capped per UTC day/month.
+
+const BANK_DAY_CAP = 250_000;
+const BANK_MONTH_CAP = 1_000_000;
+
+async function getBank(userId) {
+    const rec = await bank.get(String(userId));
+    if (!rec) return { balance: 0, day: '', dayTotal: 0, month: '', monthTotal: 0 };
+    const today = new Date().toISOString().slice(0, 10);
+    // Totals are windowed — show zero for stale windows without writing.
+    return {
+        ...rec,
+        dayTotal: rec.day === today ? rec.dayTotal : 0,
+        monthTotal: rec.month === today.slice(0, 7) ? rec.monthTotal : 0,
+    };
+}
+
+async function bankDeposit(userId, amount) {
+    const rec = await getBank(userId);
+    const leftDay = BANK_DAY_CAP - rec.dayTotal;
+    const leftMonth = BANK_MONTH_CAP - rec.monthTotal;
+    if (amount > leftDay) return { err: 'daycap', remaining: Math.max(0, leftDay) };
+    if (amount > leftMonth) return { err: 'monthcap', remaining: Math.max(0, leftMonth) };
+    const today = new Date().toISOString().slice(0, 10);
+    rec.balance += amount;
+    rec.day = today; rec.dayTotal += amount;
+    rec.month = today.slice(0, 7); rec.monthTotal += amount;
+    await bank.set(String(userId), rec);
+    return { ok: true, bank: rec };
+}
+
+async function bankWithdraw(userId, amount) {
+    const rec = await getBank(userId);
+    if (amount > rec.balance) return { err: 'funds' };
+    rec.balance -= amount;
+    await bank.set(String(userId), rec);
+    return { ok: true, bank: rec };
+}
+
+async function getTopBank(limit = 10) {
+    const rows = [];
+    for await (const [userId, rec] of bank.iterator())
+        if (rec?.balance > 0) rows.push({ userId, balance: rec.balance });
+    return rows.sort((a, b) => b.balance - a.balance).slice(0, limit);
+}
+
 // ---------- warns ----------
 
 async function getWarns(guildId, userId) {
@@ -894,6 +943,12 @@ module.exports = {
     setLastfm,
     clearLastfm,
     iterateLastfm,
+    getBank,
+    bankDeposit,
+    bankWithdraw,
+    getTopBank,
+    BANK_DAY_CAP,
+    BANK_MONTH_CAP,
     getAfk,
     setAfk,
     clearAfk,

@@ -15,6 +15,11 @@ async function run(ctx, target, amountInput) {
     const sender = await db.getProfile(ctx.guild.id, ctx.user.id);
     const amount = parseAmount(amountInput, sender.wallet);
     if (!amount) return sendError(ctx, 'Invalid amount. Examples: `250`, `1k`, `all`, `half`.');
+    // Per-payment cap — default 100k, a manager can raise it to 300k in the
+    // dashboard (Economy → Pay cap).
+    const cap = ctx.settings?.economy?.payMax ?? 100_000;
+    if (amount > cap)
+        return sendError(ctx, `Payments are capped at ${formatCoins(cap, cur)} per transfer — a manager can raise it up to **300,000** in the dashboard.`);
     if (amount > sender.wallet)
         return sendError(ctx, `You only have ${formatCoins(sender.wallet, cur)} in your wallet.`);
 

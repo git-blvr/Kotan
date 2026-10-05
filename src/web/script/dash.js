@@ -1798,6 +1798,7 @@
                 <div class="card"><h3>Currency</h3><div class="grid2">
                     ${fldHtml('Currency name', txtIn('currency', s.economy.currency || ''), 'empty = default "coins"')}
                     ${fldHtml('Starting balance', numIn('startBalance', s.economy.startBalance, 0, 10000000), 'wallet for new members')}
+                    ${fldHtml('Pay cap', numIn('payMax', s.economy.payMax, 1, 300000), 'max per payment — empty = 100,000, up to 300,000')}
                 </div></div>
                 <div class="card"><h3>Daily reward</h3><div class="grid2">
                     ${fldHtml('Base reward', numIn('dailyBase', s.economy.dailyBase, 0, 1000000), 'empty = 500')}
@@ -1821,7 +1822,7 @@
             bindSave(page, 'economy', (el) => {
                 const f = formVals(el);
                 return {
-                    currency: f.currency, startBalance: f.startBalance,
+                    currency: f.currency, startBalance: f.startBalance, payMax: f.payMax,
                     dailyBase: f.dailyBase, dailyStreak: f.dailyStreak, dailyMaxStreak: f.dailyMaxStreak,
                     shop: items.map((x, i) => ({ name: f[`sn_${i}`], price: +f[`sp_${i}`] || 0, description: f[`sd_${i}`] })),
                 };

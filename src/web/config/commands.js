@@ -8,6 +8,7 @@ module.exports = [
     { name: 'balance', description: 'Shows your (or another user\'s) wallet, level and rankings.', module: 'economy' },
     { name: 'daily', description: 'Claims your daily reward. Claim every day to grow your streak.', module: 'economy' },
     { name: 'pay', description: 'Transfers coins from your wallet to another member.', module: 'economy' },
+    { name: 'bank', description: 'Global bank account — deposit and withdraw coins across every server.', module: 'economy' },
     { name: 'shop', description: 'Shows the item shop. Use "shop buy <item>" to purchase.', module: 'economy' },
     { name: 'coinflip', description: 'Flips a coin — free, against the house, or wagered against another member.', module: 'games' },
     { name: '8ball', description: 'Ask the magic 8-ball a question.', module: 'games' },

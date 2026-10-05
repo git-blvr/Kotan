@@ -12,10 +12,11 @@ async function run(ctx, user) {
     if (!user) return sendError(ctx, 'I could not find that user.');
     if (user.bot) return sendError(ctx, 'Bots do not have a balance.');
 
-    const [profile, topLevels, topRich] = await Promise.all([
+    const [profile, topLevels, topRich, bankAcc] = await Promise.all([
         db.getProfile(ctx.guild.id, user.id),
         db.getTopLevels(ctx.guild.id, 1000),
         db.getTopRich(ctx.guild.id, 1000),
+        db.getBank(user.id),
     ]);
     const cur = ctx.settings?.economy?.currency || config.economy.currency;
 
@@ -33,6 +34,7 @@ async function run(ctx, user) {
             `Top **#${rbPos || '—'}** on Richboard`,
         fields: [
             { name: 'Wallet', value: formatCoins(profile.wallet, cur), inline: true },
+            { name: 'Bank (global)', value: formatCoins(bankAcc.balance, cur), inline: true },
             { name: 'Level', value: `**${profile.level}**`, inline: true },
             { name: 'XP', value: `**${profile.xp}/${needed}**`, inline: true },
         ],

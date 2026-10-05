@@ -25,7 +25,7 @@ const DEFAULTS = {
         goodbyeEmbed: { enabled: false, style: 'embed', title: '', description: '', color: '', colorMode: '', footer: '', thumbnail: true, components: [] },
     },
     roles: { autorole: null, reactionRoles: [] },
-    economy: { currency: null, dailyBase: null, dailyStreak: null, dailyMaxStreak: null, startBalance: null, shop: [] },
+    economy: { currency: null, dailyBase: null, dailyStreak: null, dailyMaxStreak: null, startBalance: null, payMax: null, shop: [] },
     games: { guessReward: 150, scrambleReward: 200, winMultiplier: 1, maxBet: 0, per: {} },
     boosts: { channel: null, message: '{user} just boosted {server}! 🚀', roleId: null, perks: { games: 1, coins: 1, xp: 1, shop: 0 },
               card: { enabled: false, style: 'cv2', title: '', description: '', color: '', colorMode: '', footer: '', thumbnail: true, thumb: '', components: [] } },
@@ -283,6 +283,7 @@ const SECTIONS = {
         if (f.dailyStreak !== undefined) s.economy.dailyStreak = num(f.dailyStreak, 0, 1_000_000, null);
         if (f.dailyMaxStreak !== undefined) s.economy.dailyMaxStreak = num(f.dailyMaxStreak, 0, 10_000_000, null);
         if (f.startBalance !== undefined) s.economy.startBalance = num(f.startBalance, 0, 10_000_000, null);
+        if (f.payMax !== undefined) s.economy.payMax = num(f.payMax, 1, 300_000, null);
         if (f.shop !== undefined) {
             s.economy.shop = arr(f.shop).filter((i) => i && typeof i === 'object').slice(0, 25)
                 .map((i) => ({
