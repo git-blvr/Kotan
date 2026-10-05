@@ -10,6 +10,7 @@ const {
     MessageFlags,
 } = require('discord.js');
 const config = require('../config');
+const E = require('../utils/emojis');
 
 // Component V2 factories so every command produces consistent-looking output.
 // Usage: message.reply(cv2(success('Done!')))
@@ -81,16 +82,20 @@ function base(options = {}) {
     return container;
 }
 
+// Emoji-prefix helper — "" when the app emoji isn't uploaded yet, so the
+// text never picks up a stray leading space.
+const tag = (emoji, str) => (emoji ? `${emoji} ${str}` : str);
+
 const info = (description, title = 'Kotan') =>
-    base({ color: config.colors.main, title, description });
+    base({ color: config.colors.main, title: tag(E.info, title), description });
 
 const success = (description, title = 'Success') =>
-    base({ color: config.colors.success, title, description });
+    base({ color: config.colors.success, title: tag(E.check, title), description });
 
 // Errors and warnings are one-liners: accent-colored container, description
 // text only, no title — they should glance, not headline.
-const error = (description) => base({ color: config.colors.error, description });
-const warning = (description) => base({ color: config.colors.warning, description });
+const error = (description) => base({ color: config.colors.error, description: tag(E.cross, description) });
+const warning = (description) => base({ color: config.colors.warning, description: tag(E.warn, description) });
 
 // Shortcut used all over commands and the message handler for user-facing
 // failures. Always resolves so callers can safely `return sendError(...)`.

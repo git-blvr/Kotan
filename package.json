@@ -12,7 +12,8 @@
     "smallify": "node scripts/smallify.js",
     "s": "node scripts/smallify.js",
     "preview": "node scripts/preview.js",
-    "ai": "node scripts/openrouter.js"
+    "ai": "node scripts/openrouter.js",
+    "emojis": "node scripts/uploadEmojis.js"
   },
   "keywords": [
     "discord",

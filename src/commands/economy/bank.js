@@ -3,6 +3,7 @@ const { base, success, sendError, cv2 } = require('../../helpers/embeds');
 const { fromMessage, fromInteraction } = require('../../helpers/ctx');
 const { resolveMember } = require('../../helpers/resolve');
 const { formatCoins, formatNumber, parseAmount } = require('../../helpers/format');
+const E = require('../../utils/emojis');
 const db = require('../../utils/database');
 const config = require('../../config');
 
@@ -33,7 +34,7 @@ async function showAccount(ctx, user) {
         cv2(
             base({
                 color: config.colors.main,
-                title: `🏦 ${user.username}'s bank`,
+                title: `${E.bank || '🏦'} ${user.username}'s bank`,
                 thumbnail: user.displayAvatarURL({ size: 128, extension: 'png' }),
                 fields: [
                     { name: 'Bank (global)', value: formatCoins(acc.balance, c), inline: true },
@@ -108,7 +109,7 @@ async function top(ctx) {
         (r, i) => `**${i + 1}.** ${users[i]?.username ?? `<@${r.userId}>`} — ${formatCoins(r.balance, cur(ctx))}`
     );
     return ctx.reply(
-        cv2(base({ color: config.colors.main, title: '🏦 Richest vaults — global', description: lines.join('\n') }))
+        cv2(base({ color: config.colors.main, title: `${E.bank || '🏦'} Richest vaults — global`, description: lines.join('\n') }))
     );
 }
 

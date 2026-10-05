@@ -4,6 +4,7 @@ const { fromMessage, fromInteraction } = require('../../helpers/ctx');
 const { resolveMember } = require('../../helpers/resolve');
 const { timestamp } = require('../../helpers/format');
 const { dominantColor } = require('../../utils/dominantColor');
+const E = require('../../utils/emojis');
 const db = require('../../utils/database');
 const fm = require('../../utils/lastfm');
 
@@ -98,7 +99,7 @@ async function nowPlaying(ctx, user) {
 
     const c = base({
         color: await accentOf(t),
-        author: `${playing ? '🎧 Now playing' : 'Last track'} — ${user.username}`,
+        author: `${playing ? `${E.music || '🎧'} Now playing` : 'Last track'} — ${user.username}`,
         title: t.name,
         url: t.url,
         description: `**${artist}**${album ? ` — *${album}*` : ''}`,
