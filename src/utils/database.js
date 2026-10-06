@@ -124,6 +124,15 @@ const DEFAULT_SETTINGS = {
         goodbyeChannel: null,
         goodbyeMessage: '**{username}** left {server}.',
         goodbyeEmbed: { enabled: false, style: 'embed', title: '', description: '', color: '', colorMode: '', footer: '', thumbnail: true, thumb: '', components: [] },
+        // canvas welcome image — positions are 0-1 fractions of the canvas.
+        image: {
+            enabled: false, width: 800, height: 300, background: '', bgColor: '1e1f22',
+            elements: [
+                { id: 'a1', type: 'avatar', x: 0.5, y: 0.38, size: 0.36, ring: '5865f2' },
+                { id: 't1', type: 'text', x: 0.5, y: 0.70, text: 'Welcome {username}', size: 0.11, color: 'ffffff', bold: true, align: 'center' },
+                { id: 't2', type: 'text', x: 0.5, y: 0.86, text: 'You are member #{members}', size: 0.055, color: 'b9bbbe', bold: false, align: 'center' },
+            ],
+        },
     },
     roles: {
         autorole: null,     // role id granted on join
@@ -264,6 +273,7 @@ async function getGuildSettings(guildId) {
     for (const k of NESTED) value[k] = { ...DEFAULT_SETTINGS[k], ...(value[k] || {}) };
     value.welcome.embed = { ...DEFAULT_SETTINGS.welcome.embed, ...(value.welcome.embed || {}) };
     value.welcome.goodbyeEmbed = { ...DEFAULT_SETTINGS.welcome.goodbyeEmbed, ...(value.welcome.goodbyeEmbed || {}) };
+    value.welcome.image = { ...DEFAULT_SETTINGS.welcome.image, ...(value.welcome.image || {}) };
     settingsCache.set(guildId, { value, expires: Date.now() + SETTINGS_TTL });
     return value;
 }

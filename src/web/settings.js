@@ -23,6 +23,14 @@ const DEFAULTS = {
         goodbyeChannel: null,
         goodbyeMessage: '**{username}** left {server}.',
         goodbyeEmbed: { enabled: false, style: 'embed', title: '', description: '', color: '', colorMode: '', footer: '', thumbnail: true, components: [] },
+        image: {
+            enabled: false, width: 800, height: 300, background: '', bgColor: '1e1f22',
+            elements: [
+                { id: 'a1', type: 'avatar', x: 0.5, y: 0.38, size: 0.36, ring: '5865f2' },
+                { id: 't1', type: 'text', x: 0.5, y: 0.70, text: 'Welcome {username}', size: 0.11, color: 'ffffff', bold: true, align: 'center' },
+                { id: 't2', type: 'text', x: 0.5, y: 0.86, text: 'You are member #{members}', size: 0.055, color: 'b9bbbe', bold: false, align: 'center' },
+            ],
+        },
     },
     roles: { autorole: null, reactionRoles: [] },
     economy: { currency: null, dailyBase: null, dailyStreak: null, dailyMaxStreak: null, startBalance: null, payMax: null, shop: [] },
@@ -76,6 +84,7 @@ async function getSettings(guildId) {
     // Second level — the embed payloads inside `welcome` are objects too.
     merged.welcome.embed = { ...DEFAULTS.welcome.embed, ...(s.welcome?.embed || {}) };
     merged.welcome.goodbyeEmbed = { ...DEFAULTS.welcome.goodbyeEmbed, ...(s.welcome?.goodbyeEmbed || {}) };
+    merged.welcome.image = { ...DEFAULTS.welcome.image, ...(s.welcome?.image || {}) };
     merged.voicemaster.panel = { ...DEFAULTS.voicemaster.panel, ...(s.voicemaster?.panel || {}) };
     // Shop: translate the old fixed `categories` shape into `sections` on the
     // way out — the dashboard only ever sees the current shape.
@@ -247,6 +256,32 @@ const SECTIONS = {
         if (target.enabled && target.style === 'cv2' && !target.components?.length)
             return 'CV2 card needs at least one component';
     },
+    // Canvas welcome image — element positions/sizes are 0-1 fractions so the
+    // layout survives any canvas size. Colors store without '#'.
+    welcomeImage(target, i) {
+        const hex = (v, dflt = '') => {
+            const c = String(v || '').trim();
+            return /^#?[0-9a-fA-F]{6}$/.test(c) ? c.replace('#', '') : dflt;
+        };
+        target.enabled = bool(i.enabled);
+        target.width = num(i.width, 200, 2000, 800);
+        target.height = num(i.height, 100, 1000, 300);
+        target.background = str(i.background, 500) ?? '';
+        target.bgColor = hex(i.bgColor, '1e1f22');
+        target.elements = arr(i.elements).slice(0, 30).map((e) => {
+            if (!e || typeof e !== 'object') return null;
+            const pos = { id: str(e.id, 32) ?? '', x: num(e.x, 0, 1, 0.5), y: num(e.y, 0, 1, 0.5) };
+            if (e.type === 'avatar')
+                return { ...pos, type: 'avatar', size: num(e.size, 0.02, 1, 0.35), ring: hex(e.ring) };
+            if (e.type === 'text')
+                return {
+                    ...pos, type: 'text', text: str(e.text, 200) ?? '',
+                    size: num(e.size, 0.02, 1, 0.1), color: hex(e.color, 'ffffff'),
+                    bold: bool(e.bold), align: ['left', 'center', 'right'].includes(e.align) ? e.align : 'center',
+                };
+            return null;
+        }).filter(Boolean);
+    },
     welcome(s, f) {
         const ch = optSnowflake(f.channel);
         const gch = optSnowflake(f.goodbyeChannel);
@@ -263,6 +298,7 @@ const SECTIONS = {
             const err = SECTIONS.welcomeEmbed(s.welcome.goodbyeEmbed, f.goodbyeEmbed);
             if (err) return err;
         }
+        if (f.image && typeof f.image === 'object') SECTIONS.welcomeImage(s.welcome.image, f.image);
     },
     roles(s, f) {
         const ar = optSnowflake(f.autorole);

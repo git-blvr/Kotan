@@ -688,3 +688,13 @@ html { scroll-behavior: smooth; }
 .ceio{display:flex;align-items:center;justify-content:space-between;gap:var(--s2)}
 .ceio-btns{display:flex;gap:6px;flex:none}
 .ceimp{width:100%;box-sizing:border-box;resize:vertical;min-height:120px;margin:var(--s2) 0;background:var(--panel-2);border:1px solid var(--border-soft);border-radius:var(--r-sm);color:var(--text);padding:8px 10px;font-size:12.5px}
+
+/* ---- welcome image editor ---- */
+.imged-cv{display:block;width:100%;border-radius:var(--r-sm);border:1px solid var(--border-soft);cursor:grab;touch-action:none;background:#1e1f22}
+.imged-tools{display:flex;gap:8px;margin:var(--s3) 0}
+.imged-props{margin-top:var(--s3)}
+.imged-props .fld{margin-bottom:8px}
+.imged-inline{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap}
+.imged-inline .grow{flex:1;min-width:140px}
+.imged-inline .chkline{display:flex;align-items:center;gap:6px;height:34px;font-size:13px;color:var(--text-2)}
+.colfull{width:100%;height:34px;padding:2px;border:1px solid var(--border-soft);border-radius:var(--r-sm);background:var(--panel-2);cursor:pointer}

@@ -701,6 +701,215 @@
             </g></svg>`;
     };
 
+    // ---------- welcome image editor (canvas) ----------
+    // Positions and sizes are stored as 0-1 fractions; the preview canvas
+    // uses the same 800x300 frame the bot renders with @napi-rs/canvas.
+    function imgEditorHtml(p, img) {
+        return `
+            <div class="card"><h3>Welcome image</h3>
+                <p class="sub mb">Canvas-rendered image attached to the welcome message — drag pieces around the preview. Text placeholders: <code class="mono">{username}</code> <code class="mono">{user}</code> <code class="mono">{server}</code> <code class="mono">{members}</code></p>
+                ${tgl(`${p}img_on`, 'Welcome image enabled', img?.enabled)}
+                <div class="grid2">
+                    ${fldHtml('Background image URL', txtIn(`${p}img_bg`, img?.background || ''), 'empty = solid color below')}
+                    ${fldHtml('Background color', `<input type="color" name="${p}img_col" value="#${esc(img?.bgColor || '1e1f22')}" class="colfull">`)}
+                </div>
+                <div class="imged-tools">
+                    <button type="button" class="btn sm" id="${p}img_addav">+ Avatar</button>
+                    <button type="button" class="btn sm" id="${p}img_addtx">+ Text</button>
+                    <button type="button" class="btn sm danger" id="${p}img_del" style="display:none">Remove selected</button>
+                </div>
+                <canvas id="${p}img_cv" class="imged-cv" width="800" height="300"></canvas>
+                <div id="${p}img_props" class="imged-props"></div>
+            </div>`;
+    }
+
+    function setupImageEditor(page, p, img) {
+        const W = 800, H = 300;
+        const cv = $(`#${p}img_cv`, page);
+        const props = $(`#${p}img_props`, page);
+        const delBtn = $(`#${p}img_del`, page);
+        const c2 = cv.getContext('2d');
+        const els = (img?.elements || []).map((e) => ({ ...e }));
+        let sel = null;
+        let uid = els.length;
+
+        const memberAv = dcdnAv(CTX.user.id, CTX.user.avatar);
+        const avImg = new Image(); avImg.crossOrigin = 'anonymous';
+        if (memberAv) avImg.src = memberAv;
+        const bgImg = new Image(); bgImg.crossOrigin = 'anonymous';
+        const bgIn = $(`[name=${p}img_bg]`, page);
+        const colIn = $(`[name=${p}img_col]`, page);
+        const loadBg = () => {
+            const u = (bgIn.value || '').trim();
+            bgImg.src = /^https?:\/\//i.test(u) ? u : '';
+            draw();
+        };
+        bgImg.onload = draw; avImg.onload = draw;
+        bgIn.addEventListener('input', loadBg);
+        colIn.addEventListener('input', draw);
+
+        const fmtS = (s) => String(s ?? '')
+            .replaceAll('{user}', `@${CTX.user.username}`)
+            .replaceAll('{username}', CTX.user.username)
+            .replaceAll('{server}', CTX.guild.name)
+            .replaceAll('{members}', String(CTX.guild.memberCount));
+        const textFont = (el) => `${el.bold ? '800' : '600'} ${Math.max(8, el.size * H)}px Kotan, sans-serif`;
+
+        function elBounds(el) {
+            if (el.type === 'avatar') {
+                const r = Math.max(4, el.size * H * 0.5);
+                return { x: el.x * W - r, y: el.y * H - r, w: r * 2, h: r * 2 };
+            }
+            c2.font = textFont(el);
+            const tw = c2.measureText(fmtS(el.text) || ' ').width;
+            const th = Math.max(8, el.size * H);
+            const ax = { left: 0, right: 1 }[el.align] ?? 0.5;
+            return { x: el.x * W - tw * ax, y: el.y * H - th / 2, w: tw, h: th };
+        }
+
+        function draw() {
+            c2.clearRect(0, 0, W, H);
+            c2.fillStyle = colIn.value || '#1e1f22';
+            c2.fillRect(0, 0, W, H);
+            if (bgImg.complete && bgImg.naturalWidth) {
+                const s = Math.max(W / bgImg.naturalWidth, H / bgImg.naturalHeight);
+                const w = bgImg.naturalWidth * s, h = bgImg.naturalHeight * s;
+                c2.drawImage(bgImg, (W - w) / 2, (H - h) / 2, w, h);
+            }
+            for (const el of els) {
+                if (el.type === 'avatar') {
+                    const r = Math.max(4, el.size * H * 0.5), cx = el.x * W, cy = el.y * H;
+                    if (avImg.complete && avImg.naturalWidth) {
+                        c2.save();
+                        c2.beginPath(); c2.arc(cx, cy, r, 0, 7); c2.clip();
+                        c2.drawImage(avImg, cx - r, cy - r, r * 2, r * 2);
+                        c2.restore();
+                    } else {
+                        c2.fillStyle = '#5865f2';
+                        c2.beginPath(); c2.arc(cx, cy, r, 0, 7); c2.fill();
+                    }
+                    if (el.ring) {
+                        c2.strokeStyle = '#' + el.ring;
+                        c2.lineWidth = Math.max(2, r * 0.07);
+                        c2.beginPath(); c2.arc(cx, cy, r - c2.lineWidth / 2, 0, 7); c2.stroke();
+                    }
+                } else if (el.type === 'text') {
+                    c2.font = textFont(el);
+                    c2.textAlign = { left: 'left', right: 'right' }[el.align] || 'center';
+                    c2.textBaseline = 'middle';
+                    c2.fillStyle = '#' + (el.color || 'ffffff');
+                    c2.fillText(fmtS(el.text) || ' ', el.x * W, el.y * H, W * 0.94);
+                }
+            }
+            if (sel) {
+                const b = elBounds(sel);
+                c2.save();
+                c2.strokeStyle = '#5865f2'; c2.lineWidth = 2; c2.setLineDash([6, 4]);
+                c2.strokeRect(b.x - 3, b.y - 3, b.w + 6, b.h + 6);
+                c2.restore();
+            }
+        }
+
+        function renderProps() {
+            delBtn.style.display = sel ? '' : 'none';
+            if (!sel) { props.innerHTML = '<p class="sub">Click a piece to select it — drag to move.</p>'; return; }
+            if (sel.type === 'avatar') {
+                props.innerHTML = `
+                    <div class="fld"><label>Avatar size</label><input type="range" data-k="size" min="0.05" max="0.8" step="0.01" value="${sel.size}"></div>
+                    <div class="fld"><label>Ring color</label><div class="imged-inline"><input type="color" data-k="ring" value="#${esc(sel.ring || '5865f2')}"><button type="button" class="btn sm" data-noring>No ring</button></div></div>`;
+                const sizeIn = props.querySelector('[data-k=size]');
+                sizeIn.oninput = () => { sel.size = +sizeIn.value; draw(); };
+                const ringIn = props.querySelector('[data-k=ring]');
+                ringIn.oninput = () => { sel.ring = ringIn.value.slice(1); draw(); };
+                props.querySelector('[data-noring]').onclick = () => { sel.ring = ''; draw(); };
+            } else {
+                props.innerHTML = `
+                    <div class="fld"><label>Text</label><input type="text" data-k="text" value="${esc(sel.text)}" placeholder="Welcome {username}"></div>
+                    <div class="imged-inline">
+                        <div class="fld grow"><label>Size</label><input type="range" data-k="size" min="0.02" max="0.4" step="0.005" value="${sel.size}"></div>
+                        <div class="fld"><label>Color</label><input type="color" data-k="color" value="#${esc(sel.color || 'ffffff')}"></div>
+                        <div class="fld"><label>Align</label><select data-k="align">
+                            ${['left', 'center', 'right'].map((a) => `<option value="${a}" ${sel.align === a ? 'selected' : ''}>${a}</option>`).join('')}
+                        </select></div>
+                        <div class="fld"><label>&nbsp;</label><label class="chkline"><input type="checkbox" data-k="bold" ${sel.bold ? 'checked' : ''}> Bold</label></div>
+                    </div>`;
+                const textIn = props.querySelector('[data-k=text]');
+                textIn.oninput = () => { sel.text = textIn.value; draw(); };
+                const sizeIn = props.querySelector('[data-k=size]');
+                sizeIn.oninput = () => { sel.size = +sizeIn.value; draw(); };
+                const colEl = props.querySelector('[data-k=color]');
+                colEl.oninput = () => { sel.color = colEl.value.slice(1); draw(); };
+                const alignIn = props.querySelector('[data-k=align]');
+                alignIn.onchange = () => { sel.align = alignIn.value; draw(); };
+                const boldIn = props.querySelector('[data-k=bold]');
+                boldIn.onchange = () => { sel.bold = boldIn.checked; draw(); };
+            }
+        }
+
+        // Drag: hit-test topmost element (render order = array order), then
+        // track pointer movement in canvas coords. Fires a synthetic input so
+        // the dirty scanner picks up position changes.
+        const toXY = (e) => {
+            const r = cv.getBoundingClientRect();
+            return { x: (e.clientX - r.left) * (W / r.width), y: (e.clientY - r.top) * (H / r.height) };
+        };
+        let dragOff = null;
+        cv.onpointerdown = (e) => {
+            const pt = toXY(e);
+            sel = null;
+            for (let i = els.length - 1; i >= 0; i--) {
+                const b = elBounds(els[i]);
+                if (pt.x >= b.x - 4 && pt.x <= b.x + b.w + 4 && pt.y >= b.y - 4 && pt.y <= b.y + b.h + 4) { sel = els[i]; break; }
+            }
+            if (sel) {
+                cv.setPointerCapture(e.pointerId);
+                dragOff = { dx: pt.x - sel.x * W, dy: pt.y - sel.y * H };
+                cv.style.cursor = 'grabbing';
+            }
+            renderProps(); draw();
+        };
+        cv.onpointermove = (e) => {
+            if (!dragOff || !sel) return;
+            const pt = toXY(e);
+            sel.x = Math.min(1, Math.max(0, (pt.x - dragOff.dx) / W));
+            sel.y = Math.min(1, Math.max(0, (pt.y - dragOff.dy) / H));
+            draw();
+        };
+        const endDrag = () => {
+            if (dragOff) cv.dispatchEvent(new Event('input', { bubbles: true }));
+            dragOff = null; cv.style.cursor = '';
+        };
+        cv.onpointerup = endDrag;
+        cv.onpointercancel = endDrag;
+
+        $(`#${p}img_addav`, page).onclick = () => {
+            sel = { id: `e${++uid}`, type: 'avatar', x: 0.5, y: 0.4, size: 0.3, ring: '5865f2' };
+            els.push(sel); renderProps(); draw();
+        };
+        $(`#${p}img_addtx`, page).onclick = () => {
+            sel = { id: `e${++uid}`, type: 'text', x: 0.5, y: 0.5, text: 'Welcome {username}', size: 0.08, color: 'ffffff', bold: true, align: 'center' };
+            els.push(sel); renderProps(); draw();
+        };
+        delBtn.onclick = () => {
+            const i = els.indexOf(sel);
+            if (i >= 0) els.splice(i, 1);
+            sel = null; renderProps(); draw();
+        };
+
+        renderProps(); draw();
+        return {
+            collect(f) {
+                return {
+                    enabled: f[`${p}img_on`],
+                    width: W, height: H,
+                    background: (bgIn.value || '').trim(),
+                    bgColor: (colIn.value || '').replace('#', ''),
+                    elements: els.map((e) => ({ ...e })),
+                };
+            },
+        };
+    }
+
     // ---------- unsaved-changes bar ----------
     // bindSave() registers a section collector — no per-section button is
     // rendered. Each section's collected fields are snapshotted at bind time;
@@ -1637,6 +1846,7 @@
                     <div class="preview" id="wprev"></div>
                     ${embedEditor('w', w.embed)}
                 </div>
+                ${imgEditorHtml('w', w.image)}
                 <div class="card"><h3>Goodbye</h3>
                     ${fldHtml('Channel', selSlot('gch'), 'empty = off')}
                     ${fldHtml('Message', txtArea('gmsg', w.goodbyeMessage), 'sent when the card below is disabled')}
@@ -1653,12 +1863,14 @@
 
             const cardW = setupCardEditor(page, 'w', w.embed);
             const cardG = setupCardEditor(page, 'g', w.goodbyeEmbed);
+            const imgedW = setupImageEditor(page, 'w', w.image);
             bindSave(page, 'welcome', (el) => {
                 const f = formVals(el);
                 return {
                     channel: mounts.wch.get() || null, goodbyeChannel: mounts.gch.get() || null,
                     message: f.wmsg, goodbyeMessage: f.gmsg,
                     embed: cardW.collect(f), goodbyeEmbed: cardG.collect(f),
+                    image: imgedW.collect(f),
                 };
             });
         },

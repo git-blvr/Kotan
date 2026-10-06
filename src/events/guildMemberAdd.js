@@ -4,6 +4,7 @@ const logger = require('../utils/logger');
 const automod = require('../utils/automod');
 const { logEvent } = require('../utils/eventlog');
 const { memberPayload } = require('../utils/welcomeMsg');
+const welcomeImg = require('../utils/welcomeImg');
 
 // On join: raid filter -> welcome message -> autorole -> event log.
 
@@ -27,10 +28,12 @@ module.exports = {
             const channel =
                 member.guild.channels.cache.get(settings.welcome.channel) ||
                 (await member.guild.channels.fetch(settings.welcome.channel).catch(() => null));
-            if (channel?.isTextBased())
-                await channel
-                    .send(await memberPayload(member, settings.welcome.embed, settings.welcome.message || 'Welcome {user}!'))
-                    .catch(() => {});
+            if (channel?.isTextBased()) {
+                let payload = await memberPayload(member, settings.welcome.embed, settings.welcome.message || 'Welcome {user}!');
+                if (settings.welcome.image?.enabled)
+                    payload = await welcomeImg.attach(member, payload, settings.welcome.image);
+                await channel.send(payload).catch(() => {});
+            }
         }
 
         if (settings.roles?.autorole) {
