@@ -13,6 +13,8 @@ const guildData = require('../guildData');
 const tickets = require('../../utils/tickets');
 const captcha = require('../../utils/captcha');
 const voicemaster = require('../../utils/voicemaster');
+const { memberPayload } = require('../../utils/welcomeMsg');
+const welcomeImg = require('../../utils/welcomeImg');
 const { dominantColor, toHex, ALLOWED_IMAGE_HOSTS } = require('../../utils/dominantColor');
 const commands = require('../config/commands');
 const modules = require('../config/modules');
@@ -186,6 +188,23 @@ module.exports = async (app) => {
             return reply.send({ ok: true });
         });
 
+        // Test-fire the welcome message — posts the draft from the editor
+        // (card + canvas image + fallback text) to a chosen channel, so
+        // unsaved designs can be checked without touching live config.
+        gg.post('/welcome/test', { preHandler: mutLimit }, async (req, reply) => {
+            const ch = req.guild.channels.cache.get(String(req.body?.channel || ''));
+            if (!ch || !ch.isTextBased()) return reply.code(400).send({ error: 'Unknown channel' });
+            const member = await req.guild.members.fetch(req.session.user.id).catch(() => null) || req.guild.members.me;
+            if (!member) return reply.code(400).send({ error: 'Could not resolve you as a member' });
+            const embed = {}; const embedErr = settings.SECTIONS.welcomeEmbed(embed, req.body?.embed || {});
+            if (embedErr) return reply.code(400).send({ error: embedErr });
+            const image = { elements: [] }; settings.SECTIONS.welcomeImage(image, req.body?.image || {});
+            let payload = await memberPayload(member, embed, req.body?.message || 'Welcome {user}!');
+            if (image.enabled) payload = await welcomeImg.attach(member, payload, image);
+            await ch.send(payload).catch(() => {});
+            return reply.send({ ok: true });
+        });
+
         // Card editors' "dominant color" button — picks the accent matching
         // the card's thumbnail/icon so users don't have to eyeball a hex.
         gg.get('/dominant-color', { preHandler: rateLimit({ max: 30 }) }, async (req, reply) => {
@@ -339,7 +358,7 @@ module.exports = async (app) => {
         gg.post('/tags', { preHandler: mutLimit }, async (req, reply) => {
             const { name, content, trigger } = req.body || {};
             const tag = await db.addTag(req.guild.id, String(name || '').toLowerCase(), String(content || ''), req.session.user.id, trigger === true);
-            if (!tag) return reply.code(400).send({ ok: false, error: 'Invalid tag name (a-z 0-9 _ -, max 32) or empty content' });
+            if (!tag) return reply.code(400).send({ ok: false, error: 'Invalid tag name (no spaces, slashes or leading prefix, max 32) or empty content' });
             return reply.send({ ok: true, tag });
         });
 

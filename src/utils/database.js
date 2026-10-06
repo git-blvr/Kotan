@@ -3,6 +3,7 @@ const { Keyv } = require('keyv');
 const SqliteStore = require('./sqliteStore');
 const logger = require('./logger');
 const E = require('./emojis');
+const config = require('../config');
 
 // Storage layer for Kotan.
 //
@@ -780,7 +781,9 @@ async function getHeartbeat() {
 
 // One doc per guild: { name: { content, authorId, uses, at } }. Tags are
 // invoked like "<prefix><name>" when no builtin command matches.
-const TAG_NAME = /^[a-z0-9_-]{1,32}$/;
+// Names allow any characters except whitespace and slashes; a leading guild
+// prefix would never fire as a bare-word trigger, so that's rejected too.
+const TAG_NAME = /^[^\s/\\]{1,32}$/;
 
 async function getTags(guildId) {
     return (await tags.get(guildId)) || {};
@@ -791,7 +794,9 @@ async function getTag(guildId, name) {
 }
 
 async function addTag(guildId, name, content, authorId, trigger = false) {
-    if (!TAG_NAME.test(name)) return null;
+    const prefix =
+        (await getGuildSettings(guildId).catch(() => null))?.prefix || config.prefix;
+    if (!TAG_NAME.test(name) || name.startsWith(prefix)) return null;
     const all = await getTags(guildId);
     // trigger: the tag fires on a bare first word, no prefix needed
     all[name] = { content: String(content).slice(0, 1000), authorId, uses: 0, at: Date.now(), trigger: !!trigger };

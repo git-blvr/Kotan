@@ -155,4 +155,4 @@ async function memberPayload(member, embed, fallback) {
     return fmt(fallback, member);
 }
 
-module.exports = { fmt, memberPayload, cardContainer, cardImgSrc };
+module.exports = { fmt, imgUrl, memberPayload, cardContainer, cardImgSrc };

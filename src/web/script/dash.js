@@ -714,12 +714,22 @@
                     ${fldHtml('Background color', `<input type="color" name="${p}img_col" value="#${esc(img?.bgColor || '1e1f22')}" class="colfull">`)}
                 </div>
                 <div class="imged-tools">
-                    <button type="button" class="btn sm" id="${p}img_addav">+ Avatar</button>
+                    <button type="button" class="btn sm" id="${p}img_addav">+ Media</button>
                     <button type="button" class="btn sm" id="${p}img_addtx">+ Text</button>
+                    <span class="imged-sep"></span>
+                    <button type="button" class="btn sm" id="${p}img_row" title="Spread all pieces evenly in a horizontal line">Auto: row</button>
+                    <button type="button" class="btn sm" id="${p}img_col" title="Spread all pieces evenly in a vertical line">Auto: column</button>
                     <button type="button" class="btn sm danger" id="${p}img_del" style="display:none">Remove selected</button>
                 </div>
                 <canvas id="${p}img_cv" class="imged-cv" width="800" height="300"></canvas>
                 <div id="${p}img_props" class="imged-props"></div>
+                <div class="imged-test">
+                    <div class="imged-inline">
+                        <div class="fld grow"><label>Test channel</label>${selSlot(`${p}img_tch`)}</div>
+                        <div class="fld"><label>&nbsp;</label><button type="button" class="btn sm primary" id="${p}img_test">Send test welcome</button></div>
+                    </div>
+                    <span id="${p}img_tstat" class="sub"></span>
+                </div>
             </div>`;
     }
 
@@ -729,13 +739,24 @@
         const props = $(`#${p}img_props`, page);
         const delBtn = $(`#${p}img_del`, page);
         const c2 = cv.getContext('2d');
-        const els = (img?.elements || []).map((e) => ({ ...e }));
+        // Legacy 'avatar' elements normalize to media:avatar:circle on load.
+        const els = (img?.elements || []).map((e) =>
+            e.type === 'avatar' ? { ...e, type: 'media', src: 'avatar', shape: 'circle' } : { ...e });
         let sel = null;
         let uid = els.length;
 
         const memberAv = dcdnAv(CTX.user.id, CTX.user.avatar);
-        const avImg = new Image(); avImg.crossOrigin = 'anonymous';
-        if (memberAv) avImg.src = memberAv;
+        const guildIcon = dcdnIcon(CTX.guild.id, CTX.guild.icon);
+        const imgCache = new Map();
+        const srcOf = (el) => (el.src === 'icon' ? guildIcon
+            : el.src === 'url' ? (el.url || '').replaceAll('{avatar}', memberAv).replaceAll('{icon}', guildIcon)
+            : memberAv);
+        const imgFor = (u) => {
+            if (!u) return null;
+            let i = imgCache.get(u);
+            if (!i) { i = new Image(); i.crossOrigin = 'anonymous'; i.onload = draw; i.src = u; imgCache.set(u, i); }
+            return i;
+        };
         const bgImg = new Image(); bgImg.crossOrigin = 'anonymous';
         const bgIn = $(`[name=${p}img_bg]`, page);
         const colIn = $(`[name=${p}img_col]`, page);
@@ -744,7 +765,7 @@
             bgImg.src = /^https?:\/\//i.test(u) ? u : '';
             draw();
         };
-        bgImg.onload = draw; avImg.onload = draw;
+        bgImg.onload = draw;
         bgIn.addEventListener('input', loadBg);
         colIn.addEventListener('input', draw);
 
@@ -755,8 +776,15 @@
             .replaceAll('{members}', String(CTX.guild.memberCount));
         const textFont = (el) => `${el.bold ? '800' : '600'} ${Math.max(8, el.size * H)}px Kotan, sans-serif`;
 
+        const shapeClip = (cx, cy, r, shape) => {
+            c2.beginPath();
+            if (shape === 'square') c2.rect(cx - r, cy - r, r * 2, r * 2);
+            else if (shape === 'rounded') c2.roundRect(cx - r, cy - r, r * 2, r * 2, r * 0.4);
+            else c2.arc(cx, cy, r, 0, 7);
+        };
+
         function elBounds(el) {
-            if (el.type === 'avatar') {
+            if (el.type === 'media') {
                 const r = Math.max(4, el.size * H * 0.5);
                 return { x: el.x * W - r, y: el.y * H - r, w: r * 2, h: r * 2 };
             }
@@ -777,21 +805,21 @@
                 c2.drawImage(bgImg, (W - w) / 2, (H - h) / 2, w, h);
             }
             for (const el of els) {
-                if (el.type === 'avatar') {
+                if (el.type === 'media') {
                     const r = Math.max(4, el.size * H * 0.5), cx = el.x * W, cy = el.y * H;
-                    if (avImg.complete && avImg.naturalWidth) {
-                        c2.save();
-                        c2.beginPath(); c2.arc(cx, cy, r, 0, 7); c2.clip();
-                        c2.drawImage(avImg, cx - r, cy - r, r * 2, r * 2);
+                    const mi = imgFor(srcOf(el));
+                    if (mi?.complete && mi.naturalWidth) {
+                        c2.save(); shapeClip(cx, cy, r, el.shape); c2.clip();
+                        c2.drawImage(mi, cx - r, cy - r, r * 2, r * 2);
                         c2.restore();
                     } else {
                         c2.fillStyle = '#5865f2';
-                        c2.beginPath(); c2.arc(cx, cy, r, 0, 7); c2.fill();
+                        shapeClip(cx, cy, r, el.shape); c2.fill();
                     }
                     if (el.ring) {
                         c2.strokeStyle = '#' + el.ring;
                         c2.lineWidth = Math.max(2, r * 0.07);
-                        c2.beginPath(); c2.arc(cx, cy, r - c2.lineWidth / 2, 0, 7); c2.stroke();
+                        shapeClip(cx, cy, r - c2.lineWidth / 2, el.shape); c2.stroke();
                     }
                 } else if (el.type === 'text') {
                     c2.font = textFont(el);
@@ -813,10 +841,26 @@
         function renderProps() {
             delBtn.style.display = sel ? '' : 'none';
             if (!sel) { props.innerHTML = '<p class="sub">Click a piece to select it — drag to move.</p>'; return; }
-            if (sel.type === 'avatar') {
+            if (sel.type === 'media') {
                 props.innerHTML = `
-                    <div class="fld"><label>Avatar size</label><input type="range" data-k="size" min="0.05" max="0.8" step="0.01" value="${sel.size}"></div>
-                    <div class="fld"><label>Ring color</label><div class="imged-inline"><input type="color" data-k="ring" value="#${esc(sel.ring || '5865f2')}"><button type="button" class="btn sm" data-noring>No ring</button></div></div>`;
+                    <div class="imged-inline">
+                        <div class="fld"><label>Source</label><select data-k="src">
+                            ${[['avatar', 'Member avatar'], ['icon', 'Server icon'], ['url', 'Image URL']].map(([v, l]) => `<option value="${v}" ${sel.src === v ? 'selected' : ''}>${l}</option>`).join('')}
+                        </select></div>
+                        <div class="fld grow" data-uwrap ${sel.src === 'url' ? '' : 'style="display:none"'}><label>Image URL</label><input type="text" data-k="url" value="${esc(sel.url || '')}" placeholder="https://… or {avatar}"></div>
+                        <div class="fld"><label>Edges</label><select data-k="shape">
+                            ${[['circle', 'Circle'], ['rounded', 'Rounded'], ['square', 'Square']].map(([v, l]) => `<option value="${v}" ${sel.shape === v ? 'selected' : ''}>${l}</option>`).join('')}
+                        </select></div>
+                        <div class="fld grow"><label>Size</label><input type="range" data-k="size" min="0.05" max="0.8" step="0.01" value="${sel.size}"></div>
+                        <div class="fld"><label>Ring</label><div class="imged-inline"><input type="color" data-k="ring" value="#${esc(sel.ring || '5865f2')}"><button type="button" class="btn sm" data-noring>None</button></div></div>
+                    </div>`;
+                const srcIn = props.querySelector('[data-k=src]');
+                const uwrap = props.querySelector('[data-uwrap]');
+                srcIn.onchange = () => { sel.src = srcIn.value; uwrap.style.display = sel.src === 'url' ? '' : 'none'; draw(); };
+                const urlIn = props.querySelector('[data-k=url]');
+                urlIn.oninput = () => { sel.url = urlIn.value; draw(); };
+                const shIn = props.querySelector('[data-k=shape]');
+                shIn.onchange = () => { sel.shape = shIn.value; draw(); };
                 const sizeIn = props.querySelector('[data-k=size]');
                 sizeIn.oninput = () => { sel.size = +sizeIn.value; draw(); };
                 const ringIn = props.querySelector('[data-k=ring]');
@@ -883,9 +927,21 @@
         cv.onpointercancel = endDrag;
 
         $(`#${p}img_addav`, page).onclick = () => {
-            sel = { id: `e${++uid}`, type: 'avatar', x: 0.5, y: 0.4, size: 0.3, ring: '5865f2' };
+            sel = { id: `e${++uid}`, type: 'media', src: 'avatar', shape: 'circle', x: 0.5, y: 0.4, size: 0.3, ring: '5865f2' };
             els.push(sel); renderProps(); draw();
         };
+        // Auto-layout: spread every element evenly along one axis, centered on
+        // the other — the classic "line them up, balanced" button.
+        const spread = (axis) => {
+            els.forEach((el, i) => {
+                const t = (i + 1) / (els.length + 1);
+                if (axis === 'row') { el.x = t; el.y = 0.5; }
+                else { el.x = 0.5; el.y = t; }
+            });
+            draw(); cv.dispatchEvent(new Event('input', { bubbles: true }));
+        };
+        $(`#${p}img_row`, page).onclick = () => spread('row');
+        $(`#${p}img_col`, page).onclick = () => spread('column');
         $(`#${p}img_addtx`, page).onclick = () => {
             sel = { id: `e${++uid}`, type: 'text', x: 0.5, y: 0.5, text: 'Welcome {username}', size: 0.08, color: 'ffffff', bold: true, align: 'center' };
             els.push(sel); renderProps(); draw();
@@ -1695,7 +1751,7 @@
                 <div><div class="page-title">Triggers</div><p class="page-desc">Bare words that run a command — no prefix needed. Typing <code class="mono">balance</code> can run <code class="mono">.balance</code>.</p></div>
                 <div class="card"><h3>New trigger</h3>
                     <div class="grid2">
-                        ${fldHtml('Trigger word', txtIn('tname', '', 'e.g. balance'), 'a-z 0-9 _ -, max 32 — fires on this exact first word')}
+                        ${fldHtml('Trigger word', txtIn('tname', '', 'e.g. balance'), 'any characters except spaces and slashes — can\'t start with the prefix, max 32')}
                         ${fldHtml('Command', selSlot('tcmd'), 'the command it runs')}
                     </div>
                     ${fldHtml('Arguments', txtIn('targs', '', 'optional — e.g. @user 100'), 'fixed args passed before whatever the sender types next')}
@@ -1864,6 +1920,19 @@
             const cardW = setupCardEditor(page, 'w', w.embed);
             const cardG = setupCardEditor(page, 'g', w.goodbyeEmbed);
             const imgedW = setupImageEditor(page, 'w', w.image);
+            mountSelect(page, 'wimg_tch', { options: [{ value: '', label: 'Pick a channel…' }, ...chOpts(DATA.channels)], value: '', placeholder: 'Pick a channel…' });
+            $('#wimg_test', page).onclick = async (e) => {
+                const status = $('#wimg_tstat', page);
+                const channel = mounts.wimg_tch.get();
+                if (!channel) { status.textContent = '— pick a channel first'; return; }
+                e.target.disabled = true;
+                const f = formVals(page);
+                const r = await api(`/api/guilds/${guildId}/welcome/test`, {
+                    body: { channel, message: f.wmsg, embed: cardW.collect(f), image: imgedW.collect(f) },
+                }).catch(() => null);
+                e.target.disabled = false;
+                status.textContent = r?.ok ? '— sent!' : `— ${r?.error || 'failed'}`;
+            };
             bindSave(page, 'welcome', (el) => {
                 const f = formVals(el);
                 return {

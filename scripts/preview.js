@@ -239,6 +239,7 @@ async function main() {
     // Panel posts + uploads — acknowledge without doing anything.
     for (const p of ['tickets', 'captcha', 'voicemaster'])
         app.post(`/api/guilds/:id/${p}/panel`, (req, reply) => reply.send({ ok: true }));
+    app.post('/api/guilds/:id/welcome/test', (req, reply) => reply.send({ ok: true }));
     app.get('/api/guilds/:id/dominant-color', (req, reply) => reply.send({ ok: true, color: '#5865f2' }));
     app.post('/api/guilds/:id/branding/avatar', (req, reply) => reply.send({ ok: true, avatarUrl: null }));
     app.post('/api/guilds/:id/branding/banner', (req, reply) => reply.send({ ok: true, bannerUrl: null }));

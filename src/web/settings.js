@@ -271,9 +271,17 @@ const SECTIONS = {
         target.elements = arr(i.elements).slice(0, 30).map((e) => {
             if (!e || typeof e !== 'object') return null;
             const pos = { id: str(e.id, 32) ?? '', x: num(e.x, 0, 1, 0.5), y: num(e.y, 0, 1, 0.5) };
-            if (e.type === 'avatar')
-                return { ...pos, type: 'avatar', size: num(e.size, 0.02, 1, 0.35), ring: hex(e.ring) };
-            if (e.type === 'text')
+            // legacy 'avatar' elements normalize to media
+            const type = e.type === 'avatar' ? 'media' : e.type;
+            if (type === 'media')
+                return {
+                    ...pos, type: 'media',
+                    src: ['avatar', 'icon', 'url'].includes(e.src) ? e.src : 'avatar',
+                    url: str(e.url, 500) ?? '',
+                    shape: ['circle', 'rounded', 'square'].includes(e.shape) ? e.shape : 'circle',
+                    size: num(e.size, 0.02, 1, 0.35), ring: hex(e.ring),
+                };
+            if (type === 'text')
                 return {
                     ...pos, type: 'text', text: str(e.text, 200) ?? '',
                     size: num(e.size, 0.02, 1, 0.1), color: hex(e.color, 'ffffff'),

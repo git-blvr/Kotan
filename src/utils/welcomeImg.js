@@ -1,7 +1,7 @@
 const path = require('node:path');
 const { createCanvas, loadImage, GlobalFonts } = require('@napi-rs/canvas');
 const { AttachmentBuilder, MediaGalleryBuilder, MediaGalleryItemBuilder, EmbedBuilder } = require('discord.js');
-const { fmt } = require('./welcomeMsg');
+const { fmt, imgUrl } = require('./welcomeMsg');
 const config = require('../config');
 const logger = require('./logger');
 
@@ -10,8 +10,9 @@ const logger = require('./logger');
 // stored as 0-1 fractions so the layout is resolution-independent.
 //
 //   cfg = { enabled, width, height, background, bgColor,
-//           elements: [ {type:'avatar', x, y, size, ring}
+//           elements: [ {type:'media', x, y, size, src:'avatar'|'icon'|'url', url, shape:'circle'|'rounded'|'square', ring}
 //                     | {type:'text', x, y, text, size, color, bold, align} ] }
+//   Legacy {type:'avatar'} elements normalize to media+avatar+circle.
 
 const FONT = (() => {
     try {
@@ -25,6 +26,26 @@ const num01 = (v, d) => {
     const n = Number(v);
     return Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : d;
 };
+
+// Old 'avatar' elements become media:avatar:circle — one code path.
+const normEl = (e) =>
+    e?.type === 'avatar'
+        ? { ...e, type: 'media', src: 'avatar', shape: e.shape || 'circle' }
+        : e;
+
+const mediaSrc = (el, member) => {
+    if (el.src === 'icon') return member.guild.iconURL({ size: 256, extension: 'png' });
+    if (el.src === 'url') { const u = imgUrl(el.url, member); return isHttp(u) ? u : null; }
+    return member.user.displayAvatarURL({ size: 256, extension: 'png' });
+};
+
+// Clips + strokes the element's shape: circle / rounded rect / square.
+function shapePath(ctx, cx, cy, r, shape) {
+    ctx.beginPath();
+    if (shape === 'square') ctx.rect(cx - r, cy - r, r * 2, r * 2);
+    else if (shape === 'rounded') ctx.roundRect(cx - r, cy - r, r * 2, r * 2, r * 0.4);
+    else ctx.arc(cx, cy, r, 0, Math.PI * 2);
+}
 
 async function render(member, cfg) {
     const W = Math.min(2000, Math.max(200, Math.round(cfg.width) || 800));
@@ -42,27 +63,36 @@ async function render(member, cfg) {
         } catch { /* bad bg url — color fill stands */ }
     }
 
-    let avatarImg = null;
-    if ((cfg.elements || []).some((e) => e.type === 'avatar')) {
-        avatarImg = await loadImage(member.user.displayAvatarURL({ extension: 'png', size: 256 })).catch(() => null);
-    }
+    // Preload every media source once — several elements may share it.
+    const els = (cfg.elements || []).map(normEl).filter(Boolean);
+    const mediaImgs = new Map();
+    await Promise.all(
+        [...new Set(els.filter((e) => e.type === 'media').map((e) => mediaSrc(e, member)).filter(Boolean))]
+            .map(async (u) => {
+                const img = await loadImage(u).catch(() => null);
+                if (img) mediaImgs.set(u, img);
+            })
+    );
 
-    for (const el of cfg.elements || []) {
+    for (const el of els) {
         try {
-            if (el.type === 'avatar') {
+            if (el.type === 'media') {
                 const r = Math.max(4, num01(el.size, 0.35) * H * 0.5);
                 const cx = num01(el.x, 0.5) * W;
                 const cy = num01(el.y, 0.4) * H;
-                if (avatarImg) {
+                const img = mediaImgs.get(mediaSrc(el, member));
+                if (img) {
                     ctx.save();
-                    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.clip();
-                    ctx.drawImage(avatarImg, cx - r, cy - r, r * 2, r * 2);
+                    shapePath(ctx, cx, cy, r, el.shape);
+                    ctx.clip();
+                    ctx.drawImage(img, cx - r, cy - r, r * 2, r * 2);
                     ctx.restore();
                 }
                 if (el.ring) {
                     ctx.strokeStyle = `#${el.ring}`;
                     ctx.lineWidth = Math.max(2, r * 0.07);
-                    ctx.beginPath(); ctx.arc(cx, cy, r - ctx.lineWidth / 2, 0, Math.PI * 2); ctx.stroke();
+                    shapePath(ctx, cx, cy, r - ctx.lineWidth / 2, el.shape);
+                    ctx.stroke();
                 }
             } else if (el.type === 'text') {
                 const px = Math.max(8, num01(el.size, 0.1) * H);
