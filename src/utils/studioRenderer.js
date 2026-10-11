@@ -436,8 +436,110 @@ function encodeGif(frames = [], options = {}) {
     return Buffer.from(bytes);
 }
 
+// ---------- GIF keyframe interpolation ----------
+// Animation curves shared with the dashboard preview — `steps` holds the
+// current keyframe until the next one (classic per-frame look).
+const GIF_EASE = {
+    linear: (p) => p,
+    easeIn: (p) => p * p,
+    easeOut: (p) => 1 - (1 - p) ** 2,
+    easeInOut: (p) => (p < 0.5 ? 2 * p * p : 1 - ((-2 * p + 2) ** 2) / 2),
+    elastic: (p) => (p === 0 || p === 1 ? p : 2 ** (-10 * p) * Math.sin((p * 10 - 0.75) * ((2 * Math.PI) / 3)) + 1),
+    bounce: (p) => {
+        const n = 7.5625, d = 2.75;
+        if (p < 1 / d) return n * p * p;
+        if (p < 2 / d) return n * (p -= 1.5 / d) * p + 0.75;
+        if (p < 2.5 / d) return n * (p -= 2.25 / d) * p + 0.9375;
+        return n * (p -= 2.625 / d) * p + 0.984375;
+    },
+    steps: () => 0,
+};
+const gifHexRgb = (c) => {
+    const m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(c || '').trim());
+    if (!m) return null;
+    let h = m[1];
+    if (h.length === 3) h = h.split('').map((ch) => ch + ch).join('');
+    return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+};
+const gifLerp = (a, b, p) => a + (b - a) * p;
+const gifLerpHex = (ca, cb, p) => {
+    const pa = gifHexRgb(ca), pb = gifHexRgb(cb);
+    if (!pa || !pb) return ca || cb;
+    return `#${pa.map((v, i) => Math.round(gifLerp(v, pb[i], p)).toString(16).padStart(2, '0')).join('')}`;
+};
+const GIF_NUMP = ['x', 'y', 'size', 'w', 'h', 'progress', 'opacity'];
+const GIF_COLP = ['color', 'fill', 'ring', 'bgColor'];
+function lerpGifEl(a, b, p) {
+    if (a.type !== b.type) return { ...a };
+    const r = { ...a };
+    for (const k of GIF_NUMP) if (isFinite(+a[k]) && isFinite(+b[k])) r[k] = gifLerp(+a[k], +b[k], p);
+    for (const k of GIF_COLP) if (gifHexRgb(a[k]) && gifHexRgb(b[k])) r[k] = gifLerpHex(a[k], b[k], p);
+    return r;
+}
+
+// Sample the keyframed timeline at normalized time tn (0..1); wraps
+// last→first so the animation loops seamlessly.
+function sampleGifKeyframes(kfs, tn, easeFn) {
+    if (kfs.length === 1) return { ...kfs[0] };
+    let i = kfs.length - 1;
+    for (let j = 0; j < kfs.length - 1; j++) if (tn < kfs[j + 1].t) { i = j; break; }
+    const a = kfs[i], b = kfs[(i + 1) % kfs.length];
+    const t1 = i === kfs.length - 1 ? 1 + b.t : b.t;
+    const raw = Math.min(1, Math.max(0, (tn - a.t) / Math.max(t1 - a.t, 1e-6)));
+    const p = easeFn(raw);
+    return {
+        bgColor: gifLerpHex(a.bgColor || '0b0c10', b.bgColor || a.bgColor || '0b0c10', p),
+        elements: (a.elements || []).map((e, ei) => ((b.elements || [])[ei] ? lerpGifEl(e, b.elements[ei], p) : e)),
+    };
+}
+
+function drawGifElement(ctx, el, W, H, vars) {
+    if (!el || el.hidden) return;
+    ctx.save();
+    ctx.globalAlpha = el.opacity ?? 1;
+    if (el.type === 'text') {
+        const px = Math.max(8, num01(el.size, 0.1) * H);
+        ctx.font = `${el.bold ? '800' : '600'} ${px}px ${FONT}`;
+        ctx.textAlign = el.align || 'center';
+        ctx.textBaseline = 'middle';
+        const cx = num01(el.x, 0.5) * W;
+        const cy = num01(el.y, 0.5) * H;
+        ctx.fillStyle = el.color ? (String(el.color).startsWith('#') ? el.color : `#${el.color}`) : '#ffffff';
+        ctx.fillText(replaceVars(el.text || '', vars), cx, cy);
+    } else if (el.type === 'media') {
+        const r = Math.max(4, num01(el.size, 0.3) * H * 0.5);
+        const cx = num01(el.x, 0.5) * W;
+        const cy = num01(el.y, 0.5) * H;
+        shapePath(ctx, cx, cy, r, el.shape || 'circle');
+        ctx.fillStyle = `#${String(el.fill || '5865f2').replace('#', '')}`;
+        ctx.fill();
+        if (el.ring) {
+            ctx.strokeStyle = `#${String(el.ring).replace('#', '')}`;
+            ctx.lineWidth = Math.max(2, r * 0.1);
+            ctx.stroke();
+        }
+    } else if (el.type === 'bar') {
+        const cx = num01(el.x, 0.5) * W;
+        const cy = num01(el.y, 0.5) * H;
+        const w = num01(el.w || 0.6, 0.6) * W;
+        const h = Math.max(4, num01(el.h || 0.08, 0.08) * H);
+        ctx.fillStyle = `#${String(el.bgColor || '2b2d31').replace('#', '')}`;
+        ctx.roundRect(cx - w / 2, cy - h / 2, w, h, h / 2);
+        ctx.fill();
+        if (el.progress != null) {
+            const fillW = w * Math.min(1, Math.max(0, el.progress));
+            ctx.fillStyle = `#${String(el.fill || '10b981').replace('#', '')}`;
+            ctx.roundRect(cx - w / 2, cy - h / 2, fillW, h, h / 2);
+            ctx.fill();
+        }
+    }
+    ctx.restore();
+}
+
 /**
- * Render an animated GIF from a sequence of frame configurations.
+ * Render an animated GIF. Accepts either a keyframed timeline
+ * ({ keyframes, durationMs, easing, fps }) or a legacy discrete
+ * { frames } sequence (rendered frame-by-frame as before).
  * Uses Rust-backed canvas for frame drawing + optimized GIF encoder.
  */
 async function renderGif(gifCfg = {}, vars = {}) {
@@ -445,67 +547,32 @@ async function renderGif(gifCfg = {}, vars = {}) {
     const W = Math.min(800, Math.max(100, Math.round(gifCfg.width) || 400));
     const H = Math.min(600, Math.max(100, Math.round(gifCfg.height) || 200));
     const fps = Math.min(24, Math.max(2, Math.round(gifCfg.fps) || 10));
-    const frames = Array.isArray(gifCfg.frames) ? gifCfg.frames : [];
-
-    if (!frames.length) {
-        throw new Error('GIF has no frames defined');
-    }
+    const frameDelay = Math.round(1000 / fps);
 
     const renderedFrames = [];
-    for (const frameCfg of frames) {
+    const pushFrame = (frameCfg, delay) => {
         const cv = createCanvas(W, H);
         const ctx = cv.getContext('2d');
-
-        // Draw background
-        ctx.fillStyle = `#${(frameCfg.bgColor || gifCfg.bgColor || '0f1117').replace('#', '')}`;
+        ctx.fillStyle = `#${String(frameCfg.bgColor || gifCfg.bgColor || '0f1117').replace('#', '')}`;
         ctx.fillRect(0, 0, W, H);
-
-        // Draw elements
         const elements = Array.isArray(frameCfg.elements) ? frameCfg.elements : (gifCfg.elements || []);
-        for (const el of elements) {
-            if (!el || el.hidden) continue;
-            ctx.save();
-            if (el.type === 'text') {
-                const px = Math.max(8, num01(el.size, 0.1) * H);
-                ctx.font = `${el.bold ? '800' : '600'} ${px}px ${FONT}`;
-                ctx.textAlign = el.align || 'center';
-                ctx.textBaseline = 'middle';
-                const cx = num01(el.x, 0.5) * W;
-                const cy = num01(el.y, 0.5) * H;
-                ctx.fillStyle = el.color ? (el.color.startsWith('#') ? el.color : `#${el.color}`) : '#ffffff';
-                ctx.fillText(replaceVars(el.text || '', vars), cx, cy);
-            } else if (el.type === 'media') {
-                const r = Math.max(4, num01(el.size, 0.3) * H * 0.5);
-                const cx = num01(el.x, 0.5) * W;
-                const cy = num01(el.y, 0.5) * H;
-                shapePath(ctx, cx, cy, r, el.shape || 'circle');
-                ctx.fillStyle = `#${(el.fill || '5865f2').replace('#', '')}`;
-                ctx.fill();
-                if (el.ring) {
-                    ctx.strokeStyle = `#${el.ring.replace('#', '')}`;
-                    ctx.lineWidth = Math.max(2, r * 0.1);
-                    ctx.stroke();
-                }
-            } else if (el.type === 'bar') {
-                const cx = num01(el.x, 0.5) * W;
-                const cy = num01(el.y, 0.5) * H;
-                const w = num01(el.w || 0.6, 0.6) * W;
-                const h = Math.max(4, num01(el.h || 0.08, 0.08) * H);
-                ctx.fillStyle = `#${(el.bgColor || '2b2d31').replace('#', '')}`;
-                ctx.roundRect(cx - w / 2, cy - h / 2, w, h, h / 2);
-                ctx.fill();
-                if (el.progress != null) {
-                    const fillW = w * Math.min(1, Math.max(0, el.progress));
-                    ctx.fillStyle = `#${(el.fill || '10b981').replace('#', '')}`;
-                    ctx.roundRect(cx - w / 2, cy - h / 2, fillW, h, h / 2);
-                    ctx.fill();
-                }
-            }
-            ctx.restore();
-        }
+        for (const el of elements) drawGifElement(ctx, el, W, H, vars);
+        renderedFrames.push({ data: ctx.getImageData(0, 0, W, H).data, delay });
+    };
 
-        const imgData = ctx.getImageData(0, 0, W, H);
-        renderedFrames.push({ data: imgData.data, delay: frameCfg.delay });
+    if (Array.isArray(gifCfg.keyframes) && gifCfg.keyframes.length) {
+        // Keyframed timeline — sample `fps` frames per second over durationMs.
+        const durationMs = Math.min(5000, Math.max(500, Math.round(gifCfg.durationMs) || 3000));
+        const easeFn = GIF_EASE[gifCfg.easing] || GIF_EASE.easeInOut;
+        const kfs = gifCfg.keyframes
+            .map((k) => ({ ...k, t: Math.min(1, Math.max(0, +k.t || 0)) }))
+            .sort((a, b) => a.t - b.t);
+        const total = Math.max(1, Math.round((durationMs / 1000) * fps));
+        for (let i = 0; i < total; i++) pushFrame(sampleGifKeyframes(kfs, i / total, easeFn), frameDelay);
+    } else {
+        const frames = Array.isArray(gifCfg.frames) ? gifCfg.frames : [];
+        if (!frames.length) throw new Error('GIF has no frames defined');
+        for (const frameCfg of frames) pushFrame(frameCfg, frameCfg.delay ?? frameDelay);
     }
 
     const gifBuffer = encodeGif(renderedFrames, { width: W, height: H, fps, loop: gifCfg.loop !== false });

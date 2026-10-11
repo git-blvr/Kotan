@@ -97,6 +97,7 @@
             card: '#f1e2d2',
             acc: '#f1e2d2',
             navBtn: '#e2792b',
+            onAccent: '#ffffff',
             dockMode: '',
         },
         cocoa: {
@@ -110,6 +111,7 @@
             card: '#3a2619',
             acc: '#3a2619',
             navBtn: '#f08a3c',
+            onAccent: '#2a170b',
             dockMode: '',
         },
         dark: {
@@ -123,6 +125,7 @@
             card: '#24252b',
             acc: '#202227',
             navBtn: '#5865f2',
+            onAccent: '#ffffff',
             dockMode: '',
         },
         oled: {
@@ -136,6 +139,7 @@
             card: '#18181c',
             acc: '#141417',
             navBtn: '#2b2d31',
+            onAccent: '#0c0c0e',
             dockMode: 'oled',
         },
         zinc: {
@@ -149,6 +153,7 @@
             card: '#262832',
             acc: '#21232b',
             navBtn: '#6366f1',
+            onAccent: '#ffffff',
             dockMode: 'vibrant',
         },
         charcoal: {
@@ -162,9 +167,22 @@
             card: '#282724',
             acc: '#23211f',
             navBtn: '#f59e0b',
+            onAccent: '#1c1208',
             dockMode: '',
         },
     };
+
+    // Relative luminance of a hex color — picks readable text on custom accents.
+    function accentLum(hex) {
+        const m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(hex || '').trim());
+        if (!m) return 0;
+        let h = m[1];
+        if (h.length === 3) h = h.split('').map((c) => c + c).join('');
+        return [0, 2, 4]
+            .map((i) => parseInt(h.slice(i, i + 2), 16) / 255)
+            .map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
+            .reduce((acc, v, i) => acc + v * [0.2126, 0.7152, 0.0722][i], 0);
+    }
 
     function loadTheme() {
         try {
@@ -203,6 +221,11 @@
         root.style.setProperty('--dock-accent', acc);
         root.style.setProperty('--dock-accent-2', acc2);
         root.style.setProperty('--chart', acc);
+        // Text drawn on accent-colored buttons/pills — light accents need dark text.
+        const onAcc = t.customAccent
+            ? (accentLum(acc) > 0.45 ? '#1c1208' : '#ffffff')
+            : (ctheme.onAccent || '#ffffff');
+        root.style.setProperty('--on-accent', onAcc);
 
         // Surfaces
         const sh = t.customShell || ctheme.shell;
@@ -821,7 +844,7 @@
         page.insertBefore(nav, page.firstChild);
         $$('.snv', nav).forEach((b) => (b.onclick = () => {
             const t = $(`.card[data-sec="${b.dataset.sec}"]`, page);
-            if (t) window.scrollTo({ top: t.getBoundingClientRect().top + window.scrollY - 120, behavior: 'smooth' });
+            if (t) window.scrollTo({ top: t.getBoundingClientRect().top + window.scrollY - nav.getBoundingClientRect().bottom - 12, behavior: 'smooth' });
         }));
         if (scrollSpy) window.removeEventListener('scroll', scrollSpy);
         scrollSpy = () => {
@@ -2985,33 +3008,83 @@
         // ---------- CREATIVE STUDIO: GIF STUDIO (ANIMATED FRAMES) ----------
         async 'gif-studio'(page) {
             let width = 400, height = 200;
-            let fps = 10;
-            let currentFrameIdx = 0;
-            let isPlaying = true;
-            let onion = true;
+            let fps = 15;
+            let durationMs = 3000;   // total GIF length — clamped 500..5000
+            let easing = 'easeInOut';
+            let playing = true;
+            let playT = 0;           // playhead position (ms)
+            let selKf = 0;           // selected keyframe index
 
-            const frames = [
-                {
-                    bgColor: '0b0c10', delay: 100,
-                    elements: [
-                        { type: 'text', text: '✨ WELCOME ✨', x: 0.5, y: 0.38, size: 0.12, color: '6366f1', bold: true },
-                        { type: 'text', text: '{username}', x: 0.5, y: 0.68, size: 0.14, color: 'ffffff', bold: true },
-                    ],
+            const EASE = {
+                linear: (p) => p,
+                easeIn: (p) => p * p,
+                easeOut: (p) => 1 - (1 - p) ** 2,
+                easeInOut: (p) => (p < 0.5 ? 2 * p * p : 1 - ((-2 * p + 2) ** 2) / 2),
+                elastic: (p) => (p === 0 || p === 1 ? p : 2 ** (-10 * p) * Math.sin((p * 10 - 0.75) * ((2 * Math.PI) / 3)) + 1),
+                bounce: (p) => {
+                    const n = 7.5625, d = 2.75;
+                    if (p < 1 / d) return n * p * p;
+                    if (p < 2 / d) return n * (p -= 1.5 / d) * p + 0.75;
+                    if (p < 2.5 / d) return n * (p -= 2.25 / d) * p + 0.9375;
+                    return n * (p -= 2.625 / d) * p + 0.984375;
                 },
-                {
-                    bgColor: '11131c', delay: 100,
-                    elements: [
-                        { type: 'text', text: '⚡ WELCOME ⚡', x: 0.5, y: 0.38, size: 0.12, color: 'e8622e', bold: true },
-                        { type: 'text', text: '{username}', x: 0.5, y: 0.68, size: 0.14, color: 'ffffff', bold: true },
-                    ],
-                },
-                {
-                    bgColor: '181014', delay: 100,
-                    elements: [
-                        { type: 'text', text: '🌟 WELCOME 🌟', x: 0.5, y: 0.38, size: 0.12, color: 'ec4899', bold: true },
-                        { type: 'text', text: '{username}', x: 0.5, y: 0.68, size: 0.14, color: 'ffffff', bold: true },
-                    ],
-                },
+                steps: () => 0,   // hold current keyframe until the next one
+            };
+            const hexRgb = (c) => {
+                const m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(c || '').trim());
+                if (!m) return null;
+                let h = m[1];
+                if (h.length === 3) h = h.split('').map((ch) => ch + ch).join('');
+                return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+            };
+            const lerp = (a, b, p) => a + (b - a) * p;
+            const lerpHex = (ca, cb, p) => {
+                const pa = hexRgb(ca), pb = hexRgb(cb);
+                if (!pa || !pb) return ca || cb;
+                return `#${pa.map((v, i) => Math.round(lerp(v, pb[i], p)).toString(16).padStart(2, '0')).join('')}`;
+            };
+            const NUMP = ['x', 'y', 'size', 'w', 'h', 'progress', 'opacity'];
+            const COLP = ['color', 'fill', 'ring', 'bgColor'];
+            const clone = (o) => JSON.parse(JSON.stringify(o));
+            const lerpEl = (a, b, p) => {
+                if (a.type !== b.type) return { ...a };
+                const r = { ...a };
+                for (const k of NUMP) if (isFinite(+a[k]) && isFinite(+b[k])) r[k] = lerp(+a[k], +b[k], p);
+                for (const k of COLP) if (hexRgb(a[k]) && hexRgb(b[k])) r[k] = lerpHex(a[k], b[k], p);
+                return r;
+            };
+
+            // Sample the timeline at normalized time tn (0..1) — interpolates
+            // between the bracketing keyframes; wraps last→first for a
+            // seamless loop.
+            function sampleFrame(tn) {
+                if (!kfs.length) return { bgColor: '0b0c10', elements: [] };
+                if (kfs.length === 1) return clone(kfs[0]);
+                let i = kfs.length - 1;
+                for (let j = 0; j < kfs.length - 1; j++) if (tn < kfs[j + 1].t) { i = j; break; }
+                const a = kfs[i], b = kfs[(i + 1) % kfs.length];
+                const t1 = i === kfs.length - 1 ? 1 + b.t : b.t;
+                const raw = Math.min(1, Math.max(0, (tn - a.t) / Math.max(t1 - a.t, 1e-6)));
+                const p = (EASE[easing] || EASE.easeInOut)(raw);
+                return {
+                    bgColor: lerpHex(a.bgColor || '0b0c10', b.bgColor || a.bgColor || '0b0c10', p),
+                    elements: (a.elements || []).map((e, ei) => ((b.elements || [])[ei] ? lerpEl(e, b.elements[ei], p) : e)),
+                };
+            }
+
+            const kfs = [
+                { t: 0, bgColor: '0b0c10', elements: [
+                    { type: 'text', text: '✨ WELCOME ✨', x: 0.5, y: 0.4, size: 0.12, color: '6366f1', bold: true },
+                    { type: 'text', text: '{username}', x: 0.5, y: 0.68, size: 0.14, color: 'ffffff', bold: true },
+                ] },
+                { t: 0.5, bgColor: '16121e', elements: [
+                    { type: 'text', text: '✨ WELCOME ✨', x: 0.5, y: 0.4, size: 0.16, color: 'e8622e', bold: true },
+                    { type: 'text', text: '{username}', x: 0.5, y: 0.68, size: 0.17, color: 'ffd9a0', bold: true },
+                ] },
+                { t: 1, bgColor: '0b0c10', elements: [
+                    { type: 'text', text: '✨ WELCOME ✨', x: 0.5, y: 0.4, size: 0.12, color: '6366f1', bold: true },
+                    { type: 'text', text: '{username}', x: 0.5, y: 0.68, size: 0.14, color: 'ffffff', bold: true },
+                ] },
             ];
 
             page.innerHTML = `
@@ -3022,16 +3095,30 @@
 
                 <div class="studio-topbar">
                     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-                        <button type="button" class="gif-play-btn" id="gif-toggle-play">
-                            <span>⏸ Pause Preview</span>
-                        </button>
                         <div style="display:flex;align-items:center;gap:8px;">
-                            <span style="font-size:12px;font-weight:700;color:var(--muted);">Speed:</span>
+                            <span style="font-size:12px;font-weight:700;color:var(--muted);">Duration:</span>
+                            <input type="number" id="gif-dur" value="3000" min="500" max="5000" step="100" style="width:76px;padding:4px 8px;border-radius:6px;background:var(--panel-2);border:1px solid var(--border);color:var(--text);font-size:12px;">
+                            <span style="font-size:12px;color:var(--muted);">ms</span>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <span style="font-size:12px;font-weight:700;color:var(--muted);">Animation:</span>
+                            <select id="gif-ease-sel" style="padding:4px 8px;border-radius:6px;background:var(--panel-2);border:1px solid var(--border);color:var(--text);font-size:12px;">
+                                <option value="linear">Linear</option>
+                                <option value="easeIn">Ease In</option>
+                                <option value="easeOut">Ease Out</option>
+                                <option value="easeInOut" selected>Ease In-Out</option>
+                                <option value="elastic">Elastic</option>
+                                <option value="bounce">Bounce</option>
+                                <option value="steps">Hold (steps)</option>
+                            </select>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <span style="font-size:12px;font-weight:700;color:var(--muted);">Quality:</span>
                             <select id="gif-fps-sel" style="padding:4px 8px;border-radius:6px;background:var(--panel-2);border:1px solid var(--border);color:var(--text);font-size:12px;">
-                                <option value="5">5 FPS</option>
-                                <option value="10" selected>10 FPS</option>
-                                <option value="15">15 FPS</option>
+                                <option value="10">10 FPS</option>
+                                <option value="15" selected>15 FPS</option>
                                 <option value="20">20 FPS</option>
+                                <option value="24">24 FPS</option>
                             </select>
                         </div>
                     </div>
@@ -3050,7 +3137,7 @@
                         <div class="studio-sec-title"><span>Auto Generators</span></div>
                         <p class="muted small" style="margin:0;">Generate animated frame sequences instantly:</p>
                         <div style="display:flex;flex-direction:column;gap:6px;">
-                            <button type="button" class="btn sm outline" id="gen-pulse">⚡ Pulsing Glow (8 frames)</button>
+                            <button type="button" class="btn sm outline" id="gen-pulse">⚡ Pulsing Glow</button>
                             <button type="button" class="btn sm outline" id="gen-rainbow">🌈 Rainbow Hue Shift</button>
                             <button type="button" class="btn sm outline" id="gen-bar">📊 Level Up Fill Animation</button>
                             <button type="button" class="btn sm outline" id="gen-flash">🚨 Flashing Alert Beacon</button>
@@ -3072,26 +3159,36 @@
                             </div>
                         </div>
 
-                        <!-- Timeline Bar -->
+                        <!-- Play bar -->
+                        <div class="gif-playbar">
+                            <button type="button" class="gif-play-btn" id="gif-toggle-play">⏸</button>
+                            <input type="range" id="gif-scrub" min="0" max="${durationMs}" value="0" step="10">
+                            <span class="gif-time" id="gif-time">0.00s / ${(durationMs / 1000).toFixed(2)}s</span>
+                        </div>
+
+                        <!-- Keyframe Timeline -->
                         <div class="gif-timeline-wrap">
                             <div class="gif-timeline-ctrls">
-                                <span class="studio-sec-title" style="margin:0;">Timeline Frames (<span id="gif-frame-count">${frames.length}</span>)</span>
+                                <span class="studio-sec-title" style="margin:0;">Keyframes (<span id="gif-frame-count">${kfs.length}</span>)</span>
                                 <div style="display:flex;gap:6px;">
-                                    <button type="button" class="btn sm outline" id="gif-btn-dup-fr">Duplicate Frame</button>
-                                    <button type="button" class="btn sm danger" id="gif-btn-del-fr">Delete Frame</button>
+                                    <button type="button" class="btn sm outline" id="gif-btn-dup-fr">+ At Playhead</button>
+                                    <button type="button" class="btn sm danger" id="gif-btn-del-fr">Delete</button>
                                 </div>
                             </div>
-                            <div class="gif-frames-strip" id="gif-strip"></div>
+                            <div class="gif-kf-track" id="gif-strip"></div>
+                            <div class="gif-kf-hint">Click the track to scrub · click a dot to edit that keyframe</div>
                         </div>
                     </div>
 
                     <!-- Right: Frame Content & Variable Save -->
                     <div class="studio-sidebar-card">
-                        <div class="studio-sec-title"><span>Active Frame Content</span></div>
+                        <div class="studio-sec-title"><span>Active Keyframe</span></div>
                         <div style="display:flex;flex-direction:column;gap:10px;">
+                            <div class="fld"><label>Time on timeline — <span id="gif-kf-tlbl">0%</span></label><input type="range" id="gif-kf-t" min="0" max="100" value="0" step="1"></div>
                             <div class="fld"><label>Line 1 Text</label><input type="text" id="gif-fr-text1" value="✨ WELCOME ✨"></div>
                             <div class="fld"><label>Line 2 Text</label><input type="text" id="gif-fr-text2" value="{username}"></div>
-                            <div class="fld"><label>Frame Color</label><input type="color" id="gif-fr-col" value="#6366f1"></div>
+                            <div class="fld"><label>Line 1 Color</label><input type="color" id="gif-fr-col" value="#6366f1"></div>
+                            <div class="fld"><label>Background</label><input type="color" id="gif-fr-bg" value="#0b0c10"></div>
                         </div>
 
                         <div class="studio-sec-title mt"><span>Save as GIF Variable</span></div>
@@ -3109,19 +3206,33 @@
 
             const cv = $('#gif-cv', page);
             const ctx = cv.getContext('2d');
-            const stripEl = $('#gif-strip', page);
+            const trackEl = $('#gif-strip', page);
             const playBtn = $('#gif-toggle-play', page);
             const fpsSel = $('#gif-fps-sel', page);
+            const easeSel = $('#gif-ease-sel', page);
+            const durEl = $('#gif-dur', page);
+            const scrubEl = $('#gif-scrub', page);
+            const timeEl = $('#gif-time', page);
 
-            // Draw single frame
+            function shapePathL(cx, cy, r, shape) {
+                ctx.beginPath();
+                if (shape === 'square') ctx.rect(cx - r, cy - r, r * 2, r * 2);
+                else if (shape === 'rounded') ctx.roundRect(cx - r, cy - r, r * 2, r * 2, r * 0.35);
+                else ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                ctx.closePath();
+            }
+
+            // Draw one sampled frame (interpolated keyframe state)
             function drawFrame(frame) {
                 if (!frame) return;
-                ctx.fillStyle = `#${(frame.bgColor || '0b0c10').replace('#', '')}`;
+                ctx.globalAlpha = 1;
+                ctx.fillStyle = `#${String(frame.bgColor || '0b0c10').replace('#', '')}`;
                 ctx.fillRect(0, 0, width, height);
 
-                const els = frame.elements || [];
-                for (const el of els) {
+                for (const el of frame.elements || []) {
+                    if (!el || el.hidden) continue;
                     ctx.save();
+                    ctx.globalAlpha = el.opacity ?? 1;
                     const cx = (el.x ?? 0.5) * width;
                     const cy = (el.y ?? 0.5) * height;
                     if (el.type === 'text') {
@@ -3132,197 +3243,276 @@
                         ctx.fillStyle = el.color?.startsWith('#') ? el.color : `#${el.color || 'ffffff'}`;
                         const t = (el.text || '').replaceAll('{username}', CTX.user.username).replaceAll('{server}', CTX.guild.name);
                         ctx.fillText(t, cx, cy);
+                    } else if (el.type === 'media') {
+                        const r = Math.max(4, (el.size || 0.3) * height * 0.5);
+                        shapePathL(cx, cy, r, el.shape || 'circle');
+                        ctx.fillStyle = `#${String(el.fill || '5865f2').replace('#', '')}`;
+                        ctx.fill();
+                        if (el.ring) {
+                            ctx.strokeStyle = `#${String(el.ring).replace('#', '')}`;
+                            ctx.lineWidth = Math.max(2, r * 0.1);
+                            ctx.stroke();
+                        }
+                    } else if (el.type === 'bar') {
+                        const w = (el.w ?? 0.6) * width;
+                        const h = Math.max(4, (el.h ?? 0.08) * height);
+                        ctx.fillStyle = `#${String(el.bgColor || '2b2d31').replace('#', '')}`;
+                        ctx.roundRect(cx - w / 2, cy - h / 2, w, h, h / 2);
+                        ctx.fill();
+                        if (el.progress != null) {
+                            ctx.fillStyle = `#${String(el.fill || '10b981').replace('#', '')}`;
+                            ctx.roundRect(cx - w / 2, cy - h / 2, w * Math.min(1, Math.max(0, el.progress)), h, h / 2);
+                            ctx.fill();
+                        }
                     }
                     ctx.restore();
                 }
             }
 
-            // Real-time animation loop
-            let lastTick = performance.now();
-            let animReq = null;
+            const fmtT = (ms) => `${(ms / 1000).toFixed(2)}s`;
+            function syncPlayhead() {
+                if (document.activeElement !== scrubEl) scrubEl.value = Math.round(playT);
+                timeEl.textContent = `${fmtT(playT)} / ${fmtT(durationMs)}`;
+                const cur = $('#gif-kf-cur', page);
+                if (cur) cur.style.left = `${(playT / durationMs) * 100}%`;
+            }
+            function drawAtPlayhead() {
+                drawFrame(sampleFrame(playT / Math.max(durationMs, 1)));
+                syncPlayhead();
+            }
+            function setPlaying(v) {
+                playing = v;
+                playBtn.textContent = playing ? '⏸' : '▶';
+            }
+
+            // Real-time playback — smooth interpolation across the duration.
+            let lastNow = performance.now();
             function loop(now) {
-                if (isPlaying) {
-                    const interval = 1000 / fps;
-                    if (now - lastTick >= interval) {
-                        currentFrameIdx = (currentFrameIdx + 1) % frames.length;
-                        drawFrame(frames[currentFrameIdx]);
-                        updateStripActive();
-                        lastTick = now;
-                    }
+                if (playing && durationMs > 0) {
+                    playT = (playT + (now - lastNow)) % durationMs;
+                    drawAtPlayhead();
                 }
-                animReq = requestAnimationFrame(loop);
+                lastNow = now;
+                requestAnimationFrame(loop);
             }
-            animReq = requestAnimationFrame(loop);
+            requestAnimationFrame(loop);
 
-            function updateStripActive() {
-                $$('.gif-frame-thumb', stripEl).forEach((th, idx) => {
-                    th.classList.toggle('active', idx === currentFrameIdx);
-                });
-            }
-
-            function renderStrip() {
-                stripEl.innerHTML = frames.map((f, idx) => `
-                    <div class="gif-frame-thumb ${idx === currentFrameIdx ? 'active' : ''}" data-idx="${idx}">
-                        <span class="gif-frame-num">F${idx + 1}</span>
-                        <span style="font-size:10px;color:var(--text-2);">${Math.round(1000 / fps)}ms</span>
-                    </div>`).join('') + `<div class="gif-add-frame" id="gif-btn-add-fr" title="Add Frame">${ICONS.plus}</div>`;
-
-                $('#gif-frame-count', page).textContent = frames.length;
-                $$('.gif-frame-thumb', stripEl).forEach(th => {
-                    th.onclick = () => {
-                        currentFrameIdx = +th.dataset.idx;
-                        isPlaying = false;
-                        playBtn.innerHTML = '▶ Play Preview';
-                        drawFrame(frames[currentFrameIdx]);
-                        updateStripActive();
-                        syncFrameProps();
+            // Keyframe markers on the timeline track (+ playhead line).
+            function renderTrack() {
+                trackEl.innerHTML = `<div class="gif-kf-cur" id="gif-kf-cur" style="left:${(playT / durationMs) * 100}%"></div>` +
+                    kfs.map((k, i) => `<button type="button" class="gif-kf-dot${i === selKf ? ' active' : ''}" style="left:${k.t * 100}%" data-i="${i}" title="Keyframe ${i + 1} — ${(k.t * 100).toFixed(0)}%"></button>`).join('');
+                $('#gif-frame-count', page).textContent = kfs.length;
+                $$('.gif-kf-dot', trackEl).forEach((d) => {
+                    d.onclick = (ev) => {
+                        ev.stopPropagation();
+                        selKf = +d.dataset.i;
+                        syncKfProps();
+                        renderTrack();
                     };
                 });
-                $('#gif-btn-add-fr', stripEl).onclick = () => {
-                    frames.push({
-                        bgColor: '0b0c10',
-                        elements: [
-                            { type: 'text', text: 'FRAME ' + (frames.length + 1), x: 0.5, y: 0.5, size: 0.12, color: 'ffffff', bold: true },
-                        ],
-                    });
-                    currentFrameIdx = frames.length - 1;
-                    renderStrip();
-                };
+            }
+            trackEl.onclick = (e) => {
+                const r = trackEl.getBoundingClientRect();
+                playT = Math.min(durationMs, Math.max(0, ((e.clientX - r.left) / r.width) * durationMs));
+                setPlaying(false);
+                drawAtPlayhead();
+            };
+
+            function syncKfProps() {
+                const k = kfs[selKf];
+                if (!k) return;
+                const tpct = Math.round(k.t * 100);
+                $('#gif-kf-t', page).value = tpct;
+                $('#gif-kf-tlbl', page).textContent = `${tpct}%`;
+                $('#gif-fr-text1', page).value = k.elements?.[0]?.text || '';
+                $('#gif-fr-text2', page).value = k.elements?.[1]?.text || '';
+                const col = k.elements?.[0]?.color || '6366f1';
+                $('#gif-fr-col', page).value = col.startsWith('#') ? col : `#${col}`;
+                const bg = String(k.bgColor || '0b0c10');
+                $('#gif-fr-bg', page).value = bg.startsWith('#') ? bg : `#${bg}`;
             }
 
-            function syncFrameProps() {
-                const f = frames[currentFrameIdx];
-                if (!f) return;
-                const t1 = f.elements?.[0]?.text || '';
-                const t2 = f.elements?.[1]?.text || '';
-                const col = f.elements?.[0]?.color || '#6366f1';
-                $('#gif-fr-text1', page).value = t1;
-                $('#gif-fr-text2', page).value = t2;
-                $('#gif-fr-col', page).value = col.startsWith('#') ? col : '#' + col;
-            }
-
+            // Move the selected keyframe along the timeline.
+            $('#gif-kf-t', page).oninput = (e) => {
+                const k = kfs[selKf];
+                if (!k) return;
+                k.t = Math.min(1, Math.max(0, (+e.target.value) / 100));
+                $('#gif-kf-tlbl', page).textContent = `${e.target.value}%`;
+                kfs.sort((a, b) => a.t - b.t);
+                selKf = kfs.indexOf(k);
+                renderTrack();
+                drawAtPlayhead();
+            };
             $('#gif-fr-text1', page).oninput = (e) => {
-                const f = frames[currentFrameIdx];
-                if (!f.elements[0]) f.elements[0] = { type: 'text', x: 0.5, y: 0.38, size: 0.12, bold: true };
-                f.elements[0].text = e.target.value;
-                drawFrame(f);
+                const k = kfs[selKf];
+                if (!k) return;
+                k.elements ||= [];
+                if (!k.elements[0]) k.elements[0] = { type: 'text', x: 0.5, y: 0.4, size: 0.12, bold: true };
+                k.elements[0].text = e.target.value;
+                drawAtPlayhead();
             };
             $('#gif-fr-text2', page).oninput = (e) => {
-                const f = frames[currentFrameIdx];
-                if (!f.elements[1]) f.elements[1] = { type: 'text', x: 0.5, y: 0.68, size: 0.14, bold: true };
-                f.elements[1].text = e.target.value;
-                drawFrame(f);
+                const k = kfs[selKf];
+                if (!k) return;
+                k.elements ||= [];
+                if (!k.elements[1]) k.elements[1] = { type: 'text', x: 0.5, y: 0.68, size: 0.14, bold: true };
+                k.elements[1].text = e.target.value;
+                drawAtPlayhead();
             };
             $('#gif-fr-col', page).oninput = (e) => {
-                const f = frames[currentFrameIdx];
-                if (f.elements[0]) f.elements[0].color = e.target.value;
-                drawFrame(f);
+                const k = kfs[selKf];
+                if (k?.elements?.[0]) k.elements[0].color = e.target.value;
+                drawAtPlayhead();
+            };
+            $('#gif-fr-bg', page).oninput = (e) => {
+                const k = kfs[selKf];
+                if (k) k.bgColor = e.target.value;
+                drawAtPlayhead();
             };
 
-            playBtn.onclick = () => {
-                isPlaying = !isPlaying;
-                playBtn.innerHTML = isPlaying ? '⏸ Pause Preview' : '▶ Play Preview';
+            playBtn.onclick = () => setPlaying(!playing);
+            scrubEl.oninput = () => {
+                playT = +scrubEl.value;
+                setPlaying(false);
+                drawAtPlayhead();
             };
-            fpsSel.onchange = () => { fps = +fpsSel.value; renderStrip(); };
+            fpsSel.onchange = () => { fps = +fpsSel.value; };
+            easeSel.onchange = () => { easing = easeSel.value; drawAtPlayhead(); };
+            durEl.onchange = () => {
+                durationMs = Math.min(5000, Math.max(500, Math.round(+durEl.value || 3000)));
+                durEl.value = durationMs;
+                scrubEl.max = durationMs;
+                playT = Math.min(playT, durationMs);
+                drawAtPlayhead();
+            };
 
+            // Insert a copy of the selected keyframe at the playhead.
             $('#gif-btn-dup-fr', page).onclick = () => {
-                const f = structuredClone(frames[currentFrameIdx]);
-                frames.splice(currentFrameIdx + 1, 0, f);
-                currentFrameIdx++;
-                renderStrip();
+                const base = kfs[selKf] || kfs[kfs.length - 1] || { bgColor: '0b0c10', elements: [] };
+                const nk = { ...clone(base), t: Math.min(1, Math.max(0, playT / durationMs)) };
+                kfs.push(nk);
+                kfs.sort((a, b) => a.t - b.t);
+                selKf = kfs.indexOf(nk);
+                renderTrack();
+                syncKfProps();
             };
             $('#gif-btn-del-fr', page).onclick = () => {
-                if (frames.length <= 1) return toast('Must have at least 1 frame', 'err');
-                frames.splice(currentFrameIdx, 1);
-                currentFrameIdx = Math.max(0, currentFrameIdx - 1);
-                renderStrip();
+                if (kfs.length <= 1) return toast('Must have at least 1 keyframe', 'err');
+                kfs.splice(selKf, 1);
+                selKf = Math.max(0, Math.min(selKf, kfs.length - 1));
+                renderTrack();
+                syncKfProps();
+                drawAtPlayhead();
             };
 
-            // Auto generators
+            const applyGen = (label) => { selKf = 0; playT = 0; renderTrack(); syncKfProps(); drawAtPlayhead(); toast(label); };
+
+            // Auto generators — keyframe sequences on the shared timeline.
             $('#gen-pulse', page).onclick = () => {
-                frames.length = 0;
-                for (let i = 0; i < 8; i++) {
-                    const scale = 0.1 + Math.sin((i / 8) * Math.PI) * 0.04;
-                    frames.push({
-                        bgColor: '0b0c10',
-                        elements: [
-                            { type: 'text', text: '⚡ KOTAN ACTIVE ⚡', x: 0.5, y: 0.45, size: scale, color: 'e8622e', bold: true },
-                        ],
-                    });
-                }
-                currentFrameIdx = 0;
-                renderStrip();
-                toast('Pulse animation generated (8 frames)');
+                easing = 'easeInOut'; easeSel.value = 'easeInOut';
+                kfs.length = 0;
+                kfs.push(
+                    { t: 0, bgColor: '0b0c10', elements: [{ type: 'text', text: '⚡ KOTAN ACTIVE ⚡', x: 0.5, y: 0.45, size: 0.1, color: 'e8622e', bold: true }] },
+                    { t: 0.5, bgColor: '140f14', elements: [{ type: 'text', text: '⚡ KOTAN ACTIVE ⚡', x: 0.5, y: 0.45, size: 0.15, color: 'fbbf24', bold: true }] },
+                    { t: 1, bgColor: '0b0c10', elements: [{ type: 'text', text: '⚡ KOTAN ACTIVE ⚡', x: 0.5, y: 0.45, size: 0.1, color: 'e8622e', bold: true }] },
+                );
+                applyGen('Pulse animation generated');
             };
 
             $('#gen-rainbow', page).onclick = () => {
-                frames.length = 0;
+                easing = 'linear'; easeSel.value = 'linear';
                 const colors = ['#ef4444', '#f97316', '#f59e0b', '#10b981', '#06b6d4', '#6366f1', '#ec4899'];
-                for (let i = 0; i < colors.length; i++) {
-                    frames.push({
-                        bgColor: '0b0c10',
-                        elements: [
-                            { type: 'text', text: '🌈 RAINBOW GLOW', x: 0.5, y: 0.45, size: 0.13, color: colors[i], bold: true },
-                        ],
-                    });
-                }
-                currentFrameIdx = 0;
-                renderStrip();
-                toast('Rainbow animation generated');
+                kfs.length = 0;
+                colors.forEach((c, i) => kfs.push({
+                    t: i / colors.length, bgColor: '0b0c10',
+                    elements: [{ type: 'text', text: '🌈 RAINBOW GLOW', x: 0.5, y: 0.45, size: 0.13, color: c, bold: true }],
+                }));
+                applyGen('Rainbow animation generated');
             };
 
             $('#gen-bar', page).onclick = () => {
-                frames.length = 0;
-                for (let i = 1; i <= 6; i++) {
-                    frames.push({
-                        bgColor: '0b0c10',
-                        elements: [
-                            { type: 'text', text: `LEVEL UP: ${i * 20}%`, x: 0.5, y: 0.38, size: 0.1, color: '#10b981', bold: true },
-                            { type: 'text', text: '██████████'.slice(0, i + 1), x: 0.5, y: 0.65, size: 0.09, color: '#10b981', bold: true },
-                        ],
-                    });
-                }
-                currentFrameIdx = 0;
-                renderStrip();
-                toast('Level up animation generated');
+                easing = 'easeInOut'; easeSel.value = 'easeInOut';
+                kfs.length = 0;
+                kfs.push(
+                    { t: 0, bgColor: '0b0c10', elements: [
+                        { type: 'text', text: 'LEVEL UP!', x: 0.5, y: 0.32, size: 0.11, color: '#10b981', bold: true },
+                        { type: 'bar', x: 0.5, y: 0.62, w: 0.7, h: 0.14, progress: 0, bgColor: '2b2d31', fill: '10b981' },
+                    ] },
+                    { t: 1, bgColor: '0b0c10', elements: [
+                        { type: 'text', text: 'LEVEL UP!', x: 0.5, y: 0.32, size: 0.11, color: '#34d399', bold: true },
+                        { type: 'bar', x: 0.5, y: 0.62, w: 0.7, h: 0.14, progress: 1, bgColor: '2b2d31', fill: '34d399' },
+                    ] },
+                );
+                applyGen('Level-up fill animation generated');
             };
 
             $('#gen-flash', page).onclick = () => {
-                frames.length = 0;
+                easing = 'steps'; easeSel.value = 'steps';
+                kfs.length = 0;
                 for (let i = 0; i < 4; i++) {
-                    frames.push({
-                        bgColor: i % 2 === 0 ? '1f0a0a' : '0b0c10',
-                        elements: [
-                            { type: 'text', text: '🚨 PRIORITY ALERT 🚨', x: 0.5, y: 0.5, size: 0.12, color: i % 2 === 0 ? '#ef4444' : '#ffffff', bold: true },
-                        ],
+                    kfs.push({
+                        t: i / 4, bgColor: i % 2 === 0 ? '1f0a0a' : '0b0c10',
+                        elements: [{ type: 'text', text: '🚨 PRIORITY ALERT 🚨', x: 0.5, y: 0.5, size: 0.12, color: i % 2 === 0 ? '#ef4444' : '#ffffff', bold: true }],
                     });
                 }
-                currentFrameIdx = 0;
-                renderStrip();
-                toast('Alert flash animation generated');
+                applyGen('Alert flash animation generated');
             };
 
             // Templates
             $('#gtmpl-welcome', page).onclick = () => {
-                frames.length = 0;
+                easing = 'linear'; easeSel.value = 'linear';
                 const tints = ['#6366f1', '#e8622e', '#ec4899', '#06b6d4'];
-                for (const col of tints) {
-                    frames.push({
-                        bgColor: '0b0c10',
-                        elements: [
-                            { type: 'text', text: '✨ WELCOME TO THE SERVER ✨', x: 0.5, y: 0.38, size: 0.09, color: col, bold: true },
-                            { type: 'text', text: `{username}`, x: 0.5, y: 0.65, size: 0.13, color: '#ffffff', bold: true },
-                        ],
-                    });
-                }
-                renderStrip();
+                kfs.length = 0;
+                tints.forEach((col, i) => kfs.push({
+                    t: i / tints.length, bgColor: '0b0c10',
+                    elements: [
+                        { type: 'text', text: '✨ WELCOME TO THE SERVER ✨', x: 0.5, y: 0.38, size: 0.09, color: col, bold: true },
+                        { type: 'text', text: '{username}', x: 0.5, y: 0.65, size: 0.13, color: '#ffffff', bold: true },
+                    ],
+                }));
+                applyGen('Welcome pulse template applied');
             };
+
+            $('#gtmpl-rank', page).onclick = () => {
+                easing = 'elastic'; easeSel.value = 'elastic';
+                kfs.length = 0;
+                kfs.push(
+                    { t: 0, bgColor: '0b0c10', elements: [
+                        { type: 'media', x: 0.5, y: 0.42, size: 0.36, shape: 'circle', fill: '1f2937', ring: 'f59e0b' },
+                        { type: 'text', text: 'LVL 24', x: 0.5, y: 0.42, size: 0.12, color: '#f59e0b', bold: true },
+                        { type: 'text', text: '{username} ranked up!', x: 0.5, y: 0.75, size: 0.09, color: '#e5e7eb', bold: false },
+                    ] },
+                    { t: 0.4, bgColor: '14100c', elements: [
+                        { type: 'media', x: 0.5, y: 0.42, size: 0.46, shape: 'circle', fill: '292016', ring: 'fbbf24' },
+                        { type: 'text', text: 'LVL 25', x: 0.5, y: 0.42, size: 0.15, color: '#fbbf24', bold: true },
+                        { type: 'text', text: '{username} ranked up!', x: 0.5, y: 0.75, size: 0.1, color: '#ffffff', bold: true },
+                    ] },
+                    { t: 1, bgColor: '14100c', elements: [
+                        { type: 'media', x: 0.5, y: 0.42, size: 0.46, shape: 'circle', fill: '292016', ring: 'fbbf24' },
+                        { type: 'text', text: 'LVL 25', x: 0.5, y: 0.42, size: 0.15, color: '#fbbf24', bold: true },
+                        { type: 'text', text: '{username} ranked up!', x: 0.5, y: 0.75, size: 0.1, color: '#ffffff', bold: true },
+                    ] },
+                );
+                applyGen('Level-up template applied');
+            };
+
+            $('#gtmpl-alert', page).onclick = () => {
+                easing = 'steps'; easeSel.value = 'steps';
+                kfs.length = 0;
+                const msgs = ['📢 SERVER ANNOUNCEMENT', '⚠️ READ #announcements'];
+                msgs.forEach((m, i) => kfs.push({
+                    t: i / 2, bgColor: i % 2 === 0 ? '1a0d0d' : '0f0d1a',
+                    elements: [{ type: 'text', text: m, x: 0.5, y: 0.5, size: 0.1, color: i % 2 === 0 ? '#fbbf24' : '#818cf8', bold: true }],
+                }));
+                applyGen('Announcement template applied');
+            };
+
+            const gifCfg = () => ({ width, height, durationMs, fps, easing, loop: true, keyframes: kfs });
 
             // ⚡ Render with Rust
             $('#gif-btn-rust', page).onclick = async () => {
                 toast('⚡ Rendering GIF…');
-                const cfg = { width, height, fps, frames };
-                const r = await api(`/api/guilds/${guildId}/studio/render`, { body: { type: 'gif', config: cfg } });
+                const r = await api(`/api/guilds/${guildId}/studio/render`, { body: { type: 'gif', config: gifCfg() } });
                 if (r?.ok) {
                     toast(`⚡ GIF encoded in ${r.durationMs}ms!`);
                 } else {
@@ -3333,8 +3523,7 @@
             // Download GIF
             $('#gif-btn-dl', page).onclick = async () => {
                 toast('Rendering & downloading animated GIF…');
-                const cfg = { width, height, fps, frames };
-                const r = await api(`/api/guilds/${guildId}/studio/render`, { body: { type: 'gif', config: cfg } });
+                const r = await api(`/api/guilds/${guildId}/studio/render`, { body: { type: 'gif', config: gifCfg() } });
                 if (r?.dataUrl) {
                     const a = document.createElement('a');
                     a.download = `kotan-animated-${Date.now()}.gif`;
@@ -3349,7 +3538,7 @@
                 const name = ($('#gif-var-name', page).value || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
                 if (!name) return toast('Enter a variable name first', 'err');
                 toast(`Rendering & saving variable {gif:${name}}…`);
-                const cfg = { width, height, fps, frames };
+                const cfg = gifCfg();
                 const rendered = await api(`/api/guilds/${guildId}/studio/render`, { body: { type: 'gif', config: cfg } });
                 const r = await api(`/api/guilds/${guildId}/studio/variables`, {
                     body: { name, type: 'gif', config: cfg, dataUrl: rendered?.dataUrl },
@@ -3368,8 +3557,8 @@
                 }
             };
 
-            renderStrip();
-            syncFrameProps();
+            renderTrack();
+            syncKfProps();
         },
 
         // ---------- CREATIVE STUDIO: ASSETS & VARIABLES MANAGER ----------
