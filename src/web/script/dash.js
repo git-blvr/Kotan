@@ -3371,6 +3371,7 @@
                             <div class="gif-timeline-ctrls">
                                 <span class="studio-sec-title" style="margin:0;">Keyframes (<span id="gif-frame-count">${kfs.length}</span>)</span>
                                 <div style="display:flex;gap:6px;">
+                                    <button type="button" class="btn sm outline" id="gif-btn-copy-fr" title="Clone the selected keyframe right after itself — reuse the same state later for seamless loops">${ICONS.duplicate} Duplicate</button>
                                     <button type="button" class="btn sm outline" id="gif-btn-dup-fr">+ At Playhead</button>
                                     <button type="button" class="btn sm danger" id="gif-btn-del-fr">Delete</button>
                                 </div>
@@ -3974,6 +3975,25 @@
                 scrubEl.max = durationMs;
                 playT = Math.min(playT, durationMs);
                 drawAtPlayhead();
+            };
+
+            // Duplicate — clone the selected keyframe right after itself so
+            // the same state can hold a segment or close a loop. Drag the
+            // new dot to wherever it should sit.
+            $('#gif-btn-copy-fr', page).onclick = () => {
+                const src = kfs[selKf];
+                if (!src) return;
+                const next = kfs[selKf + 1];
+                const t = next ? src.t + (next.t - src.t) / 2 : Math.min(1, src.t + 0.1);
+                const nk = { ...clone(src), t };
+                kfs.push(nk);
+                kfs.sort((a, b) => a.t - b.t);
+                selKf = kfs.indexOf(nk);
+                playT = nk.t * durationMs;
+                renderTrack();
+                syncKfProps();
+                drawAtPlayhead();
+                toast('Keyframe duplicated — drag it to position');
             };
 
             // Insert a copy of the selected keyframe at the playhead.
