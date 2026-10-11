@@ -15,7 +15,7 @@ async function run(ctx) {
 
     const lines = [];
     for (const [i, row] of rows.entries()) {
-        const user = await ctx.client.users.fetch(row.userId).catch(() => null);
+        const user = ctx.client.users.cache.get(row.userId) || await ctx.client.users.fetch(row.userId).catch(() => null);
         const name = user ? user.username : row.userId;
         lines.push(
             `${MEDALS[i] || `**${i + 1}.**`} **${name}** — ${formatCoins(row.total, cur)}`

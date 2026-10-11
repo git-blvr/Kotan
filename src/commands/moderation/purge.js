@@ -8,7 +8,12 @@ async function run(ctx, amount, target) {
     if (!Number.isInteger(amount) || amount < 1 || amount > 100)
         return sendError(ctx, `Usage: \`${ctx.prefix}purge <1-100> [@member]\``);
 
-    const fetched = await ctx.channel.messages.fetch({ limit: 100 });
+    if (ctx.interaction) {
+        await ctx.interaction.deferReply().catch(() => {});
+    }
+
+    const fetched = await ctx.channel.messages.fetch({ limit: 100 }).catch(() => null);
+    if (!fetched) return sendError(ctx, 'Could not fetch messages in this channel.');
     let batch = [...fetched.values()].filter((m) => !m.pinned);
     if (target) batch = batch.filter((m) => m.author.id === target.id);
     batch = batch.slice(0, amount);
@@ -29,7 +34,7 @@ async function run(ctx, amount, target) {
     // Slash: the notice is the interaction reply — same auto-delete.
     const payload = cv2(success(`Deleted **${deleted.size}** message(s)${target ? ` from **${target.user.tag}**` : ''}.`, 'Messages purged'));
     const notice = ctx.interaction ? await ctx.reply(payload) : await ctx.channel.send(payload);
-    setTimeout(() => notice.delete().catch(() => {}), 5000);
+    setTimeout(() => notice?.delete?.().catch(() => {}), 5000);
 }
 
 module.exports = {

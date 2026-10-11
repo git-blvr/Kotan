@@ -146,7 +146,7 @@ const withCoinMult = (profile, amount) => Math.round(amount * multOf(profile, 'c
 const fmtLeft = (until) => {
     const s = Math.max(0, Math.round((until - Date.now()) / 1000));
     const h = Math.floor(s / 3600);
-    const m = Math.ceil((s % 3600) / 60);
+    const m = Math.floor((s % 3600) / 60);
     return h ? `${h}h ${m}m` : `${m}m`;
 };
 

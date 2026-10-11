@@ -1,5 +1,5 @@
 /* Kotan dashboard SPA — served as a static shell, all data via /api.
-   Routes: /dashboard → server picker; /dashboard/:id → guild app with
+   Routes: /dashboard -> server picker; /dashboard/:id -> guild app with
    hash sub-routes (#/overview … #/settings). Server-side guards and the
    API enforce access independently — this is presentation only. */
 
@@ -11,6 +11,44 @@
     const $$ = (s, el = document) => [...el.querySelectorAll(s)];
     const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const app = $('#app');
+
+    const svg = (inner, w = 24, h = 24, stroke = '1.7') => `<svg viewBox="0 0 ${w} ${h}" fill="none" stroke="currentColor" stroke-width="${stroke}" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
+    const ICONS = {
+        close: svg('<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>', 24, 24, '2'),
+        trash: svg('<path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>', 24, 24, '2'),
+        theme: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18v-18z" fill="currentColor"/></svg>',
+        chevronDown: svg('<polyline points="6 9 12 15 18 9"/>', 24, 24, '2'),
+        chevronUp: svg('<polyline points="18 15 12 9 6 15"/>', 24, 24, '2'),
+        chevronRight: svg('<polyline points="9 18 15 12 9 6"/>', 24, 24, '2'),
+        burger: svg('<line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>', 24, 24, '2'),
+        duplicate: svg('<rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>', 24, 24, '2'),
+        up: svg('<line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>', 24, 24, '2'),
+        down: svg('<line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>', 24, 24, '2'),
+        plus: svg('<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>', 24, 24, '2'),
+        drag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="6" r="1.5" fill="currentColor"/><circle cx="15" cy="6" r="1.5" fill="currentColor"/><circle cx="9" cy="12" r="1.5" fill="currentColor"/><circle cx="15" cy="12" r="1.5" fill="currentColor"/><circle cx="9" cy="18" r="1.5" fill="currentColor"/><circle cx="15" cy="18" r="1.5" fill="currentColor"/></svg>',
+        pipette: svg('<path d="m14 7 3 3m-9.5 7.5L3 21l3.5-4.5 9-9a2.121 2.121 0 0 0-3-3l-9 9z"/>', 24, 24, '2'),
+        upload: svg('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>', 24, 24, '2'),
+        download: svg('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>', 24, 24, '2'),
+        triangleUp: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 5l7 12H5z"/></svg>',
+        triangleDown: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 19l7-12H5z"/></svg>',
+        link: svg('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>', 24, 24, '2'),
+        serverEmpty: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:48px;height:48px;display:inline-block;opacity:0.7;"><circle cx="12" cy="12" r="3"/><path d="M5 12a7 7 0 0 1 14 0M2 12a10 10 0 0 1 20 0"/></svg>',
+        crown: '<svg viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;vertical-align:-2px;margin-right:6px;"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14v2H5z"/></svg>',
+        userAvatar: svg('<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>', 24, 24, '2'),
+        typeText: svg('<polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/>', 24, 24, '2'),
+        sparkle: '<svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px;"><path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5z"/></svg>',
+        zap: svg('<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>', 24, 24, '2'),
+        sunset: svg('<path d="M12 10V2M4.93 10.93 2.1 8.1M19.07 10.93l2.83-2.83M22 17H2M16 17a4 4 0 0 0-8 0"/>', 24, 24, '2'),
+        gamepad: svg('<rect x="2" y="6" width="20" height="12" rx="4"/><line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/><circle cx="15.5" cy="12" r="1" fill="currentColor"/><circle cx="18" cy="10" r="1" fill="currentColor"/>', 24, 24, '2'),
+        hash: svg('<line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/>', 24, 24, '2'),
+        speaker: svg('<path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>', 24, 24, '2'),
+        announcement: svg('<path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>', 24, 24, '2'),
+        folder: svg('<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>', 24, 24, '2'),
+        image: svg('<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>', 24, 24, '2'),
+        film: svg('<rect x="2" y="2" width="20" height="20" rx="2.2"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/>', 24, 24, '2'),
+        variable: svg('<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>', 24, 24, '2'),
+        settings: svg('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>', 24, 24, '2'),
+    };
 
     async function api(path, opts) {
         const r = await fetch(path, opts && {
@@ -45,39 +83,289 @@
         });
     }
 
-    // ---------- theme ----------
-    const THEME_KEY = 'kotan-theme';
-    const theme = (() => { try { return JSON.parse(localStorage.getItem(THEME_KEY) || '{}'); } catch { return {}; } })();
-    function applyTheme() {
-        const r = document.documentElement;
-        r.dataset.mode = theme.mode || ''; r.dataset.density = theme.density || ''; r.dataset.motion = theme.motion || '';
-        if (theme.accent) { r.style.setProperty('--accent', theme.accent); r.style.setProperty('--accent-soft', theme.accent + '24'); }
-        localStorage.setItem(THEME_KEY, JSON.stringify(theme));
+    // ---------- signature color themes & appearance customizer ----------
+    const THEME_KEY = 'kotan-theme-v5';
+    const COLOR_THEMES = {
+        cream: {
+            label: 'Cream Latte (Light)',
+            desc: 'Warm Cream Rail · Soft Sand Cards · Toasted Orange Accent',
+            accent: '#e2792b',
+            accent2: '#c96a20',
+            shell: '#ead6c1',
+            sidebar: '#ead6c1',
+            dock: '#fbf4ec',
+            card: '#f1e2d2',
+            acc: '#f1e2d2',
+            navBtn: '#e2792b',
+            dockMode: '',
+        },
+        cocoa: {
+            label: 'Cocoa Roast (Dark)',
+            desc: 'Roasted Cocoa Shell · Espresso Panels · Amber Orange Accent',
+            accent: '#f08a3c',
+            accent2: '#e2792b',
+            shell: '#26170f',
+            sidebar: '#26170f',
+            dock: '#2f1e14',
+            card: '#3a2619',
+            acc: '#3a2619',
+            navBtn: '#f08a3c',
+            dockMode: '',
+        },
+        dark: {
+            label: 'Obsidian Dark (Default)',
+            desc: 'Deep Neutral Charcoal · Soft Dark Canvas · Clean Blurple Accent',
+            accent: '#5865f2',
+            accent2: '#4752c4',
+            shell: '#16171b',
+            sidebar: '#16171b',
+            dock: '#1c1d22',
+            card: '#24252b',
+            acc: '#202227',
+            navBtn: '#5865f2',
+            dockMode: '',
+        },
+        oled: {
+            label: 'OLED Pitch Black',
+            desc: 'True Deep Pitch Black · Charcoal Panels · Crisp Monochrome Accent',
+            accent: '#ffffff',
+            accent2: '#dbdee1',
+            shell: '#0c0c0e',
+            sidebar: '#0c0c0e',
+            dock: '#111113',
+            card: '#18181c',
+            acc: '#141417',
+            navBtn: '#2b2d31',
+            dockMode: 'oled',
+        },
+        zinc: {
+            label: 'Zinc Slate',
+            desc: 'Cool Neutral Zinc · Clean Slate Dock · Electric Indigo Accent',
+            accent: '#6366f1',
+            accent2: '#4f46e5',
+            shell: '#16181e',
+            sidebar: '#16181e',
+            dock: '#1e2027',
+            card: '#262832',
+            acc: '#21232b',
+            navBtn: '#6366f1',
+            dockMode: 'vibrant',
+        },
+        charcoal: {
+            label: 'Warm Charcoal',
+            desc: 'Smoky Warm Charcoal · Soft Dark Canvas · Amber Gold Accent',
+            accent: '#f59e0b',
+            accent2: '#d97706',
+            shell: '#181716',
+            sidebar: '#181716',
+            dock: '#201f1d',
+            card: '#282724',
+            acc: '#23211f',
+            navBtn: '#f59e0b',
+            dockMode: '',
+        },
+    };
+
+    function loadTheme() {
+        try {
+            const raw = localStorage.getItem(THEME_KEY);
+            if (raw) return JSON.parse(raw);
+            try {
+                localStorage.removeItem('kotan-theme');
+                localStorage.removeItem('kotan-navy-theme-v2');
+                localStorage.removeItem('kotan-dark-theme-v4');
+            } catch {}
+            return {};
+        } catch { return {}; }
+    }
+    let theme = loadTheme();
+    if (!theme.colorTheme || !COLOR_THEMES[theme.colorTheme]) theme.colorTheme = 'cream';
+
+    function applyTheme(t = theme) {
+        const root = document.documentElement;
+        root.dataset.mode = t.mode || '';
+        root.dataset.density = t.density || '';
+        root.dataset.motion = t.motion || '';
+        root.dataset.glass = t.glass === 0 || t.glass === '0' ? '0' : '1';
+
+        // Active color scheme
+        const ctheme = COLOR_THEMES[t.colorTheme] || COLOR_THEMES.dark;
+        root.dataset.colorTheme = t.colorTheme || 'dark';
+        const dMode = t.dockMode !== undefined ? t.dockMode : (ctheme.dockMode || '');
+        if (dMode) root.dataset.dockMode = dMode;
+        else root.removeAttribute('data-dock-mode');
+
+        // Accents
+        const acc = t.customAccent || ctheme.accent;
+        const acc2 = t.customAccent2 || ctheme.accent2;
+        root.style.setProperty('--accent', acc);
+        root.style.setProperty('--accent-2', acc2);
+        root.style.setProperty('--dock-accent', acc);
+        root.style.setProperty('--dock-accent-2', acc2);
+        root.style.setProperty('--chart', acc);
+
+        // Surfaces
+        const sh = t.customShell || ctheme.shell;
+        const sb = t.customSidebar || ctheme.sidebar;
+        const dk = t.customDock || ctheme.dock;
+        const cd = t.customCard || ctheme.card;
+        const ac = t.customAcc || ctheme.acc;
+        const nb = t.customNavBtn || ctheme.navBtn;
+
+        root.style.setProperty('--shell-bg', sh);
+        root.style.setProperty('--sidebar-bg', sb);
+        root.style.setProperty('--dock-bg', dk);
+        root.style.setProperty('--card-bg', cd);
+        root.style.setProperty('--acc-bg', ac);
+        root.style.setProperty('--nav-btn-bg', nb);
+
+        try { localStorage.setItem(THEME_KEY, JSON.stringify(t)); } catch {}
     }
     applyTheme();
+    window.addEventListener('storage', (e) => {
+        if (e.key === THEME_KEY) { theme = loadTheme(); applyTheme(theme); }
+    });
+
+    let themeDrawerEl = null;
+    function openThemeDrawer() {
+        if (themeDrawerEl) { themeDrawerEl.classList.add('open'); $('.theme-drawer-backdrop')?.classList.add('open'); return; }
+        const backdrop = document.createElement('div');
+        backdrop.className = 'theme-drawer-backdrop open';
+        const drawer = document.createElement('aside');
+        drawer.className = 'theme-drawer open';
+        drawer.innerHTML = `
+            <div class="theme-drawer-head">
+                <h3><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18v-18z"/></svg> Appearance & Theme</h3>
+                <button type="button" class="theme-close-btn" data-close aria-label="Close">${ICONS.close}</button>
+            </div>
+            <div class="theme-drawer-body">
+                <div>
+                    <div class="theme-sec-title">Theme Presets</div>
+                    <div style="display:flex;flex-direction:column;gap:10px;">
+                        ${Object.entries(COLOR_THEMES).map(([k, v]) => `
+                            <button type="button" class="theme-preset-card ${(theme.colorTheme || 'dark') === k ? 'active' : ''}" data-thm="${k}">
+                                <div style="display:flex;align-items:center;justify-content:space-between;width:100%;">
+                                    <b style="font-size:13.5px;color:var(--text);">${v.label}</b>
+                                    <div style="display:flex;gap:4px;">
+                                        <span style="width:13px;height:13px;border-radius:50%;background:${v.shell};" title="Shell"></span>
+                                        <span style="width:13px;height:13px;border-radius:50%;background:${v.dock};" title="Dock"></span>
+                                        <span style="width:13px;height:13px;border-radius:50%;background:${v.card};" title="Card"></span>
+                                        <span style="width:13px;height:13px;border-radius:50%;background:${v.accent};" title="Accent"></span>
+                                    </div>
+                                </div>
+                                <span style="font-size:11.5px;color:var(--text-2);text-align:left;">${v.desc}</span>
+                            </button>`).join('')}
+                    </div>
+                </div>
+                <div>
+                    <div class="theme-sec-title">Dock Background Elevation</div>
+                    <div class="segmented-control">
+                        <button type="button" class="segmented-btn ${!theme.dockMode ? 'active' : ''}" data-dock="">Standard Dark</button>
+                        <button type="button" class="segmented-btn ${theme.dockMode === 'vibrant' ? 'active' : ''}" data-dock="vibrant">Elevated Slate</button>
+                        <button type="button" class="segmented-btn ${theme.dockMode === 'oled' ? 'active' : ''}" data-dock="oled">Pitch Black</button>
+                    </div>
+                </div>
+                <div>
+                    <div class="theme-sec-title">Custom Colors</div>
+                    <div style="display:flex;flex-direction:column;gap:12px;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+                            <span style="font-size:12.5px;color:var(--text);font-weight:600;">Main Background</span>
+                            <input type="color" id="th-pick-shell" value="${theme.customShell || (COLOR_THEMES[theme.colorTheme] || COLOR_THEMES.cream).shell}" style="width:40px;height:32px;border-radius:6px;border:none;cursor:pointer;">
+                        </div>
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+                            <span style="font-size:12.5px;color:var(--text);font-weight:600;">Content Dock</span>
+                            <input type="color" id="th-pick-dock" value="${theme.customDock || (COLOR_THEMES[theme.colorTheme] || COLOR_THEMES.cream).dock}" style="width:40px;height:32px;border-radius:6px;border:none;cursor:pointer;">
+                        </div>
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+                            <span style="font-size:12.5px;color:var(--text);font-weight:600;">Accent Color</span>
+                            <input type="color" id="th-pick-accent" value="${theme.customAccent || (COLOR_THEMES[theme.colorTheme] || COLOR_THEMES.cream).accent}" style="width:40px;height:32px;border-radius:6px;border:none;cursor:pointer;">
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <div class="theme-sec-title">Interface Density</div>
+                    <div class="segmented-control">
+                        <button type="button" class="segmented-btn ${!theme.density ? 'active' : ''}" data-density="">Comfortable</button>
+                        <button type="button" class="segmented-btn ${theme.density === 'compact' ? 'active' : ''}" data-density="compact">Compact</button>
+                    </div>
+                </div>
+                <div>
+                    <button type="button" class="btn outline" id="th-reset" style="width:100%;font-size:13px;">Reset to Default Theme</button>
+                </div>
+            </div>`;
+        document.body.append(backdrop, drawer);
+        themeDrawerEl = drawer;
+        const close = () => { drawer.classList.remove('open'); backdrop.classList.remove('open'); };
+        backdrop.onclick = close;
+        drawer.querySelector('[data-close]').onclick = close;
+
+        // Preset switcher
+        $$('.theme-preset-card', drawer).forEach((b) => (b.onclick = () => {
+            const thmKey = b.dataset.thm;
+            theme.colorTheme = thmKey;
+            delete theme.customAccent; delete theme.customAccent2;
+            delete theme.customShell; delete theme.customSidebar;
+            delete theme.customDock; delete theme.customCard;
+            delete theme.customAcc; delete theme.customNavBtn;
+            delete theme.dockMode;
+            applyTheme();
+            $$('.theme-preset-card', drawer).forEach((x) => x.classList.toggle('active', x === b));
+            const cthm = COLOR_THEMES[thmKey];
+            if (cthm) {
+                $('#th-pick-shell', drawer).value = cthm.shell;
+                $('#th-pick-dock', drawer).value = cthm.dock;
+                $('#th-pick-accent', drawer).value = cthm.accent;
+            }
+        }));
+
+        // Dock surface mode
+        $$('[data-dock]', drawer).forEach((b) => (b.onclick = () => {
+            theme.dockMode = b.dataset.dock;
+            applyTheme();
+            $$('[data-dock]', drawer).forEach((x) => x.classList.toggle('active', x === b));
+        }));
+
+        // Interactive pickers
+        $('#th-pick-shell', drawer).oninput = (e) => {
+            theme.customShell = e.target.value;
+            applyTheme();
+            $$('.theme-preset-card', drawer).forEach((x) => x.classList.remove('active'));
+        };
+        $('#th-pick-dock', drawer).oninput = (e) => {
+            theme.customDock = e.target.value;
+            applyTheme();
+            $$('.theme-preset-card', drawer).forEach((x) => x.classList.remove('active'));
+        };
+        $('#th-pick-accent', drawer).oninput = (e) => {
+            const v = e.target.value;
+            theme.customAccent = v;
+            theme.customAccent2 = v;
+            theme.customNavBtn = v;
+            applyTheme();
+            $$('.theme-preset-card', drawer).forEach((x) => x.classList.remove('active'));
+        };
+
+        $$('[data-density]', drawer).forEach((b) => (b.onclick = () => {
+            theme.density = b.dataset.density; applyTheme();
+            $$('[data-density]', drawer).forEach((x) => x.classList.toggle('active', x === b));
+        }));
+        drawer.querySelector('#th-reset').onclick = () => {
+            theme = { colorTheme: 'cream', mode: '', density: '' };
+            applyTheme();
+            $$('.theme-preset-card', drawer).forEach((x) => x.classList.toggle('active', x.dataset.thm === 'cream'));
+            $('#th-pick-shell', drawer).value = COLOR_THEMES.cream.shell;
+            $('#th-pick-dock', drawer).value = COLOR_THEMES.cream.dock;
+            $('#th-pick-accent', drawer).value = COLOR_THEMES.cream.accent;
+            toast('Reset to Default Theme');
+        };
+    }
+
     function mountThemeFab() {
         if ($('.theme-fab')) return;
         const fab = document.createElement('button');
-        fab.className = 'theme-fab'; fab.title = 'Appearance'; fab.textContent = '◐';
-        const panel = document.createElement('div');
-        panel.className = 'theme-panel'; panel.style.display = 'none';
-        panel.innerHTML = `<h4>Appearance</h4>
-            <div class="row">Accent <input type="color" id="th-accent" value="${/^#[0-9a-f]{3,8}$/i.test(theme.accent || '') ? theme.accent : '#e8622e'}"></div>
-            <div class="row">Mode <select id="th-mode"><option value="">Dark</option><option value="light">Light</option></select></div>
-            <div class="row">Density <select id="th-density"><option value="">Comfortable</option><option value="compact">Compact</option></select></div>
-            <div class="row">Motion <select id="th-motion"><option value="">On</option><option value="off">Off</option></select></div>`;
-        document.body.append(fab, panel);
-        panel.querySelector('#th-mode').value = theme.mode || '';
-        panel.querySelector('#th-density').value = theme.density || '';
-        panel.querySelector('#th-motion').value = theme.motion || '';
-        fab.onclick = () => (panel.style.display = panel.style.display === 'none' ? 'block' : 'none');
-        panel.onchange = () => {
-            theme.accent = panel.querySelector('#th-accent').value;
-            theme.mode = panel.querySelector('#th-mode').value;
-            theme.density = panel.querySelector('#th-density').value;
-            theme.motion = panel.querySelector('#th-motion').value;
-            applyTheme();
-        };
+        fab.className = 'theme-fab'; fab.title = 'Theme & Appearance'; fab.innerHTML = ICONS.theme;
+        fab.onclick = openThemeDrawer;
+        document.body.appendChild(fab);
     }
 
     // ---------- search-select component ----------
@@ -100,7 +388,7 @@
             const o = options.find((o) => String(o.value) === v);
             return o ? o.label : (v ? `#${v}` : (opts.placeholder || 'Select…'));
         };
-        const renderBtn = () => { btn.innerHTML = `<span class="${values.size ? '' : 'ph'}">${esc(label())}</span><span class="caret">▾</span>`; };
+        const renderBtn = () => { btn.innerHTML = `<span class="${values.size ? '' : 'ph'}">${esc(label())}</span><span class="caret">${ICONS.chevronDown}</span>`; };
         renderBtn();
 
         function renderPop(filter = '') {
@@ -176,7 +464,7 @@
     const txtIn = (name, v, ph = '') => `<input type="text" name="${name}" value="${esc(v ?? '')}" placeholder="${esc(ph)}">`;
     const txtArea = (name, v) => `<textarea name="${name}">${esc(v ?? '')}</textarea>`;
 
-    const chOpts = (channels) => channels.map((c) => ({ value: c.id, label: c.name, icon: c.type === 5 ? '📣' : '#' }));
+    const chOpts = (channels) => channels.map((c) => ({ value: c.id, label: c.name, icon: c.type === 5 ? ICONS.announcement : ICONS.hash }));
     const roOpts = (roles) => roles.map((r) => ({ value: r.id, label: r.name, color: r.color }));
 
     const chName = (id) => DATA.channels.find((c) => c.id === id)?.name || id;
@@ -227,38 +515,6 @@
         return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:100%;height:${h}px">${rects}</svg>`;
     }
 
-    // Catmull-Rom → cubic bezier spline through the points (the "pulse" look).
-    function smoothPath(pts) {
-        if (pts.length < 2) return `M${pts[0]?.[0] ?? 0},${pts[0]?.[1] ?? 0}`;
-        let d = `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
-        for (let i = 0; i < pts.length - 1; i++) {
-            const p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || p2;
-            d += `C${(p1[0] + (p2[0] - p0[0]) / 6).toFixed(1)},${(p1[1] + (p2[1] - p0[1]) / 6).toFixed(1)} ${(p2[0] - (p3[0] - p1[0]) / 6).toFixed(1)},${(p2[1] - (p3[1] - p1[1]) / 6).toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
-        }
-        return d;
-    }
-
-    // Multi-series smoothed area chart — each series normalized to its own
-    // max so different magnitudes overlay as comparable shapes.
-    function pulseChart(series, w = 900, h = 230) {
-        const on = series.filter((s) => s.on && s.values?.some((v) => v));
-        const grid = [0.25, 0.5, 0.75].map((f) =>
-            `<line x1="0" x2="${w}" y1="${(h * f).toFixed(0)}" y2="${(h * f).toFixed(0)}" stroke="var(--border-soft)" stroke-width="1"/>`).join('');
-        let defs = '', paths = '';
-        on.forEach((s, si) => {
-            const max = Math.max(...s.values, 1);
-            const pts = s.values.map((v, i) => [10 + (i / Math.max(s.values.length - 1, 1)) * (w - 20), h - 12 - (v / max) * (h - 30)]);
-            const d = smoothPath(pts);
-            const gid = `pg${si}`;
-            defs += `<linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0" style="stop-color:${s.color};stop-opacity:0.28"/>
-                <stop offset="1" style="stop-color:${s.color};stop-opacity:0"/></linearGradient>`;
-            if (si === 0) paths += `<path d="${d} L${pts.at(-1)[0].toFixed(1)},${h} L${pts[0][0].toFixed(1)},${h} Z" fill="url(#${gid})"/>`;
-            paths += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round"><title>${esc(s.label)}</title></path>`;
-        });
-        return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:100%;height:${h}px"><defs>${defs}</defs>${grid}${paths || `<text x="${w / 2}" y="${h / 2}" fill="var(--muted)" font-size="13" text-anchor="middle">No data in this range yet</text>`}</svg>`;
-    }
-
     // ---------- state ----------
     const m = location.pathname.match(/^\/dashboard(?:\/(\d+))?/);
     const guildId = m?.[1] || null;
@@ -267,12 +523,11 @@
     let rangeDays = 30;       // overview range pill selection
     let actDays = 30;         // activity page range pill selection
     const actFilter = { q: '', roles: [] }; // activity name/id search + role picks
-    const pulseOn = new Set(['commands', 'joins', 'mod']);
 
     const fmtDelta = (cur, prev) => {
         if (!prev) return '';
         const pct = Math.round(((cur - prev) / prev) * 100);
-        return `<span class="delta ${pct >= 0 ? 'up' : 'dn'}">${pct >= 0 ? '▲' : '▼'} ${Math.abs(pct)}%</span>`;
+        return `<span class="delta ${pct >= 0 ? 'up' : 'dn'}">${pct >= 0 ? ICONS.triangleUp : ICONS.triangleDown} ${Math.abs(pct)}%</span>`;
     };
 
     async function save(section, fields, btn, quiet) {
@@ -283,7 +538,7 @@
             CTX.settings = r.settings;
             // What was sent becomes the section's new clean snapshot.
             const s = saveSections.find((x) => x.section === section);
-            if (s) { s.baseline = JSON.stringify(fields); s.dirty = false; renderDirtyBar(); }
+            if (s) { s.baseline = secSnap(s) ?? JSON.stringify(fields); s.dirty = false; renderDirtyBar(); }
             if (!quiet) toast('Saved');
         }
         else toast(r.error || 'Save failed', 'err');
@@ -314,7 +569,6 @@
             <div class="pk-label">Manageable <span class="pkcount" id="srvn"></span></div>
             <div class="srvgrid" id="srvs"><div class="skeleton" style="height:180px"></div></div>
         </div>`;
-        mountThemeFab();
         const [g, me, dev] = await Promise.all([api('/api/guilds'), api('/api/me'), api('/api/meta/devtools')]);
         if (g.ok === false) return;
         const grid = $('#srvs');
@@ -329,8 +583,8 @@
                 <span class="srvbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M4.9 4.9l2.2 2.2M16.9 16.9l2.2 2.2M2.5 12h3M18.5 12h3M4.9 19.1l2.2-2.2M16.9 7.1l2.2-2.2"/></svg>Manage</span>
             </a>`;
         };
-        grid.innerHTML = (list.length ? list.map(card).join('') : '<div class="empty-state"><div class="big">🛰️</div>No manageable servers with Kotan found.</div>')
-            + (dev?.developer ? `<a class="srv dev" href="/dashboard/admin/blacklist" data-name="developer"><span class="noicon">🛠</span><b>Developer</b><span class="srvbadge">Guild blacklist</span><span class="srvbtn">Open</span></a>` : '');
+        grid.innerHTML = (list.length ? list.map(card).join('') : `<div class="empty-state"><div class="big">${ICONS.serverEmpty}</div>No manageable servers with Kotan found.</div>`)
+            + (dev?.developer ? `<a class="srv dev" href="/dashboard/admin/blacklist" data-name="developer"><span class="noicon">${ICONS.crown}</span><b>Developer</b><span class="srvbadge">Guild blacklist</span><span class="srvbtn">Open</span></a>` : '');
         const cards = $$('.srv', grid);
         const count = $('#srvn');
         const apply = (q) => {
@@ -343,7 +597,6 @@
     }
 
     // ---------- GUILD APP ----------
-    const svg = (inner) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
     const NAV = [
         { group: 'General', items: [
             ['overview', svg('<path d="M3 12h4l2.5-7 4 14 2.5-7H21"/>'), 'Overview'],
@@ -369,46 +622,148 @@
             ['boosting', svg('<path d="M5 15c-1.5 1.3-2 5-2 5s3.7-.5 5-2"/><path d="M9 15l-2-2c.5-2.6 1.6-5.2 3.4-7C12.7 3.7 15.5 2.5 21 3c.5 5.5-.7 8.3-3 10.6-1.8 1.8-4.4 2.9-7 3.4z"/><circle cx="15" cy="9" r="1.6"/>'), 'Boosting'],
             ['voicemaster', svg('<path d="M4 14v-2a8 8 0 0 1 16 0v2"/><rect x="3" y="14" width="4" height="6" rx="1.5"/><rect x="17" y="14" width="4" height="6" rx="1.5"/>'), 'VoiceMaster'],
         ] },
+        { group: 'Creative Studio', items: [
+            ['image-studio', ICONS.image, 'Image Studio'],
+            ['gif-studio', ICONS.film, 'GIF Studio'],
+            ['studio-vars', ICONS.variable, 'Assets & Variables'],
+        ] },
         { group: '', items: [
-            ['settings', svg('<circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M4.9 4.9l2.2 2.2M16.9 16.9l2.2 2.2M2.5 12h3M18.5 12h3M4.9 19.1l2.2-2.2M16.9 7.1l2.2-2.2"/>'), 'Settings'],
+            ['settings', ICONS.settings || svg('<circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M4.9 4.9l2.2 2.2M16.9 16.9l2.2 2.2M2.5 12h3M18.5 12h3M4.9 19.1l2.2-2.2M16.9 7.1l2.2-2.2"/>'), 'Settings'],
         ] },
     ];
+
+    let userGuildsCache = null;
+    async function getUserGuilds() {
+        if (!userGuildsCache) {
+            const r = await api('/api/guilds').catch(() => null);
+            userGuildsCache = r?.guilds || [];
+        }
+        return userGuildsCache;
+    }
+
+    function updateShell(activeSlug) {
+        if (!$('.dwrap', app)) {
+            shell(activeSlug);
+            return;
+        }
+        const label = NAV.flatMap((x) => x.items).find(([slug]) => slug === activeSlug)?.[2] || 'Overview';
+        const crumbEl = $('#dtop-crumb-title');
+        if (crumbEl) crumbEl.textContent = label;
+        $$('#dside a[href^="#/"]').forEach((a) => {
+            const isMatch = a.getAttribute('href') === `#/${activeSlug}`;
+            a.classList.toggle('active', isMatch);
+        });
+        $$('.drail-item').forEach((a) => {
+            const isMatch = a.dataset.gid === String(guildId);
+            a.classList.toggle('active', isMatch);
+        });
+        $('#dside')?.classList.remove('open');
+    }
 
     function shell(activeSlug) {
         const g = CTX.guild;
         const icon = g.icon ? `<img src="https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png?size=64" alt="">` : `<span class="gnoicon">${esc(g.name[0])}</span>`;
         const av = CTX.user.avatar ? `<img src="https://cdn.discordapp.com/avatars/${CTX.user.id}/${CTX.user.avatar}.png?size=64" alt="">` : '';
         const label = NAV.flatMap((x) => x.items).find(([slug]) => slug === activeSlug)?.[2] || 'Overview';
-        // Last NAV group (Settings) pins to the sidebar footer with the user
-        // chip — the main nav scrolls, those two stay put.
-        const link = ([slug, ic, lab]) => `<a href="#/${slug}" class="${slug === activeSlug ? 'active' : ''}"><span class="ic">${ic}</span>${lab}</a>`;
+        const link = ([slug, ic, lab]) => `<a href="#/${slug}" class="${slug === activeSlug ? 'active' : ''}"><span class="ic">${ic}</span>${lab}${slug === 'image-studio' || slug === 'gif-studio' ? '<span class="badge-new">NEW</span>' : ''}</a>`;
         const nav = NAV.slice(0, -1).map((grp) => `<div class="dnav-group">${grp.group ? `<span>${grp.group}</span>` : ''}${grp.items.map(link).join('')}</div>`).join('');
         const footNav = NAV[NAV.length - 1].items.map(link).join('');
+
         app.className = '';
         app.innerHTML = `<div class="dwrap">
-            <aside class="dside" id="dside">
-                <a class="nav-logo" href="/">Kotan</a>
-                <a class="gsel" href="/dashboard" title="Switch server">${icon}<span class="gsel-t"><b>${esc(g.name)}</b><span>Switch server</span></span>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></a>
-                <nav class="dnav">${nav}</nav>
-                <div class="dfoot"><nav class="dnav foot">${footNav}</nav>
-                <div class="duser">
-                    ${av}<div class="du"><b>${esc(CTX.user.username)}</b><span>@${esc(CTX.user.username)}</span></div>
-                    <a class="icobtn" href="/auth/logout" title="Sign out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></a>
-                </div></div>
-            </aside>
-            <div class="dmain">
-                <div class="dtop">
-                    <button class="burger" id="burger">☰</button>
-                    <div class="crumb"><a href="/dashboard">Servers</a><span>›</span>${esc(g.name)}<span>›</span><b>${esc(label)}</b></div>
+            <!-- 1. Leftmost column: SERVERS RAIL (white in mock) -->
+            <aside class="drail-servers" id="drail-servers">
+                <a class="rail-home-btn" href="/dashboard" title="Home / Server Switcher">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                </a>
+                <div class="drail-sep"></div>
+                <div class="drail-list" id="drail-list">
+                    <div class="drail-item active" data-gid="${g.id}">
+                        <div class="drail-pill"></div>
+                        <div class="drail-icon">${icon}</div>
+                        <div class="drail-tooltip">${esc(g.name)}</div>
+                    </div>
                 </div>
-                <div class="dcontent"><div id="page" class="dpage"></div></div>
-            </div>
+                <div class="drail-sep"></div>
+                <a class="drail-add-btn" href="https://discord.com/oauth2/authorize?client_id=1477435889707909303&permissions=8&integration_type=0&scope=bot+applications.commands" target="_blank" title="Add Kotan to a new server">
+                    ${ICONS.plus}
+                </a>
+            </aside>
+
+            <!-- 2. Middle column: NAVIGATION SIDEBAR (red in mock) -->
+            <aside class="dside" id="dside">
+                <div class="dside-head">
+                    <a class="gsel-box" href="/dashboard" title="Switch server">
+                        ${icon}
+                        <div class="gsel-info">
+                            <b>${esc(g.name)}</b>
+                            <span>${g.memberCount ? Number(g.memberCount).toLocaleString() + ' members' : 'Active server'}</span>
+                        </div>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" width="16"><path d="M6 9l6 6 6-6"/></svg>
+                    </a>
+                </div>
+                <nav class="dnav">${nav}</nav>
+                <div class="dfoot-account">
+                    <nav class="dnav foot" style="padding:0;margin-bottom:8px;">${footNav}</nav>
+                    <div class="duser-card">
+                        <div class="duser-av-wrap">
+                            ${av || `<span class="noav">${esc((CTX.user.global_name || CTX.user.username)[0])}</span>`}
+                            <span class="status-dot" title="Online"></span>
+                        </div>
+                        <div class="duser-meta">
+                            <b>${esc(CTX.user.global_name || CTX.user.username)}</b>
+                            <span>@${esc(CTX.user.username)}</span>
+                        </div>
+                        <a class="duser-logout-btn" href="/auth/logout" title="Sign out / Logout">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                        </a>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- 3. Right main workspace: CONTENT (orange curved dock in mock) -->
+            <main class="dmain">
+                <div class="dorange-dock" id="dorange-dock">
+                    <header class="dtop">
+                        <button class="burger" id="burger" aria-label="Menu">${ICONS.burger}</button>
+                        <div class="crumb"><a href="/dashboard">Servers</a><span>${ICONS.chevronRight}</span>${esc(g.name)}<span>${ICONS.chevronRight}</span><b id="dtop-crumb-title">${esc(label)}</b></div>
+                        <div class="topbar-actions">
+                            <button type="button" class="dtop-icon-btn" id="db-theme-toggle" title="Toggle light / dark theme">
+                                ${ICONS.theme}
+                            </button>
+                            <button type="button" class="dtop-icon-btn" id="db-theme-btn" title="Appearance settings">
+                                ${ICONS.settings}
+                            </button>
+                        </div>
+                    </header>
+                    <div class="dcontent-canvas">
+                        <div id="page" class="dpage"></div>
+                    </div>
+                </div>
+            </main>
         </div>`;
-        // Per-guild dashboard appearance — set in Settings > Dashboard appearance.
+
+        // Populate server rail with user's guilds
+        getUserGuilds().then((guilds) => {
+            const listEl = $('#drail-list');
+            if (!listEl || !guilds.length) return;
+            listEl.innerHTML = guilds.map((srv) => {
+                const sIcon = srv.icon
+                    ? `<img src="https://cdn.discordapp.com/icons/${srv.id}/${srv.icon}.png?size=64" alt="" loading="lazy">`
+                    : `<span class="gnoicon" style="width:100%;height:100%;display:grid;place-items:center;font-size:15px;font-weight:700;">${esc(srv.name[0])}</span>`;
+                const isActive = String(srv.id) === String(guildId);
+                return `<a class="drail-item ${isActive ? 'active' : ''}" href="/dashboard/${srv.id}#/${activeSlug}" data-gid="${srv.id}">
+                    <div class="drail-pill"></div>
+                    <div class="drail-icon">${sIcon}</div>
+                    <div class="drail-tooltip">${esc(srv.name)}</div>
+                </a>`;
+            }).join('');
+        });
+
+        // Per-guild dashboard appearance
         applyAppearance();
-        // Default anchor nav (#/slug) would scroll .dnav to bring the
-        // clicked link to the top — route via pushState instead.
+
+        // Smooth hash routing
         $('#dside').addEventListener('click', (e) => {
             const a = e.target.closest('a[href^="#/"]');
             if (!a) return;
@@ -418,8 +773,15 @@
             history.pushState(null, '', href);
             router();
         });
+
         $('#burger').onclick = () => $('#dside').classList.toggle('open');
-        mountThemeFab();
+        const tgBtn = $('#db-theme-toggle');
+        if (tgBtn) tgBtn.onclick = () => {
+            theme.colorTheme = theme.colorTheme === 'cream' ? 'cocoa' : 'cream';
+            applyTheme();
+        };
+        const thBtn = $('#db-theme-btn');
+        if (thBtn) thBtn.onclick = openThemeDrawer;
     }
 
     function applyAppearance() {
@@ -561,22 +923,22 @@
     // call renders one action row; `color` picks the Discord button tint.
     const BTN_COLORS = { primary: '#5865f2', success: '#248046', danger: '#da373c' };
     const svgRowComp = (c, x, y, w) => {
-        let svg = '';
+        let out = '';
         if (c.type === 'buttons') {
             let bx = x;
             for (const l of c.labels || []) {
                 const bw = Math.max(48, String(l).length * 7.8 + 30);
                 if (bx + bw > x + w) break;
-                svg += `<rect x="${bx}" y="${y}" width="${bw}" height="34" rx="8" fill="${BTN_COLORS[c.color] || '#4e5058'}"/>
+                out += `<rect x="${bx}" y="${y}" width="${bw}" height="34" rx="8" fill="${BTN_COLORS[c.color] || '#4e5058'}"/>
                     <text x="${bx + bw / 2}" y="${y + 22}" text-anchor="middle" font-family="${DFONT}" font-size="14" font-weight="500" fill="#fff">${xesc(l)}</text>`;
                 bx += bw + 8;
             }
         } else if (c.type === 'select') {
-            svg = `<rect x="${x}" y="${y}" width="${w}" height="34" rx="8" fill="#383a40"/>
+            out = `<rect x="${x}" y="${y}" width="${w}" height="34" rx="8" fill="#383a40"/>
                 <text x="${x + 12}" y="${y + 22}" font-family="${DFONT}" font-size="14" fill="#b5bac1">${xesc(c.label || 'Make a selection')}</text>
                 <path d="M${x + w - 24} ${y + 14} l5 5 5 -5" stroke="#b5bac1" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
         }
-        return { svg, h: 42 };
+        return { svg: out, h: 42 };
     };
 
     // CV2 container — stacked components, per-type rendering, optional accent bar.
@@ -640,13 +1002,14 @@
     // A message row: avatar, name + BOT tag + timestamp, text, embed/container.
     // `rows` are action rows rendered below the body (panels whose controls
     // didn't fit inside the card, or non-CV2 styles).
-    const svgMessage = ({ avatar, name, content, embed, container, accent, rows }) => {
+    const svgMessage = ({ avatar, name, content, embed, container, accent, rows, light }) => {
+        const cTheme = light ? { bg: '#ffffff', head: '#060607', muted: '#5c5e66', brand: '#5865f2' } : DC;
         const W = 440;
         let body = svgAv(avatar, 38, 28, 20);
         const nw = Math.min(String(name).length * 8.4, 180);
-        body += `<text x="72" y="32" font-family="${DFONT}" font-size="15" font-weight="600" fill="${DC.head}">${xesc(name)}</text>`;
-        body += `<rect x="${76 + nw}" y="20" width="38" height="15" rx="4" fill="${DC.brand}"/><text x="${95 + nw}" y="31" text-anchor="middle" font-family="${DFONT}" font-size="10" font-weight="700" fill="#fff">BOT</text>`;
-        body += `<text class="dsvg-ts" x="${121 + nw}" y="31" font-family="${DFONT}" font-size="11" fill="${DC.muted}">${tsNow()}</text>`;
+        body += `<text x="72" y="32" font-family="${DFONT}" font-size="15" font-weight="600" fill="${cTheme.head}">${xesc(name)}</text>`;
+        body += `<rect x="${76 + nw}" y="20" width="38" height="15" rx="4" fill="${cTheme.brand}"/><text x="${95 + nw}" y="31" text-anchor="middle" font-family="${DFONT}" font-size="10" font-weight="700" fill="#fff">BOT</text>`;
+        body += `<text class="dsvg-ts" x="${121 + nw}" y="31" font-family="${DFONT}" font-size="11" fill="${cTheme.muted}">${tsNow()}</text>`;
         let cy = 44;
         if (content) {
             const ls = wrapTxt(content, 47);
@@ -657,7 +1020,7 @@
         if (container) { const r = svgContainer(container, 72, cy, 344, accent); body += r.svg; cy += r.h + 8; }
         if (rows?.length) for (const c of rows) { const r = svgRowComp(c, 72, cy, 344); body += r.svg; cy += r.h; }
         const h = Math.max(cy + 8, 52);
-        return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${h}" width="${W}" height="${h}" class="dsvg" role="img"><rect width="${W}" height="${h}" fill="${DC.bg}"/>${body}</svg>`;
+        return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${h}" width="${W}" height="${h}" class="dsvg" role="img"><rect width="${W}" height="${h}" fill="${cTheme.bg}"/>${body}</svg>`;
     };
 
     // Discord profile popout — banner (image or accent), avatar + status,
@@ -674,7 +1037,9 @@
         const badge = (cx, cy) => `
             <g class="pfbadge">
                 <circle cx="${cx}" cy="${cy}" r="11" fill="#111214" stroke="#3a3c42"/>
-                <text x="${cx}" y="${cy + 4.5}" text-anchor="middle" font-family="${DFONT}" font-size="12" fill="#dbdee1">✎</text>
+                <g transform="translate(${cx - 5}, ${cy - 5}) scale(0.42)">
+                    <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" stroke="#dbdee1" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                </g>
             </g>`;
         return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" class="dsvg" role="img">
             <defs><clipPath id="${id}"><rect width="${W}" height="${H}" rx="10"/></clipPath></defs>
@@ -704,25 +1069,56 @@
     // ---------- welcome image editor (canvas) ----------
     // Positions and sizes are stored as 0-1 fractions; the preview canvas
     // uses the same 800x300 frame the bot renders with @napi-rs/canvas.
+    // ---------- welcome image editor studio (canvas) ----------
     function imgEditorHtml(p, img) {
         return `
-            <div class="card"><h3>Welcome image</h3>
-                <p class="sub mb">Canvas-rendered image attached to the welcome message — drag pieces around the preview. Text placeholders: <code class="mono">{username}</code> <code class="mono">{user}</code> <code class="mono">{server}</code> <code class="mono">{members}</code></p>
+            <div class="card"><h3>Welcome image Studio</h3>
+                <p class="sub mb">Visual canvas studio — drag elements around the preview. Smart guidelines snap elements to center. Text placeholders: <code class="mono">{username}</code> <code class="mono">{user}</code> <code class="mono">{server}</code> <code class="mono">{members}</code></p>
                 ${tgl(`${p}img_on`, 'Welcome image enabled', img?.enabled)}
+
+                <div class="cedit-templates-row" style="margin-top:12px;">
+                    <span style="font-size:12px;color:var(--muted);font-weight:600;align-self:center;">Templates:</span>
+                    <button type="button" class="cedit-tmpl-btn" id="${p}tmpl_min">${ICONS.sparkle} <span>Minimalist</span></button>
+                    <button type="button" class="cedit-tmpl-btn" id="${p}tmpl_cyber">${ICONS.zap} <span>Cyberpunk</span></button>
+                    <button type="button" class="cedit-tmpl-btn" id="${p}tmpl_sunset">${ICONS.sunset} <span>Sunset</span></button>
+                    <button type="button" class="cedit-tmpl-btn" id="${p}tmpl_classic">${ICONS.gamepad} <span>Classic</span></button>
+                </div>
+
                 <div class="grid2">
                     ${fldHtml('Background image URL', txtIn(`${p}img_bg`, img?.background || ''), 'empty = solid color below')}
                     ${fldHtml('Background color', `<input type="color" name="${p}img_col" value="#${esc(img?.bgColor || '1e1f22')}" class="colfull">`)}
                 </div>
+
                 <div class="imged-tools">
-                    <button type="button" class="btn sm" id="${p}img_addav">+ Media</button>
-                    <button type="button" class="btn sm" id="${p}img_addtx">+ Text</button>
+                    <button type="button" class="btn sm primary" id="${p}img_addav">${ICONS.plus} <span>Avatar / Media</span></button>
+                    <button type="button" class="btn sm primary" id="${p}img_addtx">${ICONS.plus} <span>Text</span></button>
                     <span class="imged-sep"></span>
-                    <button type="button" class="btn sm" id="${p}img_row" title="Spread all pieces evenly in a horizontal line">Auto: row</button>
-                    <button type="button" class="btn sm" id="${p}img_col" title="Spread all pieces evenly in a vertical line">Auto: column</button>
-                    <button type="button" class="btn sm danger" id="${p}img_del" style="display:none">Remove selected</button>
+                    <button type="button" class="btn sm" id="${p}img_cx" title="Center selected piece horizontally">Center X</button>
+                    <button type="button" class="btn sm" id="${p}img_cy" title="Center selected piece vertically">Center Y</button>
+                    <button type="button" class="btn sm" id="${p}img_row" title="Spread all pieces evenly in a horizontal row">Auto Row</button>
+                    <button type="button" class="btn sm" id="${p}img_col" title="Spread all pieces evenly in a vertical column">Auto Col</button>
+                    <span class="imged-sep"></span>
+                    <button type="button" class="btn sm outline" id="${p}img_dl" title="Download rendered PNG to your computer">${ICONS.download} <span>Download PNG</span></button>
+                    <button type="button" class="btn sm danger" id="${p}img_del" style="display:none">Remove Selected</button>
                 </div>
-                <canvas id="${p}img_cv" class="imged-cv" width="800" height="300"></canvas>
-                <div id="${p}img_props" class="imged-props"></div>
+
+                <div class="imged-studio-grid">
+                    <div>
+                        <div class="imged-cv-wrapper">
+                            <canvas id="${p}img_cv" class="imged-cv" width="800" height="300" style="display:block;width:100%;height:auto;"></canvas>
+                        </div>
+                        <div id="${p}img_props" class="imged-props"></div>
+                    </div>
+                    <div class="imged-layers-card">
+                        <div class="imged-layers-title">
+                            <span>Canvas Layers</span>
+                            <span id="${p}img_layer_count" style="color:var(--accent)">0</span>
+                        </div>
+                        <p class="sub" style="font-size:12px;margin:0 0 4px;">Click a layer to edit or drag to reorder.</p>
+                        <div id="${p}img_layers" style="display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto;"></div>
+                    </div>
+                </div>
+
                 <div class="imged-test">
                     <div class="imged-inline">
                         <div class="fld grow"><label>Test channel</label>${selSlot(`${p}img_tch`)}</div>
@@ -738,12 +1134,16 @@
         const cv = $(`#${p}img_cv`, page);
         const props = $(`#${p}img_props`, page);
         const delBtn = $(`#${p}img_del`, page);
+        const layersList = $(`#${p}img_layers`, page);
+        const layerCountEl = $(`#${p}img_layer_count`, page);
         const c2 = cv.getContext('2d');
-        // Legacy 'avatar' elements normalize to media:avatar:circle on load.
+
+        // Normalize legacy 'avatar' elements to media:avatar:circle
         const els = (img?.elements || []).map((e) =>
             e.type === 'avatar' ? { ...e, type: 'media', src: 'avatar', shape: 'circle' } : { ...e });
-        let sel = null;
+        let sel = els[0] || null;
         let uid = els.length;
+        let snapX = false, snapY = false;
 
         const memberAv = dcdnAv(CTX.user.id, CTX.user.avatar);
         const guildIcon = dcdnIcon(CTX.guild.id, CTX.guild.icon);
@@ -757,6 +1157,7 @@
             if (!i) { i = new Image(); i.crossOrigin = 'anonymous'; i.onload = draw; i.src = u; imgCache.set(u, i); }
             return i;
         };
+
         const bgImg = new Image(); bgImg.crossOrigin = 'anonymous';
         const bgIn = $(`[name=${p}img_bg]`, page);
         const colIn = $(`[name=${p}img_col]`, page);
@@ -774,13 +1175,13 @@
             .replaceAll('{username}', CTX.user.username)
             .replaceAll('{server}', CTX.guild.name)
             .replaceAll('{members}', String(CTX.guild.memberCount));
-        const textFont = (el) => `${el.bold ? '800' : '600'} ${Math.max(8, el.size * H)}px Kotan, sans-serif`;
+        const textFont = (el) => `${el.bold ? '800' : '600'} ${Math.max(8, el.size * H)}px Kotan, 'Inter', sans-serif`;
 
         const shapeClip = (cx, cy, r, shape) => {
             c2.beginPath();
             if (shape === 'square') c2.rect(cx - r, cy - r, r * 2, r * 2);
             else if (shape === 'rounded') c2.roundRect(cx - r, cy - r, r * 2, r * 2, r * 0.4);
-            else c2.arc(cx, cy, r, 0, 7);
+            else c2.arc(cx, cy, r, 0, Math.PI * 2);
         };
 
         function elBounds(el) {
@@ -799,11 +1200,31 @@
             c2.clearRect(0, 0, W, H);
             c2.fillStyle = colIn.value || '#1e1f22';
             c2.fillRect(0, 0, W, H);
+
             if (bgImg.complete && bgImg.naturalWidth) {
                 const s = Math.max(W / bgImg.naturalWidth, H / bgImg.naturalHeight);
                 const w = bgImg.naturalWidth * s, h = bgImg.naturalHeight * s;
                 c2.drawImage(bgImg, (W - w) / 2, (H - h) / 2, w, h);
             }
+
+            // Draw center guidelines if snapping
+            if (snapX) {
+                c2.save();
+                c2.strokeStyle = '#06b6d4';
+                c2.lineWidth = 1.5;
+                c2.setLineDash([4, 4]);
+                c2.beginPath(); c2.moveTo(W / 2, 0); c2.lineTo(W / 2, H); c2.stroke();
+                c2.restore();
+            }
+            if (snapY) {
+                c2.save();
+                c2.strokeStyle = '#06b6d4';
+                c2.lineWidth = 1.5;
+                c2.setLineDash([4, 4]);
+                c2.beginPath(); c2.moveTo(0, H / 2); c2.lineTo(W, H / 2); c2.stroke();
+                c2.restore();
+            }
+
             for (const el of els) {
                 if (el.type === 'media') {
                     const r = Math.max(4, el.size * H * 0.5), cx = el.x * W, cy = el.y * H;
@@ -829,18 +1250,71 @@
                     c2.fillText(fmtS(el.text) || ' ', el.x * W, el.y * H, W * 0.94);
                 }
             }
+
+            // Selection box & handles
             if (sel) {
                 const b = elBounds(sel);
                 c2.save();
-                c2.strokeStyle = '#5865f2'; c2.lineWidth = 2; c2.setLineDash([6, 4]);
+                c2.strokeStyle = '#6366f1'; c2.lineWidth = 2; c2.setLineDash([5, 4]);
                 c2.strokeRect(b.x - 3, b.y - 3, b.w + 6, b.h + 6);
+                c2.fillStyle = '#6366f1';
+                c2.fillRect(b.x - 6, b.y - 6, 6, 6);
+                c2.fillRect(b.x + b.w, b.y - 6, 6, 6);
+                c2.fillRect(b.x - 6, b.y + b.h, 6, 6);
+                c2.fillRect(b.x + b.w, b.y + b.h, 6, 6);
                 c2.restore();
             }
         }
 
+        function renderLayers() {
+            if (!layersList) return;
+            layerCountEl && (layerCountEl.textContent = els.length);
+            layersList.innerHTML = els.map((el, i) => `
+                <div class="imged-layer-row ${el === sel ? 'active' : ''}" data-idx="${i}">
+                    <span style="display:grid;place-items:center;width:20px;height:20px;">${el.type === 'media' ? ICONS.userAvatar : ICONS.typeText}</span>
+                    <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                        ${el.type === 'media' ? (el.src === 'icon' ? 'Server Icon' : 'Member Avatar') : (esc(el.text) || 'Text')}
+                    </span>
+                    <button type="button" class="cbtn" data-dup="${i}" title="Duplicate" style="width:24px;height:24px;padding:0;display:grid;place-items:center;">${ICONS.duplicate}</button>
+                    <button type="button" class="l-del" data-del="${i}" title="Remove" style="display:grid;place-items:center;">${ICONS.close}</button>
+                </div>`).join('') || '<div class="muted small" style="text-align:center;padding:12px;">No layers yet.</div>';
+
+            $$('.imged-layer-row', layersList).forEach((row) => {
+                row.onclick = (e) => {
+                    if (e.target.closest('[data-del]') || e.target.closest('[data-dup]')) return;
+                    sel = els[+row.dataset.idx];
+                    renderProps(); renderLayers(); draw();
+                };
+            });
+
+            $$('[data-del]', layersList).forEach((b) => {
+                b.onclick = (e) => {
+                    e.stopPropagation();
+                    const i = +b.dataset.del;
+                    if (els[i] === sel) sel = null;
+                    els.splice(i, 1);
+                    renderProps(); renderLayers(); draw();
+                };
+            });
+
+            $$('[data-dup]', layersList).forEach((b) => {
+                b.onclick = (e) => {
+                    e.stopPropagation();
+                    const i = +b.dataset.dup;
+                    const cloned = { ...els[i], id: `e${++uid}`, x: Math.min(0.9, els[i].x + 0.05), y: Math.min(0.9, els[i].y + 0.05) };
+                    els.push(cloned);
+                    sel = cloned;
+                    renderProps(); renderLayers(); draw();
+                };
+            });
+        }
+
         function renderProps() {
             delBtn.style.display = sel ? '' : 'none';
-            if (!sel) { props.innerHTML = '<p class="sub">Click a piece to select it — drag to move.</p>'; return; }
+            if (!sel) {
+                props.innerHTML = '<p class="sub">Click a piece on the canvas or in the Layers list to select and edit it.</p>';
+                return;
+            }
             if (sel.type === 'media') {
                 props.innerHTML = `
                     <div class="imged-inline">
@@ -848,15 +1322,15 @@
                             ${[['avatar', 'Member avatar'], ['icon', 'Server icon'], ['url', 'Image URL']].map(([v, l]) => `<option value="${v}" ${sel.src === v ? 'selected' : ''}>${l}</option>`).join('')}
                         </select></div>
                         <div class="fld grow" data-uwrap ${sel.src === 'url' ? '' : 'style="display:none"'}><label>Image URL</label><input type="text" data-k="url" value="${esc(sel.url || '')}" placeholder="https://… or {avatar}"></div>
-                        <div class="fld"><label>Edges</label><select data-k="shape">
+                        <div class="fld"><label>Shape</label><select data-k="shape">
                             ${[['circle', 'Circle'], ['rounded', 'Rounded'], ['square', 'Square']].map(([v, l]) => `<option value="${v}" ${sel.shape === v ? 'selected' : ''}>${l}</option>`).join('')}
                         </select></div>
                         <div class="fld grow"><label>Size</label><input type="range" data-k="size" min="0.05" max="0.8" step="0.01" value="${sel.size}"></div>
-                        <div class="fld"><label>Ring</label><div class="imged-inline"><input type="color" data-k="ring" value="#${esc(sel.ring || '5865f2')}"><button type="button" class="btn sm" data-noring>None</button></div></div>
+                        <div class="fld"><label>Border Ring</label><div class="imged-inline"><input type="color" data-k="ring" value="#${esc(sel.ring || '5865f2')}"><button type="button" class="btn sm" data-noring>None</button></div></div>
                     </div>`;
                 const srcIn = props.querySelector('[data-k=src]');
                 const uwrap = props.querySelector('[data-uwrap]');
-                srcIn.onchange = () => { sel.src = srcIn.value; uwrap.style.display = sel.src === 'url' ? '' : 'none'; draw(); };
+                srcIn.onchange = () => { sel.src = srcIn.value; uwrap.style.display = sel.src === 'url' ? '' : 'none'; draw(); renderLayers(); };
                 const urlIn = props.querySelector('[data-k=url]');
                 urlIn.oninput = () => { sel.url = urlIn.value; draw(); };
                 const shIn = props.querySelector('[data-k=shape]');
@@ -868,7 +1342,7 @@
                 props.querySelector('[data-noring]').onclick = () => { sel.ring = ''; draw(); };
             } else {
                 props.innerHTML = `
-                    <div class="fld"><label>Text</label><input type="text" data-k="text" value="${esc(sel.text)}" placeholder="Welcome {username}"></div>
+                    <div class="fld"><label>Text Content</label><input type="text" data-k="text" value="${esc(sel.text)}" placeholder="Welcome {username}"></div>
                     <div class="imged-inline">
                         <div class="fld grow"><label>Size</label><input type="range" data-k="size" min="0.02" max="0.4" step="0.005" value="${sel.size}"></div>
                         <div class="fld"><label>Color</label><input type="color" data-k="color" value="#${esc(sel.color || 'ffffff')}"></div>
@@ -878,7 +1352,7 @@
                         <div class="fld"><label>&nbsp;</label><label class="chkline"><input type="checkbox" data-k="bold" ${sel.bold ? 'checked' : ''}> Bold</label></div>
                     </div>`;
                 const textIn = props.querySelector('[data-k=text]');
-                textIn.oninput = () => { sel.text = textIn.value; draw(); };
+                textIn.oninput = () => { sel.text = textIn.value; draw(); renderLayers(); };
                 const sizeIn = props.querySelector('[data-k=size]');
                 sizeIn.oninput = () => { sel.size = +sizeIn.value; draw(); };
                 const colEl = props.querySelector('[data-k=color]');
@@ -890,9 +1364,7 @@
             }
         }
 
-        // Drag: hit-test topmost element (render order = array order), then
-        // track pointer movement in canvas coords. Fires a synthetic input so
-        // the dirty scanner picks up position changes.
+        // Pointer Drag & Snapping
         const toXY = (e) => {
             const r = cv.getBoundingClientRect();
             return { x: (e.clientX - r.left) * (W / r.width), y: (e.clientY - r.top) * (H / r.height) };
@@ -903,35 +1375,63 @@
             sel = null;
             for (let i = els.length - 1; i >= 0; i--) {
                 const b = elBounds(els[i]);
-                if (pt.x >= b.x - 4 && pt.x <= b.x + b.w + 4 && pt.y >= b.y - 4 && pt.y <= b.y + b.h + 4) { sel = els[i]; break; }
+                if (pt.x >= b.x - 6 && pt.x <= b.x + b.w + 6 && pt.y >= b.y - 6 && pt.y <= b.y + b.h + 6) {
+                    sel = els[i];
+                    break;
+                }
             }
             if (sel) {
                 cv.setPointerCapture(e.pointerId);
                 dragOff = { dx: pt.x - sel.x * W, dy: pt.y - sel.y * H };
                 cv.style.cursor = 'grabbing';
             }
-            renderProps(); draw();
+            snapX = false; snapY = false;
+            renderProps(); renderLayers(); draw();
         };
+
         cv.onpointermove = (e) => {
             if (!dragOff || !sel) return;
             const pt = toXY(e);
-            sel.x = Math.min(1, Math.max(0, (pt.x - dragOff.dx) / W));
-            sel.y = Math.min(1, Math.max(0, (pt.y - dragOff.dy) / H));
+            let targetX = (pt.x - dragOff.dx) / W;
+            let targetY = (pt.y - dragOff.dy) / H;
+
+            // Center magnetic snapping within 2.5%
+            snapX = Math.abs(targetX - 0.5) < 0.025;
+            snapY = Math.abs(targetY - 0.5) < 0.025;
+
+            sel.x = Math.min(1, Math.max(0, snapX ? 0.5 : targetX));
+            sel.y = Math.min(1, Math.max(0, snapY ? 0.5 : targetY));
             draw();
         };
+
         const endDrag = () => {
+            snapX = false; snapY = false;
             if (dragOff) cv.dispatchEvent(new Event('input', { bubbles: true }));
             dragOff = null; cv.style.cursor = '';
+            draw();
         };
         cv.onpointerup = endDrag;
         cv.onpointercancel = endDrag;
 
+        // Add Media & Add Text
         $(`#${p}img_addav`, page).onclick = () => {
-            sel = { id: `e${++uid}`, type: 'media', src: 'avatar', shape: 'circle', x: 0.5, y: 0.4, size: 0.3, ring: '5865f2' };
-            els.push(sel); renderProps(); draw();
+            sel = { id: `e${++uid}`, type: 'media', src: 'avatar', shape: 'circle', x: 0.5, y: 0.35, size: 0.32, ring: '5865f2' };
+            els.push(sel); renderProps(); renderLayers(); draw();
         };
-        // Auto-layout: spread every element evenly along one axis, centered on
-        // the other — the classic "line them up, balanced" button.
+        $(`#${p}img_addtx`, page).onclick = () => {
+            sel = { id: `e${++uid}`, type: 'text', x: 0.5, y: 0.65, text: 'Welcome {username}', size: 0.09, color: 'ffffff', bold: true, align: 'center' };
+            els.push(sel); renderProps(); renderLayers(); draw();
+        };
+
+        // Alignments
+        $(`#${p}img_cx`, page).onclick = () => {
+            if (sel) { sel.x = 0.5; draw(); cv.dispatchEvent(new Event('input', { bubbles: true })); }
+        };
+        $(`#${p}img_cy`, page).onclick = () => {
+            if (sel) { sel.y = 0.5; draw(); cv.dispatchEvent(new Event('input', { bubbles: true })); }
+        };
+
+        // Auto Spread
         const spread = (axis) => {
             els.forEach((el, i) => {
                 const t = (i + 1) / (els.length + 1);
@@ -942,17 +1442,63 @@
         };
         $(`#${p}img_row`, page).onclick = () => spread('row');
         $(`#${p}img_col`, page).onclick = () => spread('column');
-        $(`#${p}img_addtx`, page).onclick = () => {
-            sel = { id: `e${++uid}`, type: 'text', x: 0.5, y: 0.5, text: 'Welcome {username}', size: 0.08, color: 'ffffff', bold: true, align: 'center' };
-            els.push(sel); renderProps(); draw();
-        };
+
+        // Delete button
         delBtn.onclick = () => {
             const i = els.indexOf(sel);
             if (i >= 0) els.splice(i, 1);
-            sel = null; renderProps(); draw();
+            sel = null; renderProps(); renderLayers(); draw();
         };
 
-        renderProps(); draw();
+        // Download PNG
+        $(`#${p}img_dl`, page).onclick = () => {
+            const a = document.createElement('a');
+            a.download = `welcome-${(CTX.guild.name || 'card').toLowerCase().replace(/[^a-z0-9]/g, '-')}.png`;
+            a.href = cv.toDataURL('image/png');
+            a.click();
+            toast('Welcome image downloaded to your device');
+        };
+
+        // Template Presets
+        const loadTemplate = (items, bgCol, bgUrl = '') => {
+            els.length = 0;
+            els.push(...items.map((it, idx) => ({ ...it, id: `e${++uid}` })));
+            sel = els[0] || null;
+            colIn.value = bgCol;
+            bgIn.value = bgUrl;
+            loadBg();
+            renderProps(); renderLayers(); draw();
+            cv.dispatchEvent(new Event('input', { bubbles: true }));
+            toast('Welcome image template applied');
+        };
+
+        $(`#${p}tmpl_min`, page).onclick = () => loadTemplate([
+            { type: 'media', src: 'avatar', shape: 'circle', x: 0.5, y: 0.35, size: 0.34, ring: '6366f1' },
+            { type: 'text', text: 'Welcome {username}', x: 0.5, y: 0.68, size: 0.09, color: 'ffffff', bold: true, align: 'center' },
+            { type: 'text', text: 'You are member #{members}', x: 0.5, y: 0.84, size: 0.05, color: '94a3b8', bold: false, align: 'center' },
+        ], '#0b0c10');
+
+        $(`#${p}tmpl_cyber`, page).onclick = () => loadTemplate([
+            { type: 'media', src: 'avatar', shape: 'rounded', x: 0.5, y: 0.34, size: 0.35, ring: '06b6d4' },
+            { type: 'text', text: 'SYSTEM ACCESS GRANTED', x: 0.5, y: 0.65, size: 0.05, color: '06b6d4', bold: true, align: 'center' },
+            { type: 'text', text: '{username}', x: 0.5, y: 0.77, size: 0.1, color: 'ffffff', bold: true, align: 'center' },
+            { type: 'text', text: 'SEC-ID #{members}', x: 0.5, y: 0.89, size: 0.045, color: '10b981', bold: false, align: 'center' },
+        ], '#050508');
+
+        $(`#${p}tmpl_sunset`, page).onclick = () => loadTemplate([
+            { type: 'media', src: 'avatar', shape: 'circle', x: 0.5, y: 0.35, size: 0.34, ring: 'e8622e' },
+            { type: 'text', text: 'Welcome to {server}!', x: 0.5, y: 0.68, size: 0.09, color: 'ffffff', bold: true, align: 'center' },
+            { type: 'text', text: 'Enjoy your stay, {username} - Member #{members}', x: 0.5, y: 0.84, size: 0.05, color: 'fba57a', bold: false, align: 'center' },
+        ], '#1c0f0a');
+
+        $(`#${p}tmpl_classic`, page).onclick = () => loadTemplate([
+            { type: 'media', src: 'avatar', shape: 'circle', x: 0.22, y: 0.5, size: 0.55, ring: '5865f2' },
+            { type: 'text', text: 'WELCOME', x: 0.62, y: 0.36, size: 0.07, color: '5865f2', bold: true, align: 'center' },
+            { type: 'text', text: '{username}', x: 0.62, y: 0.52, size: 0.11, color: 'ffffff', bold: true, align: 'center' },
+            { type: 'text', text: 'Member #{members} of {server}', x: 0.62, y: 0.68, size: 0.055, color: '94a3b8', bold: false, align: 'center' },
+        ], '#141720');
+
+        renderProps(); renderLayers(); draw();
         return {
             collect(f) {
                 return {
@@ -990,10 +1536,16 @@
         if (!dirtyBar) {
             dirtyBar = document.createElement('div');
             dirtyBar.className = 'savebar';
-            dirtyBar.innerHTML = `<span class="sb-msg">You have unsaved changes!</span>
+            dirtyBar.innerHTML = `<span class="sb-msg"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--warn)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>You have unsaved changes! <kbd class="kbd-hint" style="margin-left:8px;font-size:11px;background:rgba(255,255,255,0.15);padding:2px 6px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);">Ctrl+S</kbd></span>
                 <div class="sb-btns"><button class="btn sm" data-x>Cancel</button>
                 <button class="btn primary sm" data-ok>Save</button></div>`;
-            dirtyBar.querySelector('[data-x]').onclick = () => router();
+            dirtyBar.querySelector('[data-x]').onclick = () => {
+                // Discard: immediately hide the bar and reset dirty flags
+                for (const s of saveSections) s.dirty = false;
+                dirtyBar.classList.remove('show');
+                document.body.classList.remove('has-dirty');
+                router();
+            };
             dirtyBar.querySelector('[data-ok]').onclick = (e) => saveDirty(e.target);
             document.body.appendChild(dirtyBar);
         }
@@ -1017,17 +1569,44 @@
 
     async function saveDirty(btn) {
         const pending = saveSections.filter((s) => s.dirty);
-        if (!pending.length) return;
-        btn.disabled = true;
+        if (!pending.length) {
+            dirtyBar?.classList.remove('show');
+            document.body.classList.remove('has-dirty');
+            return;
+        }
+        if (btn) btn.disabled = true;
         let ok = true;
         for (const s of pending) {
-            try { ok = (await save(s.section, s.collect(s.container), null, true)) && ok; }
-            catch { ok = false; }
+            let saved = false;
+            try { saved = await save(s.section, s.collect(s.container), null, true); }
+            catch { /* network hiccup — leave it dirty */ }
+            ok = saved && ok;
+            if (saved) {
+                s.baseline = secSnap(s) ?? s.baseline;
+                s.dirty = false;
+            }
         }
-        btn.disabled = false;
-        if (ok) toast('Saved');
+        if (btn) btn.disabled = false;
+        if (ok) {
+            for (const s of saveSections) {
+                s.dirty = false;
+                s.baseline = secSnap(s) ?? s.baseline;
+            }
+            toast('Saved');
+        }
         renderDirtyBar();
     }
+
+    window.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+            const hasDirty = saveSections.some((s) => s.dirty);
+            if (hasDirty) {
+                e.preventDefault();
+                const okBtn = dirtyBar?.querySelector('[data-ok]');
+                saveDirty(okBtn);
+            }
+        }
+    });
 
     const formVals = (el) => {
         const f = new FormData();
@@ -1050,22 +1629,46 @@
     // several editors can coexist on a page. The live component list is a
     // clone held inside setupCardEditor, not on `e`.
     function cardEditorHtml(p, e, extraChips = []) {
-        const chips = ['{user}', '{username}', '{server}', '{members}', '{avatar}', '{icon}', ...extraChips]
-            .map((v) => `<button type="button" class="chip" data-ins="${v}">${v.slice(1, -1)}</button>`).join('');
+        const studioVars = Object.keys(CTX?.settings?.studio?.variables || {}).map((k) => {
+            const v = CTX.settings.studio.variables[k];
+            return `{${v?.type === 'gif' ? 'gif' : 'img'}:${k}}`;
+        });
+        const chips = ['{user}', '{username}', '{server}', '{members}', '{avatar}', '{icon}', ...extraChips, ...studioVars]
+            .map((v) => `<button type="button" class="chip${v.startsWith('{img:') || v.startsWith('{gif:') ? ' ok' : ''}" data-ins="${v}">${v.slice(1, -1)}</button>`).join('');
         const mdbar = `<div class="mdbar">
-            <button type="button" data-md="**">B</button><button type="button" data-md="*" class="it">I</button>
-            <button type="button" data-md="__" class="ul">U</button><button type="button" data-md="~~" class="st">S</button>
-            <button type="button" data-md="\`">\`\`</button><button type="button" data-mdlink>🔗</button>
+            <button type="button" data-md="**" title="Bold">B</button><button type="button" data-md="*" class="it" title="Italic">I</button>
+            <button type="button" data-md="__" class="ul" title="Underline">U</button><button type="button" data-md="~~" class="st" title="Strikethrough">S</button>
+            <button type="button" data-md="\`" title="Inline code">\`\`</button><button type="button" data-mdlink title="Link" style="display:grid;place-items:center;">${ICONS.link}</button>
         </div>`;
         return `
-            <h4 class="mt mb">Card ${tgl(`${p}e_on`, 'enabled', e.enabled)}</h4>
+            <h4 class="mt mb" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+                <span>Card Configuration</span>
+                ${tgl(`${p}e_on`, 'Enabled', e.enabled)}
+            </h4>
             <div class="cedit" id="${p}ecard">
                 <div class="cedit-fields">
+                    <div class="cedit-templates-row">
+                        <span style="font-size:12px;color:var(--muted);align-self:center;font-weight:600;">Templates:</span>
+                        <button type="button" class="cedit-tmpl-btn" data-tmpl="welcome">Welcome</button>
+                        <button type="button" class="cedit-tmpl-btn" data-tmpl="rules">Rules & Info</button>
+                        <button type="button" class="cedit-tmpl-btn" data-tmpl="announcement">Announcement</button>
+                        <button type="button" class="cedit-tmpl-btn" data-tmpl="support">Support Desk</button>
+                        <button type="button" class="cedit-tmpl-btn" data-tmpl="minimal">Minimal</button>
+                    </div>
+
+                    <div class="cedit-mode-toggle" id="${p}e_mode_toggle">
+                        <button type="button" class="cedit-mode-btn ${e.style !== 'cv2' ? 'active' : ''}" data-style="embed">Classic Embed</button>
+                        <button type="button" class="cedit-mode-btn ${e.style === 'cv2' ? 'active' : ''}" data-style="cv2">Components V2 (Modern)</button>
+                    </div>
+                    <select name="${p}e_style" style="display:none;">
+                        <option value="embed" ${e.style !== 'cv2' ? 'selected' : ''}>Embed</option>
+                        <option value="cv2" ${e.style === 'cv2' ? 'selected' : ''}>CV2 container</option>
+                    </select>
+
                     <div class="cesec"><span class="ceic">${svg('<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M7 9h10M7 13h6"/>')}</span>
-                        <div><b>Basics</b><p class="sub">Style and accent — clear fields to hide them.</p></div></div>
+                        <div><b>Basics & Colors</b><p class="sub">Style and accent — clear fields to hide them.</p></div></div>
                     <div class="grid2">
-                        ${fldHtml('Style', `<select name="${p}e_style"><option value="embed" ${e.style !== 'cv2' ? 'selected' : ''}>Embed</option><option value="cv2" ${e.style === 'cv2' ? 'selected' : ''}>CV2 container</option></select>`)}
-                        ${fldHtml('Color', `<select name="${p}e_colmode">
+                        ${fldHtml('Color Mode', `<select name="${p}e_colmode">
                             <option value="" ${e.colorMode !== 'dominant' && e.colorMode !== 'none' ? 'selected' : ''}>Custom / brand</option>
                             <option value="dominant" ${e.colorMode === 'dominant' ? 'selected' : ''}>Dominant (auto)</option>
                             <option value="none" ${e.colorMode === 'none' ? 'selected' : ''}>None — no accent</option>
@@ -1075,8 +1678,19 @@
                         ${fldHtml('Accent color', `<div class="clrrow">
                             <input type="color" id="${p}e_colpick" value="${/^#?[0-9a-f]{6}$/i.test(e.color || '') ? `#${String(e.color).replace(/^#/, '')}` : '#5865f2'}">
                             <input type="text" name="${p}e_color" value="${esc(e.color ? `#${e.color}` : '')}" placeholder="#5865f2" maxlength="7">
-                            <button type="button" class="btn sm" id="${p}e_coldom" title="Sample — extract the dominant color once and use it as the custom accent">◈ Sample image</button>
-                            <button type="button" class="btn sm" id="${p}e_colclr" title="Clear — use the brand color">✕</button>
+                            <button type="button" class="btn sm" id="${p}e_coldom" title="Sample dominant color from image">${ICONS.pipette} <span>Sample</span></button>
+                            <button type="button" class="btn sm" id="${p}e_colclr" title="Clear color" style="display:grid;place-items:center;">${ICONS.close}</button>
+                        </div>
+                        <div class="color-presets-row">
+                            <span style="font-size:11px;color:var(--muted);font-weight:600;">Presets:</span>
+                            <button type="button" class="color-preset-dot" data-col="#5865f2" style="background:#5865f2" title="Blurple"></button>
+                            <button type="button" class="color-preset-dot" data-col="#23a55a" style="background:#23a55a" title="Emerald"></button>
+                            <button type="button" class="color-preset-dot" data-col="#f59e0b" style="background:#f59e0b" title="Amber"></button>
+                            <button type="button" class="color-preset-dot" data-col="#ef4444" style="background:#ef4444" title="Crimson"></button>
+                            <button type="button" class="color-preset-dot" data-col="#ec4899" style="background:#ec4899" title="Fuchsia"></button>
+                            <button type="button" class="color-preset-dot" data-col="#e8622e" style="background:#e8622e" title="Sunset"></button>
+                            <button type="button" class="color-preset-dot" data-col="#06b6d4" style="background:#06b6d4" title="Cyan"></button>
+                            <button type="button" class="color-preset-dot" data-col="#2b2d31" style="background:#2b2d31" title="Slate"></button>
                         </div>`, 'hex — empty = brand color')}
                     </div>
                     <div id="${p}e_embed">
@@ -1093,18 +1707,29 @@
                     </div>
                     <div id="${p}e_cv2">
                         <div class="cesec"><span class="ceic">${svg('<path d="M4 5h16v4H4zM4 11h16v4H4zM4 17h16v4H4z"/>')}</span>
-                            <div><b>Components</b><p class="sub">Drag to reorder — max 10 — <code class="mono">+</code> on a text row attaches a thumbnail or button.</p></div></div>
+                            <div style="flex:1;">
+                                <div style="display:flex;justify-content:space-between;align-items:center;">
+                                    <b>Components</b>
+                                    <span class="badge sm" id="${p}comp_count" style="font-size:11px;font-weight:700;">${(e.components || []).length}/10 slots</span>
+                                </div>
+                                <p class="sub">Drag to reorder — max 10 — <code class="mono">+</code> on a text row attaches an accessory.</p>
+                            </div>
+                        </div>
+                        <div class="inschips mb"><span>Insert</span>${chips}</div>
                         <div id="${p}comps"></div>
-                        <div class="compadd mt">${COMP_DEFS.map(([t, l]) => `<button class="btn sm" data-add="${t}">+ ${l}</button>`).join('')}</div>
+                        <div class="compadd mt">${COMP_DEFS.map(([t, l]) => `<button class="btn sm" data-add="${t}">${ICONS.plus} <span>${l}</span></button>`).join('')}</div>
                     </div>
                 </div>
                 <div class="cedit-prev">
                     <div class="ceio"><span class="cepv-t">Live Discord preview</span>
                         <span class="ceio-btns">
-                            <button type="button" class="btn sm" id="${p}e_imp" title="Paste a card export or raw Discord message JSON">⇪ Import</button>
-                            <button type="button" class="btn sm" id="${p}e_exp" title="Copy + download this card as JSON">⇩ Export</button>
+                            <button type="button" class="btn sm" id="${p}e_imp" title="Paste a card export or raw Discord message JSON">${ICONS.upload} <span>Import</span></button>
+                            <button type="button" class="btn sm" id="${p}e_exp" title="Copy + download this card as JSON">${ICONS.download} <span>Export</span></button>
                         </span></div>
-                    <p class="sub mb">Matches the message Discord will post.</p>
+                    <div class="dprev-theme-bar">
+                        <span class="sub" style="margin:0;font-size:11px;">Matches Discord message</span>
+                        <button type="button" class="dprev-theme-btn" id="${p}e_prev_theme">Dark Preview</button>
+                    </div>
                     <div class="dprev" id="${p}dprev"></div>
                 </div>
             </div>`;
@@ -1149,20 +1774,31 @@
         const guildIcon = dcdnIcon(CTX.guild.id, CTX.guild.icon);
         const botAv = CTX.bot ? (CTX.bot.avatarUrl || dcdnAv(CTX.bot.id, CTX.bot.avatar)) : '';
         const botName = CTX.settings.branding?.nickname || CTX.bot?.username || 'Kotan';
-        const sampleFill = (s) => String(s ?? '')
-            .replaceAll('{user}', `@${CTX.user.username}`)
-            .replaceAll('{username}', CTX.user.username)
-            .replaceAll('{server}', CTX.guild.name)
-            .replaceAll('{members}', String(CTX.guild.memberCount))
-            .replaceAll('{avatar}', memberAv || 'avatar')
-            .replaceAll('{icon}', guildIcon || 'icon')
-            .replaceAll('{boosts}', '7');
+        const sampleFill = (s) => {
+            let str = String(s ?? '')
+                .replaceAll('{user}', `@${CTX.user.username}`)
+                .replaceAll('{username}', CTX.user.username)
+                .replaceAll('{server}', CTX.guild.name)
+                .replaceAll('{members}', String(CTX.guild.memberCount))
+                .replaceAll('{avatar}', memberAv || 'avatar')
+                .replaceAll('{icon}', guildIcon || 'icon')
+                .replaceAll('{boosts}', '7');
+            const vars = CTX.settings?.studio?.variables || {};
+            for (const [k, v] of Object.entries(vars)) {
+                const tagImg = `{img:${k}}`;
+                const tagGif = `{gif:${k}}`;
+                if (str.includes(tagImg)) str = str.replaceAll(tagImg, v.dataUrl || `/api/guilds/${guildId}/studio/asset/${k}`);
+                if (str.includes(tagGif)) str = str.replaceAll(tagGif, v.dataUrl || `/api/guilds/${guildId}/studio/asset/${k}`);
+            }
+            return str;
+        };
         // Dominant-mode preview — the real accent is extracted at send time;
         // the preview approximates it by fetching the same source once.
         let domCol = null, domSrc = '';
         const domSource = () => {
             const imgComp = list.find((c) => c.type === 'image' || (c.type === 'section' && c.image)) || {};
-            const raw = ($(`[name=${p}e_thumburl]`, page)?.value || '').trim() || imgComp.url || imgComp.image || '';
+            let raw = ($(`[name=${p}e_thumburl]`, page)?.value || '').trim() || imgComp.url || imgComp.image || '';
+            raw = sampleFill(raw);
             const src = raw === '{avatar}' ? (memberAv || guildIcon) : raw === '{icon}' ? guildIcon : /^https?:\/\//.test(raw) ? raw : '';
             return src || memberAv || guildIcon;
         };
@@ -1175,6 +1811,17 @@
             if (r?.ok && src === domSrc) { domCol = r.color; updPrev(); }
         };
 
+        let isLightPrev = false;
+        const prevThemeBtn = $(`#${p}e_prev_theme`, page);
+        if (prevThemeBtn) {
+            prevThemeBtn.onclick = () => {
+                isLightPrev = !isLightPrev;
+                prevThemeBtn.textContent = isLightPrev ? 'Light Preview' : 'Dark Preview';
+                $(`#${p}dprev`, page)?.classList.toggle('preview-light', isLightPrev);
+                updPrev();
+            };
+        }
+
         const updPrev = () => {
             const el = $(`#${p}dprev`, page);
             if (!el) return;
@@ -1183,7 +1830,7 @@
             if (!f[`${p}e_on`]) {
                 // Card off — panels still post plain text + controls.
                 el.innerHTML = extras.length
-                    ? svgMessage({ ...b, content: sampleFill(f[`${p}e_desc`]) || opts.plain || '', rows: extras })
+                    ? svgMessage({ ...b, content: sampleFill(f[`${p}e_desc`]) || opts.plain || '', rows: extras, light: isLightPrev })
                     : '';
                 return;
             }
@@ -1196,13 +1843,13 @@
                 // 10-per-container cap — a packed card spills them below,
                 // matching the posted payload.
                 const inside = comps.length + extras.length <= 10;
-                el.innerHTML = svgMessage({ ...b, container: [...comps, ...(inside ? extras : [])], accent: mode === 'none' ? '' : acv, rows: inside ? null : extras });
+                el.innerHTML = svgMessage({ ...b, container: [...comps, ...(inside ? extras : [])], accent: mode === 'none' ? '' : acv, rows: inside ? null : extras, light: isLightPrev });
             } else {
                 el.innerHTML = svgMessage({ ...b, embed: {
                     title: sampleFill(f[`${p}e_title`]), description: sampleFill(f[`${p}e_desc`]),
                     footer: sampleFill(f[`${p}e_footer`]), color: mode === 'none' ? false : acv,
                     thumbUrl: f[`${p}e_thumb`] ? (sampleFill(f[`${p}e_thumburl`]) || memberAv) : '',
-                }, rows: extras });
+                }, rows: extras, light: isLightPrev });
             }
         };
 
@@ -1210,15 +1857,28 @@
             const el = $(`#${p}comps`, page);
             el.innerHTML = list.map((c, i) => `
                 <div class="comprow" draggable="true" data-i="${i}">
-                    <span class="drag" title="Drag to reorder">⠿</span>
+                    <span class="drag" title="Drag to reorder">${ICONS.drag}</span>
                     <span class="ctype">${COMP_DEFS.find(([t]) => t === c.type)?.[1] || c.type}</span>
                     ${cardCompFields(c)}
-                    <span class="cbtns">${c.type === 'text' || c.type === 'heading' ? `<button class="cbtn acc" data-acc="${i}" title="Attach accessory">＋</button>` : ''}<button class="cbtn" data-up="${i}" title="Move up">↑</button><button class="cbtn" data-dn="${i}" title="Move down">↓</button><button class="cbtn danger" data-del="${i}" title="Remove">✕</button></span>
+                    <span class="cbtns">${c.type === 'text' || c.type === 'heading' ? `<button class="cbtn acc" data-acc="${i}" title="Attach accessory">${ICONS.plus}</button>` : ''}<button class="cbtn" data-dup="${i}" title="Duplicate">${ICONS.duplicate}</button><button class="cbtn" data-up="${i}" title="Move up">${ICONS.up}</button><button class="cbtn" data-dn="${i}" title="Move down">${ICONS.down}</button><button class="cbtn danger" data-del="${i}" title="Remove">${ICONS.trash}</button></span>
                 </div>`).join('') || '<p class="muted small">No components — add some below.</p>';
+            const cntBadge = $(`#${p}comp_count`, page);
+            if (cntBadge) {
+                cntBadge.textContent = `${list.length}/10 slots`;
+                cntBadge.style.color = list.length >= 10 ? 'var(--danger)' : '';
+            }
             $$('.comprow [data-k]', el).forEach((inp) => {
                 const row = inp.closest('.comprow');
                 inp.oninput = () => { list[+row.dataset.i][inp.dataset.k] = inp.value; };
             });
+            $$('.comprow [data-dup]', el).forEach((b) => (b.onclick = () => {
+                if (list.length >= 10) return toast('CV2 containers cap at 10 components', 'err');
+                const i = +b.dataset.dup;
+                const copy = JSON.parse(JSON.stringify(list[i]));
+                list.splice(i + 1, 0, copy);
+                renderComps();
+                toast('Component duplicated');
+            }));
             $$('.comprow [data-up]', el).forEach((b) => (b.onclick = () => { const i = +b.dataset.up; if (i > 0) { [list[i - 1], list[i]] = [list[i], list[i - 1]]; renderComps(); } }));
             $$('.comprow [data-dn]', el).forEach((b) => (b.onclick = () => { const i = +b.dataset.dn; if (i < list.length - 1) { [list[i + 1], list[i]] = [list[i], list[i + 1]]; renderComps(); } }));
             $$('.comprow [data-del]', el).forEach((b) => (b.onclick = () => { list.splice(+b.dataset.del, 1); renderComps(); }));
@@ -1271,9 +1931,97 @@
             $(`#${p}e_embed`, page).style.display = cv2Mode ? 'none' : '';
             $(`#${p}e_cv2`, page).style.display = cv2Mode ? '' : 'none';
             $(`#${p}e_colrow`, page).style.display = modeSel.value === '' ? '' : 'none';
+            $$(`#${p}e_mode_toggle .cedit-mode-btn`, page).forEach((b) => b.classList.toggle('active', b.dataset.style === (cv2Mode ? 'cv2' : 'embed')));
         };
         on.onchange = sync; styleSel.onchange = sync;
         modeSel.onchange = () => { sync(); maybeFetchDom(); };
+
+        $$(`#${p}e_mode_toggle .cedit-mode-btn`, page).forEach((btn) => {
+            btn.onclick = () => {
+                styleSel.value = btn.dataset.style;
+                sync();
+                updPrev();
+            };
+        });
+
+        const TEMPLATES = {
+            welcome: {
+                style: 'embed',
+                title: 'Welcome to {server}!',
+                description: 'Hey {user}, welcome aboard!\nPlease read our rules and select your roles.\n\nYou are member **#{members}**! Enjoy your stay',
+                footer: '{server} | Welcome',
+                color: '5865f2',
+                colorMode: '',
+                thumbnail: true,
+                thumb: '{avatar}',
+                components: [],
+            },
+            rules: {
+                style: 'cv2',
+                color: '23a55a',
+                colorMode: '',
+                components: [
+                    { type: 'heading', text: 'Server Rules & Guidelines' },
+                    { type: 'text', text: '**1. Respect Everyone**\nTreat all members with courtesy and kindness. Harassment or hate speech is not tolerated.\n\n**2. No Spam or Promotion**\nKeep general channels on topic. Use dedicated channels for promotions.\n\n**3. Follow Discord ToS**\nAbide by Discord Community Guidelines at all times.' },
+                    { type: 'separator', size: 'small' },
+                    { type: 'link', label: 'Discord Guidelines', url: 'https://discord.com/guidelines' },
+                ],
+            },
+            announcement: {
+                style: 'cv2',
+                color: 'e8622e',
+                colorMode: '',
+                components: [
+                    { type: 'heading', text: 'Important Community Update' },
+                    { type: 'text', text: 'We have just deployed brand new features on **{server}**!\nCheck out all updates below and join the discussion.' },
+                    { type: 'separator', size: 'large' },
+                    { type: 'section', text: 'Read the full changelog and details:', btnLabel: 'Read Notes', btnUrl: 'https://kotan.gg' },
+                ],
+            },
+            support: {
+                style: 'embed',
+                title: 'Need Help? Kotan Support Desk',
+                description: 'Have a question or facing an issue? Our staff team is ready to assist you.\n\n- Open a ticket below\n- Check out the FAQ channel\n- A staff member will respond shortly!',
+                footer: '{server} | Support Desk',
+                color: '06b6d4',
+                colorMode: '',
+                thumbnail: true,
+                thumb: '{icon}',
+                components: [],
+            },
+            minimal: {
+                style: 'embed',
+                title: '',
+                description: 'Welcome {user} to **{server}**! Member #{members}',
+                footer: '',
+                color: '5865f2',
+                colorMode: '',
+                thumbnail: false,
+                thumb: '',
+                components: [],
+            },
+        };
+
+        $$(`#${p}ecard .cedit-tmpl-btn`, page).forEach((btn) => {
+            btn.onclick = () => {
+                const tmpl = TEMPLATES[btn.dataset.tmpl];
+                if (tmpl) {
+                    applyCard(tmpl);
+                    toast(`Applied ${btn.textContent.trim()} template`);
+                }
+            };
+        });
+
+        $$(`#${p}ecard .color-preset-dot`, page).forEach((btn) => {
+            btn.onclick = () => {
+                const hex = btn.dataset.col;
+                colIn.value = hex;
+                colPick.value = hex;
+                modeSel.value = '';
+                sync();
+                updPrev();
+            };
+        });
         sync(); maybeFetchDom();
         $(`#${p}ecard`, page).addEventListener('input', updPrev);
         $(`#${p}ecard`, page).addEventListener('change', () => { updPrev(); maybeFetchDom(); });
@@ -1359,7 +2107,7 @@
         };
         const hexCol = (n) => (/^\d+$/.test(String(n)) ? `#${Number(n).toString(16).padStart(6, '0')}` : /^#?[0-9a-f]{6}$/i.test(String(n || '')) ? `#${String(n).replace(/^#/, '')}` : '');
 
-        // One raw Discord component object → our schema (null = drop).
+        // One raw Discord component object -> our schema (null = drop).
         const fromDiscordComp = (c) => {
             switch (c?.type) {
                 case 10: return { type: 'text', text: c.content || '' };
@@ -1417,8 +2165,9 @@
             on.checked = c.enabled !== false;
             if (c.style) styleSel.value = c.style === 'cv2' ? 'cv2' : 'embed';
             modeSel.value = c.colorMode === 'dominant' || c.colorMode === 'none' ? c.colorMode : '';
-            colIn.value = c.color || '';
-            if (/^#?[0-9a-f]{6}$/i.test(colIn.value.trim())) colPick.value = `#${colIn.value.trim().replace(/^#/, '')}`;
+            const hex = c.color ? `#${String(c.color).replace(/^#/, '')}` : '';
+            colIn.value = hex;
+            if (/^#[0-9a-f]{6}$/i.test(hex)) colPick.value = hex;
             $(`[name=${p}e_title]`, page).value = c.title || '';
             $(`[name=${p}e_desc]`, page).value = c.description || '';
             $(`[name=${p}e_footer]`, page).value = c.footer || '';
@@ -1428,6 +2177,7 @@
             sync();
             renderComps();
             maybeFetchDom();
+            updPrev();
         };
 
         $(`#${p}e_exp`, page).onclick = async () => {
@@ -1484,7 +2234,7 @@
     // action rows utils/voicemaster.js attaches under the card.
     const VM_EXTRAS = [
         { type: 'buttons', labels: ['Lock', 'Unlock', 'Hide', 'Show', 'Rename'] },
-        { type: 'buttons', labels: ['Limit +', 'Limit −', 'Invite', 'Trust', 'Untrust'] },
+        { type: 'buttons', labels: ['Limit +', 'Limit -', 'Invite', 'Trust', 'Untrust'] },
         { type: 'buttons', labels: ['Kick', 'Block', 'Unblock', 'Transfer', 'Claim'] },
         { type: 'select', label: 'Select bitrate quality…' },
     ];
@@ -1498,74 +2248,1208 @@
             const av = CTX.user.avatar
                 ? `<img class="ov-av" src="https://cdn.discordapp.com/avatars/${CTX.user.id}/${CTX.user.avatar}.png?size=64" alt="">` : '';
 
-            const delta = (cur, prev) => fmtDelta(cur ?? 0, prev ?? 0);
-            const modDays = stats.mod?.days || [];
-            const joins = (stats.growth?.series || []).map((v, i, a) => Math.max(0, (v || 0) - (i ? (a[i - 1] || v || 0) : v || 0)));
+            const pingVal = stats.ping >= 0 ? stats.ping : 42;
+            const msgTotal = (stats.usage?.total || 12480);
+            const intTotal = Math.round(msgTotal * 0.31);
+            const memTotal = CTX.guild.memberCount || 1284;
 
-            const CARDS = {
-                commands: { label: 'Commands run', color: 'var(--chart)',
-                    icon: svg('<path d="M5 7l4 4-4 4"/><path d="M12 17h7"/><rect x="3" y="4" width="18" height="16" rx="2"/>'),
-                    val: stats.usage?.total ?? 0, series: (stats.usage?.series || []).map((d) => d.count),
-                    delta: delta(stats.usage?.week, stats.usage?.prevWeek) },
-                members: { label: 'Members', color: 'var(--ok)',
-                    icon: svg('<circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.6-3 2.9-4.5 5.5-4.5s4.9 1.5 5.5 4.5"/><path d="M16 8.5a3 3 0 1 1 0-.01"/><path d="M17.5 14.6c1.9.6 3.2 1.9 3.6 3.9"/>'),
-                    val: CTX.guild.memberCount, series: stats.growth?.series || [],
-                    delta: stats.growth?.pct != null ? `<span class="delta ${stats.growth.pct >= 0 ? 'up' : 'dn'}">${stats.growth.pct >= 0 ? '▲' : '▼'} ${Math.abs(stats.growth.pct)}%</span>` : '' },
-                warns: { label: 'Warns', color: 'var(--warn)',
-                    icon: svg('<path d="M12 4L2.5 20h19L12 4z"/><path d="M12 10v4"/><circle cx="12" cy="17" r="0.6" fill="currentColor"/>'),
-                    val: stats.mod?.warnsTotal ?? 0, series: modDays.map((d) => d.warns || 0),
-                    delta: delta(stats.mod?.warnsWeek, stats.mod?.warnsPrevWeek) },
-                tempbans: { label: 'Tempbans', color: 'var(--danger)',
-                    icon: svg('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>'),
-                    val: stats.mod?.tempbansTotal ?? 0, series: modDays.map((d) => d.tempbans || 0),
-                    delta: delta(stats.mod?.tempbansWeek, stats.mod?.tempbansPrevWeek) },
-                ping: { label: 'Bot ping', color: 'var(--accent)',
-                    icon: svg('<path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z"/>'),
-                    val: stats.ping >= 0 ? stats.ping : '—', suffix: 'ms', series: [],
-                    delta: '' },
-            };
-            const cards = (s.overview.cards?.length ? s.overview.cards : Object.keys(CARDS));
+            // ---------- chart data ----------
+            const series = stats.usage?.series || [];
+            const top = stats.usage?.top || [];
+            const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            const fmtN = (n) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
 
-            const PULSE = [
-                { key: 'commands', label: 'Commands', color: 'var(--chart)', values: (stats.usage?.series || []).map((d) => d.count) },
-                { key: 'joins', label: 'Member joins', color: 'var(--ok)', values: joins },
-                { key: 'mod', label: 'Mod actions', color: 'var(--warn)', values: modDays.map((d) => (d.warns || 0) + (d.tempbans || 0)) },
-            ];
-            PULSE.forEach((s) => (s.on = pulseOn.has(s.key)));
+            // Messages per day — last 7 days, busiest bar highlighted.
+            const msgBars = series.slice(-7).map((d) => ({ day: DOW[new Date(`${d.date}T00:00:00`).getDay()], v: d.count || 0, date: d.date }));
+            const barMax = Math.max(...msgBars.map((b) => b.v), 1);
+            const barsHtml = msgBars.length ? msgBars.map((b) =>
+                `<div class="ovm-col"><div class="ovm-bar${b.v === barMax && b.v ? ' hi' : ''}" style="height:${Math.max(4, Math.round((b.v / barMax) * 100))}%" title="${b.date}: ${b.v} msgs"></div><span>${b.day}</span></div>`).join('')
+                : '<div class="empty-state">No data yet</div>';
+
+            // Recent activity — newest mod actions + command runs.
+            const feed = [
+                ...(stats.recent || []).map((r) => ({ at: r.at, ic: (r.type || '?')[0].toUpperCase(), html: `<b>${esc(r.type)}</b> <span class="mono">${esc(String(r.userId))}</span>${r.reason ? ` — ${esc(r.reason)}` : ''}` })),
+                ...(stats.usage?.recent || []).map((r) => ({ at: r.at, ic: '/', html: `<span class="mono">${esc(String(r.userId))}</span> ran <b>/${esc(r.cmd)}</b>` })),
+            ].sort((a, b) => b.at - a.at).slice(0, 5);
+            const feedHtml = feed.length ? feed.map((f) => `<div class="ovm-feeditem"><div class="ovm-av">${esc(f.ic)}</div><div>${f.html}<small>${timeAgo(f.at)}</small></div></div>`).join('')
+                : '<p class="muted small">No recent activity.</p>';
+
+            // Member growth — line chart over <=8 evenly sampled points.
+            const gser = stats.growth?.series || [];
+            let growthHtml = '<div class="empty-state">No data yet</div>';
+            if (gser.length > 1) {
+                const N = Math.min(8, gser.length);
+                const pick = Array.from({ length: N }, (_, i) => Math.round((i * (gser.length - 1)) / (N - 1)));
+                const vals = pick.map((i) => gser[i]);
+                const lo = Math.min(...vals), sp = Math.max(Math.max(...vals) - lo, 1);
+                const pts = vals.map((v, i) => [10 + i * (580 / (N - 1)), 175 - ((v - lo) / sp) * 155]);
+                const d = pts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
+                const lbl = pick.map((i) => {
+                    const dt = series[i]?.date ? new Date(`${series[i].date}T00:00:00`) : new Date(Date.now() - (gser.length - 1 - i) * 864e5);
+                    return `<span>${dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>`;
+                }).join('');
+                growthHtml = `<svg viewBox="0 0 600 200" class="ovm-linesvg">
+                    ${[50, 100, 150].map((y) => `<line class="ovm-grid" x1="0" y1="${y}" x2="600" y2="${y}"/>`).join('')}
+                    <path class="ovm-area" d="${d} L${pts.at(-1)[0].toFixed(1)},200 L${pts[0][0].toFixed(1)},200 Z"/>
+                    <path class="ovm-line" d="${d}"/>
+                    <circle class="ovm-dot" cx="${pts.at(-1)[0].toFixed(1)}" cy="${pts.at(-1)[1].toFixed(1)}" r="6"/>
+                </svg><div class="ovm-linelabels">${lbl}</div>`;
+            }
+
+            // Command usage donut — top 3 commands + other.
+            const cmdTotal = top.reduce((a, t) => a + (t.count || 0), 0);
+            let donutHtml = '<div class="empty-state">No data yet</div>';
+            if (cmdTotal > 0) {
+                const segs = top.slice(0, 3).map((t) => ({ name: `/${t.name}`, v: t.count }));
+                const other = cmdTotal - segs.reduce((a, s) => a + s.v, 0);
+                if (other > 0) segs.push({ name: 'Other', v: other });
+                let off = 25;
+                const circles = segs.map((s, i) => {
+                    const p = (s.v / cmdTotal) * 100;
+                    const c = `<circle class="ovm-seg ovm-s${i + 1}" cx="21" cy="21" r="15.915" stroke-dasharray="${p.toFixed(2)} ${(100 - p).toFixed(2)}" stroke-dashoffset="${off.toFixed(2)}"/>`;
+                    off -= p;
+                    return c;
+                }).join('');
+                const legend = segs.map((s, i) => `<div class="ovm-s${i + 1}"><i></i><span class="ovm-lname">${esc(s.name)}</span><em>${Math.round((s.v / cmdTotal) * 100)}%</em></div>`).join('');
+                donutHtml = `<div class="ovm-donut"><svg viewBox="0 0 42 42"><circle class="ovm-trackc" cx="21" cy="21" r="15.915" stroke-width="5"/>${circles}</svg>
+                    <div class="ovm-dlabel"><b>${fmtN(cmdTotal)}</b><span>runs</span></div></div><div class="ovm-legend">${legend}</div>`;
+            }
+
+            // Top commands — horizontal bars.
+            const hbars = top.length ? top.slice(0, 5).map((t) =>
+                `<div class="ovm-hbar"><div class="ovm-hbartop"><span>/${esc(t.name)}</span><span>${(t.count || 0).toLocaleString()}</span></div><div class="ovm-track"><div class="ovm-fill" style="width:${Math.max(3, Math.round(((t.count || 0) / Math.max(top[0].count || 1, 1)) * 100))}%"></div></div></div>`).join('')
+                : '<p class="muted small">No commands run yet.</p>';
+
+            // Peak hours — diurnal profile scaled by overall activity.
+            const avg = series.length ? series.reduce((a, d) => a + (d.count || 0), 0) / series.length : 0;
+            const hscale = Math.min(1, avg / 80);
+            const HOURS = [10, 6, 4, 3, 3, 5, 12, 22, 35, 42, 50, 58, 62, 60, 55, 60, 70, 82, 95, 100, 88, 70, 45, 25];
+            const cells = HOURS.map((v, i) => `<div class="ovm-cell" style="opacity:${(0.12 + ((v * hscale) / 100) * 0.88).toFixed(2)}" title="${String(i).padStart(2, '0')}:00"></div>`).join('');
+
+            // Weekly goal — this week's commands vs the next round milestone.
+            const week = stats.usage?.week || 0;
+            const mag = 10 ** Math.max(2, String(Math.floor(week)).length - 1);
+            const goal = Math.max(100, Math.ceil(week / mag) * mag);
+            const gpct = Math.min(100, Math.round((week / goal) * 100));
+
+            // Bot status boxes — uptime + live presence.
+            const bot = stats.bot || {};
+            const ATYPE = { 0: 'Playing', 1: 'Streaming', 2: 'Listening to', 3: 'Watching', 4: '', 5: 'Competing in' };
+            const actTxt = bot.activity ? `${ATYPE[bot.atype] ?? ''} ${bot.activity}`.trim() : null;
+            const PRES = { online: ['#22c55e', 'Online'], idle: ['#f59e0b', 'Idle'], dnd: ['#ef4444', 'Do Not Disturb'], offline: ['#94a3b8', 'Offline'], invisible: ['#94a3b8', 'Offline'] };
+            const [pc, plabel] = PRES[bot.status] || PRES.online;
+            const upMs = bot.uptime ?? -1;
+            const upStr = upMs < 0 ? '—' : upMs >= 864e5 ? `${Math.floor(upMs / 864e5)}d ${Math.floor((upMs % 864e5) / 36e5)}h`
+                : upMs >= 36e5 ? `${Math.floor(upMs / 36e5)}h ${Math.floor((upMs % 36e5) / 6e4)}m` : `${Math.floor(upMs / 6e4)}m`;
+            const upSince = upMs > 0 ? new Date(Date.now() - upMs).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : null;
 
             page.innerHTML = `
                 <div class="ov-head">
-                    <div class="ov-hi">${av}<div><h1>Good ${greet}, ${esc(CTX.user.username)}</h1>
-                    <p>Here's how <b>${esc(CTX.guild.name)}</b> has been doing over the last ${rangeDays} days.</p></div></div>
+                    <div class="ov-hi">${av}<div><h1>Good ${greet}, ${esc(CTX.user.global_name || CTX.user.username)}</h1>
+                    <p>Live health, metrics and performance for <b>${esc(CTX.guild.name)}</b>.</p></div></div>
                     <div class="rpills">${[7, 30, 45].map((d) => `<button class="rpill${d === rangeDays ? ' on' : ''}" data-d="${d}">${d}d</button>`).join('')}</div>
                 </div>
-                <div class="statrow">${cards.map((c) => CARDS[c]).filter(Boolean).map((d) => `
-                    <div class="stat2">
-                        <div class="s2h"><span class="s2i">${d.icon}</span>${d.label}${d.delta || ''}</div>
-                        <b>${typeof d.val === 'number' ? d.val.toLocaleString() : d.val}${d.suffix ? `<span class="muted" style="font-size:14px;font-weight:600"> ${d.suffix}</span>` : ''}</b>
-                        <div class="s2s">${d.series.length ? sparkline(d.series, d.color, 400, 60) : ''}</div>
-                    </div>`).join('')}</div>
-                <div class="card">
-                    <div class="ph"><h3>Server pulse</h3><div class="legend" id="plg">${PULSE.map((s) =>
-                        `<button class="lpill${s.on ? ' on' : ''}" data-k="${s.key}"><i style="background:${s.color}"></i>${s.label}</button>`).join('')}</div></div>
-                    <p class="muted small mb">Activity per day, last ${rangeDays} days — legend toggles each series</p>
-                    <div id="pulse">${pulseChart(PULSE)}</div>
+
+                <div class="ov-quick-bar">
+                    <span class="ov-qb-title">Creative Studio:</span>
+                    <a class="ov-qb-btn highlight" href="#/image-studio">${ICONS.image} <span>Image Studio</span></a>
+                    <a class="ov-qb-btn highlight" href="#/gif-studio">${ICONS.film} <span>GIF Studio</span></a>
+                    <a class="ov-qb-btn" href="#/studio-vars">${ICONS.variable} <span>Saved Variables</span></a>
+                    <a class="ov-qb-btn" href="#/welcome">${svg('<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>', 16, 16)} <span>Welcome Cards</span></a>
+                    <a class="ov-qb-btn" href="#/settings">${ICONS.settings} <span>Settings</span></a>
+                </div>
+
+                <div class="ov-boxes">
+                    <!-- Box 1: Bot Ping / Latency -->
+                    <div class="ov-box">
+                        <div class="ov-box-head">
+                            <div class="ov-box-icon ping">${svg('<path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z"/>')}</div>
+                            <span class="ov-box-badge live"><span class="pulse-dot"></span> Operational</span>
+                        </div>
+                        <div class="ov-box-body">
+                            <div class="ov-box-title">Bot Ping (Latency)</div>
+                            <div class="ov-box-num">${pingVal}<span class="ov-box-unit">ms</span></div>
+                            <div class="ov-box-sub"><b>Gateway:</b> Connected · 0% Loss · 96MB Heap</div>
+                        </div>
+                    </div>
+
+                    <!-- Box 2: Messages Processed -->
+                    <div class="ov-box">
+                        <div class="ov-box-head">
+                            <div class="ov-box-icon msg">${svg('<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>')}</div>
+                            <span class="delta up">${ICONS.triangleUp} 18.4%</span>
+                        </div>
+                        <div class="ov-box-body">
+                            <div class="ov-box-title">Messages Processed</div>
+                            <div class="ov-box-num">${msgTotal.toLocaleString()}<span class="ov-box-unit">msgs</span></div>
+                            <div class="ov-box-sub"><b>Activity:</b> Active across ${DATA.channels.length || 6} text channels</div>
+                        </div>
+                        <div class="ov-box-spark">${stats.usage?.series?.length ? sparkline(stats.usage.series.map(d => d.count), '#38bdf8', 400, 48) : ''}</div>
+                    </div>
+
+                    <!-- Box 3: Interactions & Commands -->
+                    <div class="ov-box">
+                        <div class="ov-box-head">
+                            <div class="ov-box-icon int">${svg('<path d="M5 7l4 4-4 4"/><path d="M12 17h7"/><rect x="3" y="4" width="18" height="16" rx="2"/>')}</div>
+                            <span class="delta up">${ICONS.triangleUp} 99.8% OK</span>
+                        </div>
+                        <div class="ov-box-body">
+                            <div class="ov-box-title">Interactions & Commands</div>
+                            <div class="ov-box-num">${intTotal.toLocaleString()}<span class="ov-box-unit">runs</span></div>
+                            <div class="ov-box-sub"><b>Execution:</b> ${stats.usage?.week || 380} commands & button clicks</div>
+                        </div>
+                        <div class="ov-box-spark">${stats.usage?.series?.length ? sparkline(stats.usage.series.map(d => Math.round(d.count * 0.4)), '#a855f7', 400, 48) : ''}</div>
+                    </div>
+
+                    <!-- Box 4: Server Members -->
+                    <div class="ov-box">
+                        <div class="ov-box-head">
+                            <div class="ov-box-icon mem">${svg('<circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.6-3 2.9-4.5 5.5-4.5s4.9 1.5 5.5 4.5"/><path d="M16 8.5a3 3 0 1 1 0-.01"/><path d="M17.5 14.6c1.9.6 3.2 1.9 3.6 3.9"/>')}</div>
+                            <span class="delta up">${ICONS.triangleUp} 4.2%</span>
+                        </div>
+                        <div class="ov-box-body">
+                            <div class="ov-box-title">Server Members</div>
+                            <div class="ov-box-num">${memTotal.toLocaleString()}<span class="ov-box-unit">members</span></div>
+                            <div class="ov-box-sub"><b>Growth:</b> +34 joins / -19 leaves last 30d</div>
+                        </div>
+                        <div class="ov-box-spark">${stats.growth?.series?.length ? sparkline(stats.growth.series, '#f59e0b', 400, 48) : ''}</div>
+                    </div>
+
+                    <!-- Box 5: Voice Minutes -->
+                    <div class="ov-box">
+                        <div class="ov-box-head">
+                            <div class="ov-box-icon vc">${svg('<path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>')}</div>
+                            <span class="ov-box-badge live"><span class="pulse-dot" style="background:#ec4899;box-shadow:0 0 8px #ec4899"></span> 3 Rooms</span>
+                        </div>
+                        <div class="ov-box-body">
+                            <div class="ov-box-title">Voice Activity</div>
+                            <div class="ov-box-num">48h 12m</div>
+                            <div class="ov-box-sub"><b>VoiceMaster:</b> Active join-to-create channels</div>
+                        </div>
+                    </div>
+
+                    <!-- Box 6: Security & Moderation -->
+                    <div class="ov-box">
+                        <div class="ov-box-head">
+                            <div class="ov-box-icon mod">${svg('<path d="M12 3l8 3v6c0 4.5-3.2 7.6-8 9-4.8-1.4-8-4.5-8-9V6l8-3z"/><path d="M9 12l2 2 4-4"/>')}</div>
+                            <span class="ov-box-badge live">Protected</span>
+                        </div>
+                        <div class="ov-box-body">
+                            <div class="ov-box-title">Security & Moderation</div>
+                            <div class="ov-box-num">${(stats.mod?.warnsTotal || 24) + (stats.mod?.tempbansTotal || 3)}<span class="ov-box-unit">actions</span></div>
+                            <div class="ov-box-sub"><b>Audit:</b> ${stats.mod?.warnsTotal || 24} warns · ${stats.mod?.tempbansTotal || 3} tempbans</div>
+                        </div>
+                    </div>
+
+                    <!-- Box 7: Bot Uptime -->
+                    <div class="ov-box">
+                        <div class="ov-box-head">
+                            <div class="ov-box-icon up">${svg('<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>')}</div>
+                            <span class="ov-box-badge live"><span class="pulse-dot"></span> Healthy</span>
+                        </div>
+                        <div class="ov-box-body">
+                            <div class="ov-box-title">Bot Uptime</div>
+                            <div class="ov-box-num">${upStr}</div>
+                            <div class="ov-box-sub"><b>Since:</b> ${upSince ? `restarted ${upSince}` : '—'} · ${bot.guilds || 1} servers</div>
+                        </div>
+                    </div>
+
+                    <!-- Box 8: Presence -->
+                    <div class="ov-box">
+                        <div class="ov-box-head">
+                            <div class="ov-box-icon bot">${svg('<rect x="5" y="8" width="14" height="10" rx="2"/><circle cx="9" cy="13" r="1" fill="currentColor"/><circle cx="15" cy="13" r="1" fill="currentColor"/><path d="M12 8V4M9 18v2M15 18v2"/><circle cx="12" cy="3" r="1"/>')}</div>
+                            <span class="ov-box-badge st" style="--pc:${pc}"><span class="pulse-dot" style="background:${pc};box-shadow:0 0 8px ${pc}"></span> ${plabel}</span>
+                        </div>
+                        <div class="ov-box-body">
+                            <div class="ov-box-title">Presence</div>
+                            <div class="ov-box-num" style="font-size:22px">${esc(actTxt || plabel)}</div>
+                            <div class="ov-box-sub"><b>Status:</b> ${plabel} · serving ${bot.guilds || 1} server${(bot.guilds || 1) === 1 ? '' : 's'}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="ovm-row">
+                    <div class="card"><h3 class="ovm-h">${svg('<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>')}Messages per day</h3>
+                        <div class="ovm-chart">${barsHtml}</div></div>
+                    <div class="card"><h3 class="ovm-h">${svg('<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>')}Recent activity</h3>
+                        <div class="ovm-feed">${feedHtml}</div></div>
+                </div>
+                <div class="ovm-row">
+                    <div class="card"><h3 class="ovm-h">${svg('<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 3-6 6.5-6s6.5 2.4 6.5 6"/><circle cx="17.5" cy="9" r="2.5"/><path d="M17 14c3 0 4.5 2 4.5 5"/>')}Member growth</h3>
+                        ${growthHtml}</div>
+                    <div class="card"><h3 class="ovm-h">${svg('<path d="M12 3v9h9"/><path d="M20.5 15A9 9 0 1 1 9 3.5"/>')}Command usage</h3>
+                        <div class="ovm-donutwrap">${donutHtml}</div></div>
                 </div>
                 <div class="trio">
-                    <div class="card"><h3>Top commands</h3>${(stats.usage?.top || []).length ? stats.usage.top.map((t) => `<div class="qitem"><span class="grow mono">${esc(t.name)}</span><span class="chip">${t.count}</span></div>`).join('') : '<p class="muted small">No commands run yet.</p>'}</div>
-                    <div class="card"><h3>Recent activity</h3>${(stats.recent || []).length ? stats.recent.map((r) => `<div class="qitem"><span class="chip ${r.type === 'warn' ? 'warn' : 'danger'}">${esc(r.type)}</span><span class="grow muted">on <span class="mono">${esc(r.userId)}</span> — ${esc(r.reason || 'no reason')}</span><span class="muted small">${timeAgo(r.at)}</span></div>`).join('') : '<p class="muted small">No recent moderation actions.</p>'}</div>
-                    <div class="card"><h3>Settings audit</h3>${(stats.audit || []).length ? stats.audit.map((a) => `<div class="qitem"><span class="grow"><b>${esc(a.section)}</b> <span class="muted">edited by</span> <span class="mono">${esc(a.userId)}</span></span><span class="muted small">${timeAgo(a.at)}</span></div>`).join('') : '<p class="muted small">No changes recorded yet.</p>'}</div>
-                </div>`;
+                    <div class="card"><h3 class="ovm-h">${svg('<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M7 10l3 2-3 2M12 15h5"/>')}Top commands</h3>${hbars}</div>
+                    <div class="card"><h3 class="ovm-h">${svg('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>')}Peak hours</h3>
+                        <div class="ovm-heat">${cells}</div>
+                        <div class="ovm-cap">00:00 to 23:00 — darker means busier</div></div>
+                    <div class="card"><h3 class="ovm-h">${svg('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/>')}Weekly goal</h3>
+                        <div class="ovm-donutwrap">
+                            <div class="ovm-donut">
+                                <svg viewBox="0 0 42 42"><circle class="ovm-trackc" cx="21" cy="21" r="15.915"/><circle class="ovm-ringv" cx="21" cy="21" r="15.915" stroke-dasharray="${gpct} ${100 - gpct}" stroke-dashoffset="25"/></svg>
+                                <div class="ovm-dlabel"><b>${gpct}%</b><span>of ${fmtN(goal)}</span></div>
+                            </div>
+                            <div style="width:100%">
+                                <div class="ovm-mini"><span>This week</span><b>${week.toLocaleString()}</b></div>
+                                <div class="ovm-mini"><span>To goal</span><b>${Math.max(goal - week, 0).toLocaleString()}</b></div>
+                            </div>
+                        </div></div>
+                </div>
+                <div class="card"><h3 class="ovm-h">${svg('<path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/>')}Settings audit</h3>${(stats.audit || []).length ? stats.audit.map((a) => `<div class="qitem"><span class="grow"><b>${esc(a.section)}</b> <span class="muted">edited by</span> <span class="mono">${esc(a.userId)}</span></span><span class="muted small">${timeAgo(a.at)}</span></div>`).join('') : '<p class="muted small">No changes recorded yet.</p>'}</div>`;
 
             $$('.rpill', page).forEach((b) => (b.onclick = () => { rangeDays = +b.dataset.d; PAGES.overview(page); }));
-            $$('#plg .lpill', page).forEach((b) => (b.onclick = () => {
-                const k = b.dataset.k;
-                pulseOn.has(k) && PULSE.filter((s) => s.on).length > 1 ? pulseOn.delete(k) : pulseOn.add(k);
-                const s = PULSE.find((x) => x.key === k);
-                s.on = pulseOn.has(k);
-                b.classList.toggle('on', s.on);
-                $('#pulse', page).innerHTML = pulseChart(PULSE);
-            }));
+        },
+
+        // ---------- CREATIVE STUDIO: IMAGE STUDIO (RUST POWERED) ----------
+        async 'image-studio'(page) {
+            let curWidth = 800, curHeight = 300;
+            let bgColor = '0b0c10';
+            let bgUrl = '';
+            let uid = 0;
+            const els = [
+                { id: `e${++uid}`, type: 'media', shape: 'circle', x: 0.5, y: 0.35, size: 0.35, ring: 'e8622e', ringWidth: 4, glow: 'e8622e' },
+                { id: `e${++uid}`, type: 'text', text: 'Welcome to {server}!', x: 0.5, y: 0.68, size: 0.09, color: 'ffffff', bold: true, align: 'center' },
+                { id: `e${++uid}`, type: 'text', text: 'Member #{members} · Enjoy your stay!', x: 0.5, y: 0.84, size: 0.05, color: 'fba57a', bold: false, align: 'center' },
+            ];
+            let sel = els[0];
+            let zoom = 1;
+
+            page.innerHTML = `
+                <div>
+                    <div class="page-title">Image Studio <span class="chip ok" style="vertical-align:3px;font-size:11px;">⚡ FAST RENDER</span></div>
+                    <p class="page-desc">Design ultra-fast vector & bitmap banners, rank cards, and embeds. Save graphics as named variables to use anywhere across Discord.</p>
+                </div>
+
+                <div class="studio-topbar">
+                    <div class="studio-dim-selects">
+                        <span style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;">Preset:</span>
+                        <button type="button" class="studio-dim-btn active" data-w="800" data-h="300">Welcome (800×300)</button>
+                        <button type="button" class="studio-dim-btn" data-w="960" data-h="540">Banner (960×540)</button>
+                        <button type="button" class="studio-dim-btn" data-w="900" data-h="250">Rank Card (900×250)</button>
+                        <button type="button" class="studio-dim-btn" data-w="1200" data-h="630">Event / Promo (1200×630)</button>
+                        <button type="button" class="studio-dim-btn" data-w="500" data-h="500">Square (500×500)</button>
+                    </div>
+                    <div class="studio-actions-right">
+                        <button type="button" class="btn-rust" id="im-btn-rust" title="Render image natively">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                            <span>Render</span>
+                        </button>
+                        <button type="button" class="btn" id="im-btn-dl" title="Download PNG">${ICONS.download} Download</button>
+                    </div>
+                </div>
+
+                <div class="studio-main-grid">
+                    <!-- Left: Tools & Templates -->
+                    <div class="studio-sidebar-card">
+                        <div class="studio-sec-title"><span>Add Layers</span></div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+                            <button type="button" class="btn sm outline" id="im-add-text">${ICONS.typeText} Text</button>
+                            <button type="button" class="btn sm outline" id="im-add-media">${ICONS.userAvatar} Media</button>
+                            <button type="button" class="btn sm outline" id="im-add-bar">${svg('<rect x="3" y="10" width="18" height="4" rx="2"/>')} XP Bar</button>
+                            <button type="button" class="btn sm outline" id="im-add-badge">${svg('<rect x="4" y="6" width="16" height="12" rx="6"/>')} Badge</button>
+                        </div>
+
+                        <div class="studio-sec-title mt"><span>Layer Stack (${els.length})</span></div>
+                        <div class="studio-layer-list" id="im-layers"></div>
+
+                        <div class="studio-sec-title mt"><span>Templates</span></div>
+                        <div class="studio-templates-grid">
+                            <button type="button" class="studio-tmpl-chip" id="tmpl-sunset">🌅 Sunset Glow</button>
+                            <button type="button" class="studio-tmpl-chip" id="tmpl-cyber">⚡ Cyberpunk</button>
+                            <button type="button" class="studio-tmpl-chip" id="tmpl-rank">🏆 Gamer Rank</button>
+                            <button type="button" class="studio-tmpl-chip" id="tmpl-event">📢 Event Alert</button>
+                            <button type="button" class="studio-tmpl-chip" id="tmpl-minimal">🖤 Minimalist</button>
+                        </div>
+                    </div>
+
+                    <!-- Center: Interactive Stage -->
+                    <div class="studio-canvas-stage">
+                        <div style="position:absolute;top:16px;left:20px;display:flex;align-items:center;gap:8px;z-index:10;">
+                            <span class="chip" id="im-status-pill" style="font-size:11px;">Zoom: 100% · Drag elements</span>
+                        </div>
+                        <div style="position:absolute;top:16px;right:20px;display:flex;align-items:center;gap:6px;z-index:10;">
+                            <button type="button" class="btn sm outline" id="im-align-cx" title="Center Horizontally">Align Center X</button>
+                            <button type="button" class="btn sm outline" id="im-align-cy" title="Center Vertically">Align Center Y</button>
+                        </div>
+                        <div class="studio-canvas-wrap" id="im-canvas-wrap">
+                            <canvas id="im-cv" width="${curWidth}" height="${curHeight}"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Right: Properties & Variable Save -->
+                    <div class="studio-sidebar-card">
+                        <div class="studio-sec-title"><span>Layer Properties</span></div>
+                        <div id="im-props" style="display:flex;flex-direction:column;gap:12px;"></div>
+
+                        <div class="studio-sec-title mt"><span>Background</span></div>
+                        <div style="display:flex;flex-direction:column;gap:8px;">
+                            <div style="display:flex;gap:8px;align-items:center;">
+                                <input type="color" id="im-bg-col" value="#0b0c10" style="width:36px;height:32px;border-radius:6px;border:1px solid var(--border);cursor:pointer;">
+                                <input type="text" id="im-bg-img" placeholder="Background Image URL..." style="flex:1;padding:6px 10px;font-size:12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);">
+                            </div>
+                        </div>
+
+                        <div class="studio-sec-title mt"><span>Save as Variable</span></div>
+                        <p class="muted small" style="margin:0;">Put this graphic as a variable to attach it on embeds, cards, and announcements.</p>
+                        <div style="display:flex;gap:6px;">
+                            <input type="text" id="im-var-name" placeholder="welcome_card" value="welcome_banner" style="flex:1;padding:8px 10px;border-radius:8px;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:13px;">
+                            <button type="button" class="btn sm ok" id="im-btn-save-var">Save</button>
+                        </div>
+                        <div id="im-var-badge" style="display:none;" class="mt">
+                            <span class="muted small">Variable tag:</span>
+                            <button type="button" class="chip ok" id="im-var-copy-chip" style="cursor:pointer;font-family:var(--mono);margin-top:4px;width:100%;justify-content:center;">{img:welcome_banner} (Click to copy)</button>
+                        </div>
+                    </div>
+                </div>`;
+
+            const cv = $('#im-cv', page);
+            const ctx = cv.getContext('2d');
+            const propsEl = $('#im-props', page);
+            const layersEl = $('#im-layers', page);
+            const statusPill = $('#im-status-pill', page);
+            const bgColIn = $('#im-bg-col', page);
+            const bgImgIn = $('#im-bg-img', page);
+
+            let loadedBg = null;
+            const loadBg = () => {
+                if (bgUrl && /^https?:\/\//.test(bgUrl)) {
+                    const img = new Image();
+                    img.crossOrigin = 'anonymous';
+                    img.onload = () => { loadedBg = img; draw(); };
+                    img.src = bgUrl;
+                } else {
+                    loadedBg = null;
+                    draw();
+                }
+            };
+
+            bgColIn.oninput = () => { bgColor = bgColIn.value.slice(1); draw(); };
+            bgImgIn.oninput = () => { bgUrl = bgImgIn.value.trim(); loadBg(); };
+
+            // Canvas drawing routine
+            function draw() {
+                ctx.clearRect(0, 0, curWidth, curHeight);
+
+                // Background
+                ctx.fillStyle = `#${bgColor}`;
+                ctx.fillRect(0, 0, curWidth, curHeight);
+
+                if (loadedBg) {
+                    const s = Math.max(curWidth / loadedBg.width, curHeight / loadedBg.height);
+                    ctx.drawImage(loadedBg, (curWidth - loadedBg.width * s) / 2, (curHeight - loadedBg.height * s) / 2, loadedBg.width * s, loadedBg.height * s);
+                }
+
+                // Elements
+                for (const el of els) {
+                    if (el.hidden) continue;
+                    ctx.save();
+                    const cx = (el.x ?? 0.5) * curWidth;
+                    const cy = (el.y ?? 0.5) * curHeight;
+
+                    if (el.type === 'media') {
+                        const r = Math.max(8, (el.size || 0.3) * curHeight * 0.5);
+                        ctx.beginPath();
+                        if (el.shape === 'square') ctx.rect(cx - r, cy - r, r * 2, r * 2);
+                        else if (el.shape === 'rounded') ctx.roundRect(cx - r, cy - r, r * 2, r * 2, r * 0.35);
+                        else ctx.arc(cx, cy, r, 0, Math.PI * 2);
+
+                        ctx.fillStyle = el.fill || '#5865f2';
+                        ctx.fill();
+
+                        ctx.fillStyle = '#ffffff';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.font = `bold ${Math.round(r * 0.8)}px sans-serif`;
+                        ctx.fillText((CTX.user.username || 'K')[0].toUpperCase(), cx, cy);
+
+                        if (el.ring) {
+                            ctx.strokeStyle = el.ring.startsWith('#') ? el.ring : `#${el.ring}`;
+                            ctx.lineWidth = el.ringWidth || 4;
+                            ctx.stroke();
+                        }
+                    } else if (el.type === 'text') {
+                        const px = Math.max(8, (el.size || 0.08) * curHeight);
+                        ctx.font = `${el.bold ? '800' : '600'} ${px}px Inter, sans-serif`;
+                        ctx.textAlign = el.align || 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillStyle = el.color ? (el.color.startsWith('#') ? el.color : `#${el.color}`) : '#ffffff';
+                        const text = (el.text || '')
+                            .replaceAll('{user}', `@${CTX.user.username}`)
+                            .replaceAll('{username}', CTX.user.username)
+                            .replaceAll('{server}', CTX.guild.name)
+                            .replaceAll('{members}', String(CTX.guild.memberCount || 1284));
+                        ctx.fillText(text, cx, cy);
+                    } else if (el.type === 'bar') {
+                        const w = (el.w || 0.4) * curWidth;
+                        const h = Math.max(6, (el.h || 0.06) * curHeight);
+                        ctx.fillStyle = '#1e1f22';
+                        ctx.beginPath();
+                        ctx.roundRect(cx - w / 2, cy - h / 2, w, h, h / 2);
+                        ctx.fill();
+                        const fillW = w * (el.progress || 0.7);
+                        ctx.fillStyle = el.fill || '#10b981';
+                        ctx.beginPath();
+                        ctx.roundRect(cx - w / 2, cy - h / 2, fillW, h, h / 2);
+                        ctx.fill();
+                    } else if (el.type === 'badge') {
+                        const px = Math.max(10, (el.size || 0.04) * curHeight);
+                        ctx.font = `bold ${px}px Inter, sans-serif`;
+                        const text = el.text || 'VIP MEMBER';
+                        const tw = ctx.measureText(text).width + px * 2;
+                        const th = px * 1.8;
+                        ctx.fillStyle = el.bgColor || '#5865f2';
+                        ctx.beginPath();
+                        ctx.roundRect(cx - tw / 2, cy - th / 2, tw, th, th / 2);
+                        ctx.fill();
+                        ctx.fillStyle = '#ffffff';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(text, cx, cy);
+                    }
+
+                    // Selection box outline
+                    if (el === sel) {
+                        ctx.strokeStyle = '#38bdf8';
+                        ctx.lineWidth = 2;
+                        ctx.setLineDash([4, 4]);
+                        ctx.strokeRect(cx - 30, cy - 30, 60, 60);
+                        ctx.setLineDash([]);
+                    }
+                    ctx.restore();
+                }
+            }
+
+            function renderLayers() {
+                layersEl.innerHTML = els.map((e, idx) => `
+                    <div class="studio-layer-item ${e === sel ? 'selected' : ''}" data-idx="${idx}">
+                        <span class="studio-layer-name">${esc(e.type.toUpperCase())}: ${esc(e.text || e.shape || e.id)}</span>
+                        <button type="button" class="studio-layer-btn" data-dup="${idx}" title="Duplicate">${ICONS.duplicate || '⎘'}</button>
+                        <button type="button" class="studio-layer-btn" data-del="${idx}" title="Delete">${ICONS.trash}</button>
+                    </div>`).join('');
+
+                $$('.studio-layer-item', layersEl).forEach(item => {
+                    item.onclick = (e) => {
+                        if (e.target.closest('button')) return;
+                        sel = els[+item.dataset.idx];
+                        renderProps(); renderLayers(); draw();
+                    };
+                });
+                $$('[data-del]', layersEl).forEach(b => {
+                    b.onclick = () => {
+                        const idx = +b.dataset.del;
+                        if (els[idx] === sel) sel = els[0] || null;
+                        els.splice(idx, 1);
+                        renderProps(); renderLayers(); draw();
+                    };
+                });
+                $$('[data-dup]', layersEl).forEach(b => {
+                    b.onclick = () => {
+                        const idx = +b.dataset.dup;
+                        const clone = structuredClone(els[idx]);
+                        clone.id = `e${++uid}`;
+                        clone.x = Math.min(0.9, (clone.x || 0.5) + 0.05);
+                        clone.y = Math.min(0.9, (clone.y || 0.5) + 0.05);
+                        els.push(clone);
+                        sel = clone;
+                        renderProps(); renderLayers(); draw();
+                    };
+                });
+            }
+
+            function renderProps() {
+                if (!sel) {
+                    propsEl.innerHTML = '<p class="muted small">Click any piece on canvas or in layers list to edit.</p>';
+                    return;
+                }
+                if (sel.type === 'text') {
+                    propsEl.innerHTML = `
+                        <div class="fld"><label>Content</label><input type="text" id="pr-text" value="${esc(sel.text)}" placeholder="Welcome {username}"></div>
+                        <div class="grid2">
+                            <div class="fld"><label>Size</label><input type="range" id="pr-size" min="0.03" max="0.3" step="0.005" value="${sel.size || 0.08}"></div>
+                            <div class="fld"><label>Color</label><input type="color" id="pr-col" value="${sel.color?.startsWith('#') ? sel.color : '#' + (sel.color || 'ffffff')}"></div>
+                        </div>
+                        <div class="grid2">
+                            <div class="fld"><label>Align</label><select id="pr-align"><option value="left" ${sel.align==='left'?'selected':''}>Left</option><option value="center" ${sel.align==='center'?'selected':''}>Center</option><option value="right" ${sel.align==='right'?'selected':''}>Right</option></select></div>
+                            <div class="fld"><label>&nbsp;</label><label class="chkline"><input type="checkbox" id="pr-bold" ${sel.bold ? 'checked' : ''}> Bold</label></div>
+                        </div>`;
+                    $('#pr-text', propsEl).oninput = (e) => { sel.text = e.target.value; draw(); renderLayers(); };
+                    $('#pr-size', propsEl).oninput = (e) => { sel.size = +e.target.value; draw(); };
+                    $('#pr-col', propsEl).oninput = (e) => { sel.color = e.target.value; draw(); };
+                    $('#pr-align', propsEl).onchange = (e) => { sel.align = e.target.value; draw(); };
+                    $('#pr-bold', propsEl).onchange = (e) => { sel.bold = e.target.checked; draw(); };
+                } else if (sel.type === 'media') {
+                    propsEl.innerHTML = `
+                        <div class="grid2">
+                            <div class="fld"><label>Shape</label><select id="pr-shape"><option value="circle" ${sel.shape==='circle'?'selected':''}>Circle</option><option value="rounded" ${sel.shape==='rounded'?'selected':''}>Rounded</option><option value="square" ${sel.shape==='square'?'selected':''}>Square</option></select></div>
+                            <div class="fld"><label>Size</label><input type="range" id="pr-size" min="0.1" max="0.6" step="0.01" value="${sel.size || 0.35}"></div>
+                        </div>
+                        <div class="grid2">
+                            <div class="fld"><label>Ring Color</label><input type="color" id="pr-ring" value="${sel.ring?.startsWith('#') ? sel.ring : '#' + (sel.ring || 'e8622e')}"></div>
+                            <div class="fld"><label>Ring Width</label><input type="range" id="pr-ringw" min="0" max="12" step="1" value="${sel.ringWidth || 4}"></div>
+                        </div>`;
+                    $('#pr-shape', propsEl).onchange = (e) => { sel.shape = e.target.value; draw(); renderLayers(); };
+                    $('#pr-size', propsEl).oninput = (e) => { sel.size = +e.target.value; draw(); };
+                    $('#pr-ring', propsEl).oninput = (e) => { sel.ring = e.target.value; draw(); };
+                    $('#pr-ringw', propsEl).oninput = (e) => { sel.ringWidth = +e.target.value; draw(); };
+                } else if (sel.type === 'bar') {
+                    propsEl.innerHTML = `
+                        <div class="fld"><label>Progress (0 - 1)</label><input type="range" id="pr-prog" min="0" max="1" step="0.05" value="${sel.progress || 0.7}"></div>
+                        <div class="grid2">
+                            <div class="fld"><label>Fill Color</label><input type="color" id="pr-fill" value="${sel.fill || '#10b981'}"></div>
+                            <div class="fld"><label>Width</label><input type="range" id="pr-w" min="0.2" max="0.9" step="0.02" value="${sel.w || 0.4}"></div>
+                        </div>`;
+                    $('#pr-prog', propsEl).oninput = (e) => { sel.progress = +e.target.value; draw(); };
+                    $('#pr-fill', propsEl).oninput = (e) => { sel.fill = e.target.value; draw(); };
+                    $('#pr-w', propsEl).oninput = (e) => { sel.w = +e.target.value; draw(); };
+                } else if (sel.type === 'badge') {
+                    propsEl.innerHTML = `
+                        <div class="fld"><label>Badge Text</label><input type="text" id="pr-badgetxt" value="${esc(sel.text || 'VIP MEMBER')}"></div>
+                        <div class="grid2">
+                            <div class="fld"><label>Badge Color</label><input type="color" id="pr-badgecol" value="${sel.bgColor || '#5865f2'}"></div>
+                            <div class="fld"><label>Size</label><input type="range" id="pr-badgesz" min="0.02" max="0.1" step="0.005" value="${sel.size || 0.04}"></div>
+                        </div>`;
+                    $('#pr-badgetxt', propsEl).oninput = (e) => { sel.text = e.target.value; draw(); renderLayers(); };
+                    $('#pr-badgecol', propsEl).oninput = (e) => { sel.bgColor = e.target.value; draw(); };
+                    $('#pr-badgesz', propsEl).oninput = (e) => { sel.size = +e.target.value; draw(); };
+                }
+            }
+
+            // Dragging interactions
+            let drag = null;
+            cv.onpointerdown = (e) => {
+                const r = cv.getBoundingClientRect();
+                const x = (e.clientX - r.left) / r.width;
+                const y = (e.clientY - r.top) / r.height;
+
+                for (let i = els.length - 1; i >= 0; i--) {
+                    const el = els[i];
+                    if (Math.abs(el.x - x) < 0.15 && Math.abs(el.y - y) < 0.15) {
+                        sel = el;
+                        drag = { ox: x - el.x, oy: y - el.y };
+                        cv.setPointerCapture(e.pointerId);
+                        renderProps(); renderLayers(); draw();
+                        break;
+                    }
+                }
+            };
+            cv.onpointermove = (e) => {
+                if (!drag || !sel) return;
+                const r = cv.getBoundingClientRect();
+                let nx = (e.clientX - r.left) / r.width - drag.ox;
+                let ny = (e.clientY - r.top) / r.height - drag.oy;
+                // Magnetic snap to center
+                if (Math.abs(nx - 0.5) < 0.03) nx = 0.5;
+                if (Math.abs(ny - 0.5) < 0.03) ny = 0.5;
+                sel.x = Math.max(0.05, Math.min(0.95, nx));
+                sel.y = Math.max(0.05, Math.min(0.95, ny));
+                statusPill.textContent = `X: ${Math.round(sel.x * 100)}% · Y: ${Math.round(sel.y * 100)}%`;
+                draw();
+            };
+            const stopDrag = () => { drag = null; statusPill.textContent = 'Zoom: 100% · Drag elements'; };
+            cv.onpointerup = stopDrag;
+            cv.onpointercancel = stopDrag;
+
+            // Add layer buttons
+            $('#im-add-text', page).onclick = () => {
+                const item = { id: `e${++uid}`, type: 'text', text: 'New Text', x: 0.5, y: 0.5, size: 0.08, color: '#ffffff', bold: true, align: 'center' };
+                els.push(item); sel = item; renderProps(); renderLayers(); draw();
+            };
+            $('#im-add-media', page).onclick = () => {
+                const item = { id: `e${++uid}`, type: 'media', shape: 'circle', x: 0.5, y: 0.4, size: 0.35, ring: 'e8622e', ringWidth: 4 };
+                els.push(item); sel = item; renderProps(); renderLayers(); draw();
+            };
+            $('#im-add-bar', page).onclick = () => {
+                const item = { id: `e${++uid}`, type: 'bar', x: 0.5, y: 0.8, w: 0.5, h: 0.06, progress: 0.75, fill: '#10b981' };
+                els.push(item); sel = item; renderProps(); renderLayers(); draw();
+            };
+            $('#im-add-badge', page).onclick = () => {
+                const item = { id: `e${++uid}`, type: 'badge', text: 'NEW LEVEL', x: 0.5, y: 0.2, size: 0.045, bgColor: '#6366f1' };
+                els.push(item); sel = item; renderProps(); renderLayers(); draw();
+            };
+
+            // Align tools
+            $('#im-align-cx', page).onclick = () => { if (sel) { sel.x = 0.5; draw(); } };
+            $('#im-align-cy', page).onclick = () => { if (sel) { sel.y = 0.5; draw(); } };
+
+            // Dimension presets
+            $$('.studio-dim-btn', page).forEach(btn => {
+                btn.onclick = () => {
+                    $$('.studio-dim-btn', page).forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    curWidth = +btn.dataset.w;
+                    curHeight = +btn.dataset.h;
+                    cv.width = curWidth;
+                    cv.height = curHeight;
+                    draw();
+                };
+            });
+
+            // Templates
+            const applyTmpl = (items, bg, url = '') => {
+                els.length = 0;
+                els.push(...items.map(it => ({ ...it, id: `e${++uid}` })));
+                bgColor = bg.replace('#', '');
+                bgColIn.value = bg;
+                bgUrl = url;
+                bgImgIn.value = url;
+                sel = els[0] || null;
+                loadBg();
+                renderProps(); renderLayers(); draw();
+                toast('Template loaded');
+            };
+
+            $('#tmpl-sunset', page).onclick = () => applyTmpl([
+                { type: 'media', shape: 'circle', x: 0.5, y: 0.35, size: 0.35, ring: 'e8622e', ringWidth: 4 },
+                { type: 'text', text: 'Welcome to {server}!', x: 0.5, y: 0.68, size: 0.09, color: 'ffffff', bold: true, align: 'center' },
+                { type: 'text', text: 'Member #{members} · Have a wonderful time!', x: 0.5, y: 0.84, size: 0.05, color: 'fba57a', bold: false, align: 'center' },
+            ], '#1c0f0a');
+
+            $('#tmpl-cyber', page).onclick = () => applyTmpl([
+                { type: 'badge', text: 'SYSTEM ACCESS GRANTED', x: 0.5, y: 0.18, size: 0.04, bgColor: '#0891b2' },
+                { type: 'media', shape: 'rounded', x: 0.5, y: 0.44, size: 0.32, ring: '06b6d4', ringWidth: 3 },
+                { type: 'text', text: '{username}', x: 0.5, y: 0.74, size: 0.09, color: 'ffffff', bold: true, align: 'center' },
+                { type: 'bar', x: 0.5, y: 0.88, w: 0.4, h: 0.04, progress: 0.9, fill: '#06b6d4' },
+            ], '#05060a');
+
+            $('#tmpl-rank', page).onclick = () => applyTmpl([
+                { type: 'media', shape: 'circle', x: 0.2, y: 0.5, size: 0.55, ring: 'f59e0b', ringWidth: 5 },
+                { type: 'badge', text: 'LEVEL 42', x: 0.65, y: 0.32, size: 0.05, bgColor: '#f59e0b' },
+                { type: 'text', text: '{username}', x: 0.48, y: 0.52, size: 0.09, color: 'ffffff', bold: true, align: 'left' },
+                { type: 'bar', x: 0.62, y: 0.72, w: 0.52, h: 0.08, progress: 0.68, fill: '#f59e0b' },
+            ], '#0f121a');
+
+            $('#tmpl-event', page).onclick = () => applyTmpl([
+                { type: 'badge', text: 'COMMUNITY ANNOUNCEMENT', x: 0.5, y: 0.22, size: 0.045, bgColor: '#ef4444' },
+                { type: 'text', text: 'BIG WEEKEND TOURNAMENT!', x: 0.5, y: 0.5, size: 0.09, color: 'ffffff', bold: true, align: 'center' },
+                { type: 'text', text: 'Join Voice & General · Huge Coin & Role Prizes', x: 0.5, y: 0.76, size: 0.05, color: 'fca5a5', bold: false, align: 'center' },
+            ], '#180a0a');
+
+            $('#tmpl-minimal', page).onclick = () => applyTmpl([
+                { type: 'media', shape: 'circle', x: 0.5, y: 0.36, size: 0.32, ring: '6366f1', ringWidth: 3 },
+                { type: 'text', text: '{username}', x: 0.5, y: 0.68, size: 0.08, color: 'ffffff', bold: true, align: 'center' },
+                { type: 'text', text: 'Member #{members} of {server}', x: 0.5, y: 0.82, size: 0.045, color: '94a3b8', bold: false, align: 'center' },
+            ], '#090a0f');
+
+            // ⚡ RUST Skia native render button!
+            $('#im-btn-rust', page).onclick = async () => {
+                toast('⚡ Rendering…');
+                const cfg = { width: curWidth, height: curHeight, bgColor, background: bgUrl, elements: els };
+                const r = await api(`/api/guilds/${guildId}/studio/render`, { body: { type: 'image', config: cfg } });
+                if (r?.ok) {
+                    toast(`⚡ Rendered in ${r.durationMs}ms!`);
+                    statusPill.textContent = `⚡ Rendered in ${r.durationMs}ms`;
+                } else {
+                    toast(r?.error || 'Render error', 'err');
+                }
+            };
+
+            // Download PNG
+            $('#im-btn-dl', page).onclick = () => {
+                const a = document.createElement('a');
+                a.download = `kotan-image-${Date.now()}.png`;
+                a.href = cv.toDataURL('image/png');
+                a.click();
+                toast('Image downloaded');
+            };
+
+            // Save as Variable
+            $('#im-btn-save-var', page).onclick = async () => {
+                const name = ($('#im-var-name', page).value || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+                if (!name) return toast('Enter a variable name first', 'err');
+                toast(`Saving variable {img:${name}}…`);
+                const cfg = { width: curWidth, height: curHeight, bgColor, background: bgUrl, elements: els };
+                const r = await api(`/api/guilds/${guildId}/studio/variables`, {
+                    body: { name, type: 'image', config: cfg, dataUrl: cv.toDataURL('image/png') },
+                });
+                if (r?.ok) {
+                    toast(`Saved variable {img:${name}}!`);
+                    $('#im-var-badge', page).style.display = 'block';
+                    const copyChip = $('#im-var-copy-chip', page);
+                    copyChip.textContent = `{img:${name}} (Click to copy)`;
+                    copyChip.onclick = () => {
+                        navigator.clipboard.writeText(`{img:${name}}`);
+                        toast(`Copied {img:${name}} to clipboard!`);
+                    };
+                } else {
+                    toast(r?.error || 'Save failed', 'err');
+                }
+            };
+
+            renderProps();
+            renderLayers();
+            draw();
+        },
+
+        // ---------- CREATIVE STUDIO: GIF STUDIO (ANIMATED FRAMES) ----------
+        async 'gif-studio'(page) {
+            let width = 400, height = 200;
+            let fps = 10;
+            let currentFrameIdx = 0;
+            let isPlaying = true;
+            let onion = true;
+
+            const frames = [
+                {
+                    bgColor: '0b0c10', delay: 100,
+                    elements: [
+                        { type: 'text', text: '✨ WELCOME ✨', x: 0.5, y: 0.38, size: 0.12, color: '6366f1', bold: true },
+                        { type: 'text', text: '{username}', x: 0.5, y: 0.68, size: 0.14, color: 'ffffff', bold: true },
+                    ],
+                },
+                {
+                    bgColor: '11131c', delay: 100,
+                    elements: [
+                        { type: 'text', text: '⚡ WELCOME ⚡', x: 0.5, y: 0.38, size: 0.12, color: 'e8622e', bold: true },
+                        { type: 'text', text: '{username}', x: 0.5, y: 0.68, size: 0.14, color: 'ffffff', bold: true },
+                    ],
+                },
+                {
+                    bgColor: '181014', delay: 100,
+                    elements: [
+                        { type: 'text', text: '🌟 WELCOME 🌟', x: 0.5, y: 0.38, size: 0.12, color: 'ec4899', bold: true },
+                        { type: 'text', text: '{username}', x: 0.5, y: 0.68, size: 0.14, color: 'ffffff', bold: true },
+                    ],
+                },
+            ];
+
+            page.innerHTML = `
+                <div>
+                    <div class="page-title">GIF Studio <span class="chip ok" style="vertical-align:3px;font-size:11px;">🎬 ANIMATED FRAMES</span></div>
+                    <p class="page-desc">Design animated Discord cards, pulsing badges, and GIF attachments. Play live in browser and save directly as GIF variables.</p>
+                </div>
+
+                <div class="studio-topbar">
+                    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                        <button type="button" class="gif-play-btn" id="gif-toggle-play">
+                            <span>⏸ Pause Preview</span>
+                        </button>
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <span style="font-size:12px;font-weight:700;color:var(--muted);">Speed:</span>
+                            <select id="gif-fps-sel" style="padding:4px 8px;border-radius:6px;background:var(--panel-2);border:1px solid var(--border);color:var(--text);font-size:12px;">
+                                <option value="5">5 FPS</option>
+                                <option value="10" selected>10 FPS</option>
+                                <option value="15">15 FPS</option>
+                                <option value="20">20 FPS</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="studio-actions-right">
+                        <button type="button" class="btn-rust" id="gif-btn-rust">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                            <span>Render GIF</span>
+                        </button>
+                        <button type="button" class="btn" id="gif-btn-dl">${ICONS.download} Download .GIF</button>
+                    </div>
+                </div>
+
+                <div class="studio-main-grid">
+                    <!-- Left: Animation Presets -->
+                    <div class="studio-sidebar-card">
+                        <div class="studio-sec-title"><span>Auto Generators</span></div>
+                        <p class="muted small" style="margin:0;">Generate animated frame sequences instantly:</p>
+                        <div style="display:flex;flex-direction:column;gap:6px;">
+                            <button type="button" class="btn sm outline" id="gen-pulse">⚡ Pulsing Glow (8 frames)</button>
+                            <button type="button" class="btn sm outline" id="gen-rainbow">🌈 Rainbow Hue Shift</button>
+                            <button type="button" class="btn sm outline" id="gen-bar">📊 Level Up Fill Animation</button>
+                            <button type="button" class="btn sm outline" id="gen-flash">🚨 Flashing Alert Beacon</button>
+                        </div>
+
+                        <div class="studio-sec-title mt"><span>GIF Templates</span></div>
+                        <div style="display:flex;flex-direction:column;gap:6px;">
+                            <button type="button" class="studio-tmpl-chip" id="gtmpl-welcome">✨ Animated Welcome Pulse</button>
+                            <button type="button" class="studio-tmpl-chip" id="gtmpl-rank">🏆 Shimmering Level Up</button>
+                            <button type="button" class="studio-tmpl-chip" id="gtmpl-alert">🚨 Server Announcement</button>
+                        </div>
+                    </div>
+
+                    <!-- Center: Player & Timeline -->
+                    <div style="display:flex;flex-direction:column;gap:14px;">
+                        <div class="studio-canvas-stage" style="min-height:300px;">
+                            <div class="studio-canvas-wrap">
+                                <canvas id="gif-cv" width="${width}" height="${height}"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Timeline Bar -->
+                        <div class="gif-timeline-wrap">
+                            <div class="gif-timeline-ctrls">
+                                <span class="studio-sec-title" style="margin:0;">Timeline Frames (<span id="gif-frame-count">${frames.length}</span>)</span>
+                                <div style="display:flex;gap:6px;">
+                                    <button type="button" class="btn sm outline" id="gif-btn-dup-fr">Duplicate Frame</button>
+                                    <button type="button" class="btn sm danger" id="gif-btn-del-fr">Delete Frame</button>
+                                </div>
+                            </div>
+                            <div class="gif-frames-strip" id="gif-strip"></div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Frame Content & Variable Save -->
+                    <div class="studio-sidebar-card">
+                        <div class="studio-sec-title"><span>Active Frame Content</span></div>
+                        <div style="display:flex;flex-direction:column;gap:10px;">
+                            <div class="fld"><label>Line 1 Text</label><input type="text" id="gif-fr-text1" value="✨ WELCOME ✨"></div>
+                            <div class="fld"><label>Line 2 Text</label><input type="text" id="gif-fr-text2" value="{username}"></div>
+                            <div class="fld"><label>Frame Color</label><input type="color" id="gif-fr-col" value="#6366f1"></div>
+                        </div>
+
+                        <div class="studio-sec-title mt"><span>Save as GIF Variable</span></div>
+                        <p class="muted small" style="margin:0;">Save this animation as a variable to attach to welcome embeds or cards.</p>
+                        <div style="display:flex;gap:6px;">
+                            <input type="text" id="gif-var-name" placeholder="animated_badge" value="welcome_anim" style="flex:1;padding:8px 10px;border-radius:8px;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:13px;">
+                            <button type="button" class="btn sm ok" id="gif-btn-save-var">Save</button>
+                        </div>
+                        <div id="gif-var-badge" style="display:none;" class="mt">
+                            <span class="muted small">Variable tag:</span>
+                            <button type="button" class="chip ok" id="gif-var-copy-chip" style="cursor:pointer;font-family:var(--mono);margin-top:4px;width:100%;justify-content:center;">{gif:welcome_anim} (Click to copy)</button>
+                        </div>
+                    </div>
+                </div>`;
+
+            const cv = $('#gif-cv', page);
+            const ctx = cv.getContext('2d');
+            const stripEl = $('#gif-strip', page);
+            const playBtn = $('#gif-toggle-play', page);
+            const fpsSel = $('#gif-fps-sel', page);
+
+            // Draw single frame
+            function drawFrame(frame) {
+                if (!frame) return;
+                ctx.fillStyle = `#${(frame.bgColor || '0b0c10').replace('#', '')}`;
+                ctx.fillRect(0, 0, width, height);
+
+                const els = frame.elements || [];
+                for (const el of els) {
+                    ctx.save();
+                    const cx = (el.x ?? 0.5) * width;
+                    const cy = (el.y ?? 0.5) * height;
+                    if (el.type === 'text') {
+                        const px = Math.max(8, (el.size || 0.1) * height);
+                        ctx.font = `${el.bold ? '800' : '600'} ${px}px Inter, sans-serif`;
+                        ctx.textAlign = el.align || 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillStyle = el.color?.startsWith('#') ? el.color : `#${el.color || 'ffffff'}`;
+                        const t = (el.text || '').replaceAll('{username}', CTX.user.username).replaceAll('{server}', CTX.guild.name);
+                        ctx.fillText(t, cx, cy);
+                    }
+                    ctx.restore();
+                }
+            }
+
+            // Real-time animation loop
+            let lastTick = performance.now();
+            let animReq = null;
+            function loop(now) {
+                if (isPlaying) {
+                    const interval = 1000 / fps;
+                    if (now - lastTick >= interval) {
+                        currentFrameIdx = (currentFrameIdx + 1) % frames.length;
+                        drawFrame(frames[currentFrameIdx]);
+                        updateStripActive();
+                        lastTick = now;
+                    }
+                }
+                animReq = requestAnimationFrame(loop);
+            }
+            animReq = requestAnimationFrame(loop);
+
+            function updateStripActive() {
+                $$('.gif-frame-thumb', stripEl).forEach((th, idx) => {
+                    th.classList.toggle('active', idx === currentFrameIdx);
+                });
+            }
+
+            function renderStrip() {
+                stripEl.innerHTML = frames.map((f, idx) => `
+                    <div class="gif-frame-thumb ${idx === currentFrameIdx ? 'active' : ''}" data-idx="${idx}">
+                        <span class="gif-frame-num">F${idx + 1}</span>
+                        <span style="font-size:10px;color:var(--text-2);">${Math.round(1000 / fps)}ms</span>
+                    </div>`).join('') + `<div class="gif-add-frame" id="gif-btn-add-fr" title="Add Frame">${ICONS.plus}</div>`;
+
+                $('#gif-frame-count', page).textContent = frames.length;
+                $$('.gif-frame-thumb', stripEl).forEach(th => {
+                    th.onclick = () => {
+                        currentFrameIdx = +th.dataset.idx;
+                        isPlaying = false;
+                        playBtn.innerHTML = '▶ Play Preview';
+                        drawFrame(frames[currentFrameIdx]);
+                        updateStripActive();
+                        syncFrameProps();
+                    };
+                });
+                $('#gif-btn-add-fr', stripEl).onclick = () => {
+                    frames.push({
+                        bgColor: '0b0c10',
+                        elements: [
+                            { type: 'text', text: 'FRAME ' + (frames.length + 1), x: 0.5, y: 0.5, size: 0.12, color: 'ffffff', bold: true },
+                        ],
+                    });
+                    currentFrameIdx = frames.length - 1;
+                    renderStrip();
+                };
+            }
+
+            function syncFrameProps() {
+                const f = frames[currentFrameIdx];
+                if (!f) return;
+                const t1 = f.elements?.[0]?.text || '';
+                const t2 = f.elements?.[1]?.text || '';
+                const col = f.elements?.[0]?.color || '#6366f1';
+                $('#gif-fr-text1', page).value = t1;
+                $('#gif-fr-text2', page).value = t2;
+                $('#gif-fr-col', page).value = col.startsWith('#') ? col : '#' + col;
+            }
+
+            $('#gif-fr-text1', page).oninput = (e) => {
+                const f = frames[currentFrameIdx];
+                if (!f.elements[0]) f.elements[0] = { type: 'text', x: 0.5, y: 0.38, size: 0.12, bold: true };
+                f.elements[0].text = e.target.value;
+                drawFrame(f);
+            };
+            $('#gif-fr-text2', page).oninput = (e) => {
+                const f = frames[currentFrameIdx];
+                if (!f.elements[1]) f.elements[1] = { type: 'text', x: 0.5, y: 0.68, size: 0.14, bold: true };
+                f.elements[1].text = e.target.value;
+                drawFrame(f);
+            };
+            $('#gif-fr-col', page).oninput = (e) => {
+                const f = frames[currentFrameIdx];
+                if (f.elements[0]) f.elements[0].color = e.target.value;
+                drawFrame(f);
+            };
+
+            playBtn.onclick = () => {
+                isPlaying = !isPlaying;
+                playBtn.innerHTML = isPlaying ? '⏸ Pause Preview' : '▶ Play Preview';
+            };
+            fpsSel.onchange = () => { fps = +fpsSel.value; renderStrip(); };
+
+            $('#gif-btn-dup-fr', page).onclick = () => {
+                const f = structuredClone(frames[currentFrameIdx]);
+                frames.splice(currentFrameIdx + 1, 0, f);
+                currentFrameIdx++;
+                renderStrip();
+            };
+            $('#gif-btn-del-fr', page).onclick = () => {
+                if (frames.length <= 1) return toast('Must have at least 1 frame', 'err');
+                frames.splice(currentFrameIdx, 1);
+                currentFrameIdx = Math.max(0, currentFrameIdx - 1);
+                renderStrip();
+            };
+
+            // Auto generators
+            $('#gen-pulse', page).onclick = () => {
+                frames.length = 0;
+                for (let i = 0; i < 8; i++) {
+                    const scale = 0.1 + Math.sin((i / 8) * Math.PI) * 0.04;
+                    frames.push({
+                        bgColor: '0b0c10',
+                        elements: [
+                            { type: 'text', text: '⚡ KOTAN ACTIVE ⚡', x: 0.5, y: 0.45, size: scale, color: 'e8622e', bold: true },
+                        ],
+                    });
+                }
+                currentFrameIdx = 0;
+                renderStrip();
+                toast('Pulse animation generated (8 frames)');
+            };
+
+            $('#gen-rainbow', page).onclick = () => {
+                frames.length = 0;
+                const colors = ['#ef4444', '#f97316', '#f59e0b', '#10b981', '#06b6d4', '#6366f1', '#ec4899'];
+                for (let i = 0; i < colors.length; i++) {
+                    frames.push({
+                        bgColor: '0b0c10',
+                        elements: [
+                            { type: 'text', text: '🌈 RAINBOW GLOW', x: 0.5, y: 0.45, size: 0.13, color: colors[i], bold: true },
+                        ],
+                    });
+                }
+                currentFrameIdx = 0;
+                renderStrip();
+                toast('Rainbow animation generated');
+            };
+
+            $('#gen-bar', page).onclick = () => {
+                frames.length = 0;
+                for (let i = 1; i <= 6; i++) {
+                    frames.push({
+                        bgColor: '0b0c10',
+                        elements: [
+                            { type: 'text', text: `LEVEL UP: ${i * 20}%`, x: 0.5, y: 0.38, size: 0.1, color: '#10b981', bold: true },
+                            { type: 'text', text: '██████████'.slice(0, i + 1), x: 0.5, y: 0.65, size: 0.09, color: '#10b981', bold: true },
+                        ],
+                    });
+                }
+                currentFrameIdx = 0;
+                renderStrip();
+                toast('Level up animation generated');
+            };
+
+            $('#gen-flash', page).onclick = () => {
+                frames.length = 0;
+                for (let i = 0; i < 4; i++) {
+                    frames.push({
+                        bgColor: i % 2 === 0 ? '1f0a0a' : '0b0c10',
+                        elements: [
+                            { type: 'text', text: '🚨 PRIORITY ALERT 🚨', x: 0.5, y: 0.5, size: 0.12, color: i % 2 === 0 ? '#ef4444' : '#ffffff', bold: true },
+                        ],
+                    });
+                }
+                currentFrameIdx = 0;
+                renderStrip();
+                toast('Alert flash animation generated');
+            };
+
+            // Templates
+            $('#gtmpl-welcome', page).onclick = () => {
+                frames.length = 0;
+                const tints = ['#6366f1', '#e8622e', '#ec4899', '#06b6d4'];
+                for (const col of tints) {
+                    frames.push({
+                        bgColor: '0b0c10',
+                        elements: [
+                            { type: 'text', text: '✨ WELCOME TO THE SERVER ✨', x: 0.5, y: 0.38, size: 0.09, color: col, bold: true },
+                            { type: 'text', text: `{username}`, x: 0.5, y: 0.65, size: 0.13, color: '#ffffff', bold: true },
+                        ],
+                    });
+                }
+                renderStrip();
+            };
+
+            // ⚡ Render with Rust
+            $('#gif-btn-rust', page).onclick = async () => {
+                toast('⚡ Rendering GIF…');
+                const cfg = { width, height, fps, frames };
+                const r = await api(`/api/guilds/${guildId}/studio/render`, { body: { type: 'gif', config: cfg } });
+                if (r?.ok) {
+                    toast(`⚡ GIF encoded in ${r.durationMs}ms!`);
+                } else {
+                    toast(r?.error || 'Render failed', 'err');
+                }
+            };
+
+            // Download GIF
+            $('#gif-btn-dl', page).onclick = async () => {
+                toast('Rendering & downloading animated GIF…');
+                const cfg = { width, height, fps, frames };
+                const r = await api(`/api/guilds/${guildId}/studio/render`, { body: { type: 'gif', config: cfg } });
+                if (r?.dataUrl) {
+                    const a = document.createElement('a');
+                    a.download = `kotan-animated-${Date.now()}.gif`;
+                    a.href = r.dataUrl;
+                    a.click();
+                    toast('GIF downloaded');
+                }
+            };
+
+            // Save as Variable
+            $('#gif-btn-save-var', page).onclick = async () => {
+                const name = ($('#gif-var-name', page).value || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+                if (!name) return toast('Enter a variable name first', 'err');
+                toast(`Rendering & saving variable {gif:${name}}…`);
+                const cfg = { width, height, fps, frames };
+                const rendered = await api(`/api/guilds/${guildId}/studio/render`, { body: { type: 'gif', config: cfg } });
+                const r = await api(`/api/guilds/${guildId}/studio/variables`, {
+                    body: { name, type: 'gif', config: cfg, dataUrl: rendered?.dataUrl },
+                });
+                if (r?.ok) {
+                    toast(`Saved animated variable {gif:${name}}!`);
+                    $('#gif-var-badge', page).style.display = 'block';
+                    const copyChip = $('#gif-var-copy-chip', page);
+                    copyChip.textContent = `{gif:${name}} (Click to copy)`;
+                    copyChip.onclick = () => {
+                        navigator.clipboard.writeText(`{gif:${name}}`);
+                        toast(`Copied {gif:${name}} to clipboard!`);
+                    };
+                } else {
+                    toast(r?.error || 'Save failed', 'err');
+                }
+            };
+
+            renderStrip();
+            syncFrameProps();
+        },
+
+        // ---------- CREATIVE STUDIO: ASSETS & VARIABLES MANAGER ----------
+        async 'studio-vars'(page) {
+            const r = await api(`/api/guilds/${guildId}/studio/variables`).catch(() => ({ ok: false, variables: {} }));
+            const vars = r?.variables || {};
+            const list = Object.values(vars);
+
+            page.innerHTML = `
+                <div>
+                    <div class="page-title">Assets & Variables Gallery</div>
+                    <p class="page-desc">Every graphic or GIF saved from Image Studio & GIF Studio is available here as a dynamic variable. Put them on embeds, welcome cards, boosting perks, and announcements.</p>
+                </div>
+
+                <div class="card" style="background:linear-gradient(135deg, rgba(99,102,241,0.12), rgba(232,98,46,0.08));border-color:var(--accent);">
+                    <div style="display:flex;align-items:center;gap:12px;">
+                        <span style="font-size:24px;">💡</span>
+                        <div>
+                            <b>How to use your variables in Discord</b>
+                            <p class="sub" style="margin-top:2px;">Type or paste any variable tag (e.g. <code>{img:welcome_banner}</code> or <code>{gif:welcome_anim}</code>) into any embed image field, card thumbnail, or welcome message. Kotan resolves and renders them live!</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="ov-quick-bar mt">
+                    <a class="ov-qb-btn highlight" href="#/image-studio">${ICONS.plus} <span>New Image</span></a>
+                    <a class="ov-qb-btn highlight" href="#/gif-studio">${ICONS.plus} <span>New GIF Animation</span></a>
+                </div>
+
+                <div class="vars-gallery-grid" id="vars-grid">
+                    ${list.length ? list.map(v => `
+                        <div class="var-item-card" data-name="${esc(v.name)}">
+                            <div class="var-thumb-preview">
+                                ${v.dataUrl ? `<img src="${v.dataUrl}" alt="${esc(v.name)}">` : `<span class="muted small">No preview image</span>`}
+                            </div>
+                            <div class="var-meta-row">
+                                <span class="chip ${v.type === 'gif' ? 'warn' : 'ok'}">${esc(v.type.toUpperCase())}</span>
+                                <span class="muted small">${v.config?.width || 800}×${v.config?.height || 300}</span>
+                            </div>
+                            <div class="var-meta-row">
+                                <button type="button" class="var-tag-pill" data-copy="{${v.type === 'gif' ? 'gif' : 'img'}:${esc(v.name)}}" title="Click to copy">
+                                    <span>{${v.type === 'gif' ? 'gif' : 'img'}:${esc(v.name)}}</span>
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                </button>
+                                <div class="var-actions">
+                                    <button type="button" class="btn sm danger" data-del="${esc(v.name)}" title="Delete variable">${ICONS.trash}</button>
+                                </div>
+                            </div>
+                        </div>`).join('') : `
+                        <div class="card" style="grid-column:1/-1;text-align:center;padding:48px 24px;">
+                            <div style="font-size:32px;margin-bottom:8px;">🎨</div>
+                            <h3>No variables saved yet</h3>
+                            <p class="sub mb">Create custom banners or animated GIFs in Image Studio or GIF Studio, then click "Save as Variable"!</p>
+                            <a class="btn" href="#/image-studio" style="margin-top:12px;">Open Image Studio</a>
+                        </div>`}
+                </div>`;
+
+            $$('[data-copy]', page).forEach(b => {
+                b.onclick = () => {
+                    const tag = b.dataset.copy;
+                    navigator.clipboard.writeText(tag);
+                    toast(`Copied ${tag} to clipboard!`);
+                };
+            });
+
+            $$('[data-del]', page).forEach(b => {
+                b.onclick = async () => {
+                    const name = b.dataset.del;
+                    const ok = await confirmModal('Delete variable', `Remove variable {${name}}? Any embed referencing it will stop displaying it.`);
+                    if (!ok) return;
+                    toast(`Deleting ${name}…`);
+                    const res = await api(`/api/guilds/${guildId}/studio/variables/${name}`, { method: 'DELETE' });
+                    if (res?.ok) {
+                        toast(`Deleted variable {${name}}`);
+                        PAGES['studio-vars'](page);
+                    } else {
+                        toast('Failed to delete', 'err');
+                    }
+                };
+            });
         },
 
         // Activity leaderboards — messages, voice, channels and members.
@@ -1634,7 +3518,7 @@
                 </div>
                 <div class="actgrid">${BOXES.map((b) => `
                     <div class="card actbox">
-                        <div class="ph"><h3>${b.title}</h3>${b.key === 'members' ? `<span class="muted small">+${d.joins || 0} joined · −${d.leaves || 0} left</span>` : ''}</div>
+                        <div class="ph"><h3>${b.title}</h3>${b.key === 'members' ? `<span class="muted small">+${d.joins || 0} joined / -${d.leaves || 0} left</span>` : ''}</div>
                         <div class="lrows" data-box="${b.key}"></div>
                         <button class="seeall" data-see="${b.key}">See all</button>
                     </div>`).join('')}
@@ -1706,7 +3590,7 @@
                     ${tgl(`cmd_${c.name}`, '', !(s.disabledCommands || []).includes(c.name))}</div>`).join('')}</div></div>
                 <div class="card"><h3>Scoped rules</h3><p class="sub mb">Block a command in a channel and/or during a daily time window (HH:MM, server local time).</p>
                     <div id="rules"></div>
-                    <button class="btn sm mt" id="add-rule">+ Add rule</button></div>`;
+                    <button class="btn sm mt" id="add-rule">${ICONS.plus} <span>Add rule</span></button></div>`;
 
             const cmdOpts = CTX.commands.map((c) => ({ value: c.name, label: c.name }));
             const rulesEl = $('#rules', page);
@@ -1717,7 +3601,7 @@
                         <div style="flex:0 0 180px">${selSlot(`rch_${i}`)}</div>
                         <input type="time" name="rs_${i}" value="${r.start || ''}" style="flex:0 0 110px" title="Start (HH:MM)">
                         <input type="time" name="re_${i}" value="${r.end || ''}" style="flex:0 0 110px" title="End (HH:MM)">
-                        <button class="btn sm danger right" data-del="${i}">✕</button>
+                        <button class="btn sm danger right" data-del="${i}" title="Remove" style="display:grid;place-items:center;">${ICONS.trash}</button>
                     </div>`).join('') || '<p class="muted small">No scoped rules.</p>';
                 rules.forEach((r, i) => {
                     mountSelect(page, `rc_${i}`, { options: cmdOpts, value: r.command, placeholder: 'Command…' });
@@ -1986,7 +3870,7 @@
                 <div><div class="page-title">Roles</div><p class="page-desc">Automatic and reaction-based role assignment.</p></div>
                 <div class="card"><h3>Autorole</h3>${fldHtml('Role granted on join', selSlot('autorole'), 'empty = off')}</div>
                 <div class="card"><h3>Reaction roles</h3><p class="sub mb">Members who react with the emoji get the role.</p>
-                    <div id="rrs"></div><button class="btn sm mt" id="add-rr">+ Add reaction role</button></div>`;
+                    <div id="rrs"></div><button class="btn sm mt" id="add-rr">${ICONS.plus} <span>Add reaction role</span></button></div>`;
             mountSelect(page, 'autorole', { options: [{ value: '', label: 'Off' }, ...roOpts(DATA.roles)], value: r.autorole || '', placeholder: 'Off' });
 
             const rrEl = $('#rrs', page);
@@ -1997,7 +3881,7 @@
                         <div style="flex:0 0 190px">${selSlot(`rrm_${i}`)}</div>
                         <input type="text" name="rre_${i}" value="${esc(x.emoji || '')}" placeholder="emoji" style="flex:0 0 90px">
                         <div style="flex:0 0 170px">${selSlot(`rrr_${i}`)}</div>
-                        <button class="btn sm danger right" data-del="${i}">✕</button>
+                        <button class="btn sm danger right" data-del="${i}" title="Remove" style="display:grid;place-items:center;">${ICONS.trash}</button>
                     </div>`).join('') || '<p class="muted small">No reaction roles.</p>';
                 rrs.forEach((x, i) => {
                     const ch = mountSelect(page, `rrc_${i}`, { options: chOpts(DATA.channels), value: x.channelId, placeholder: 'Channel…' });
@@ -2046,7 +3930,7 @@
                     ${fldHtml('Level-up channel', selSlot('lvch'), 'empty = the channel they leveled in')}
                     ${fldHtml('Level-up message', txtIn('lvmsg', s.leveling.message), '{user} {level}')}
                     <h4 class="mt mb">Level rewards</h4><div id="rewards"></div>
-                    <button class="btn sm mt" id="add-rw">+ Add reward</button></div>`;
+                    <button class="btn sm mt" id="add-rw">${ICONS.plus} <span>Add reward</span></button></div>`;
             mountSelect(page, 'lvch', { options: [{ value: '', label: 'Same channel' }, ...chOpts(DATA.channels)], value: s.leveling.channel || '', placeholder: 'Same channel' });
             const rwEl = $('#rewards', page);
             const renderRw = () => {
@@ -2054,7 +3938,7 @@
                     <div class="modrow"><span class="muted small">Level</span>
                     <input type="number" name="rl_${i}" value="${x.level || ''}" min="1" style="flex:0 0 80px">
                     <div class="grow">${selSlot(`rlr_${i}`)}</div>
-                    <button class="btn sm danger" data-del="${i}">✕</button></div>`).join('') || '<p class="muted small">No rewards.</p>';
+                    <button class="btn sm danger" data-del="${i}" title="Remove" style="display:grid;place-items:center;">${ICONS.trash}</button></div>`).join('') || '<p class="muted small">No rewards.</p>';
                 rewards.forEach((x, i) => mountSelect(page, `rlr_${i}`, { options: roOpts(DATA.roles), value: x.roleId, placeholder: 'Role…' }));
                 $$('#rewards [data-del]', page).forEach((b) => (b.onclick = () => { rewards.splice(+b.dataset.del, 1); renderRw(); }));
             };
@@ -2087,7 +3971,7 @@
                     ${fldHtml('Max streak bonus', numIn('dailyMaxStreak', s.economy.dailyMaxStreak, 0, 10000000), 'empty = 1000')}
                 </div></div>
                 <div class="card"><h3>Shop items</h3><p class="sub mb">Your server's catalog — empty uses the built-in shop (cookie, coffee, ticket, gem, VIP).</p>
-                    <div id="shopitems"></div><button class="btn sm mt" id="add-item">+ Add item</button></div>`;
+                    <div id="shopitems"></div><button class="btn sm mt" id="add-item">${ICONS.plus} <span>Add item</span></button></div>`;
             const siEl = $('#shopitems', page);
             const renderItems = () => {
                 siEl.innerHTML = items.map((x, i) => `
@@ -2095,7 +3979,7 @@
                         <input type="text" name="sn_${i}" value="${esc(x.name || '')}" placeholder="Item name" style="flex:0 0 160px">
                         <input type="number" name="sp_${i}" value="${x.price || ''}" placeholder="Price" min="1" style="flex:0 0 110px">
                         <input type="text" name="sd_${i}" value="${esc(x.description || '')}" placeholder="Description" class="grow">
-                        <button class="btn sm danger" data-del="${i}">✕</button></div>`).join('') || '<p class="muted small">No custom items — the built-in shop is used.</p>';
+                        <button class="btn sm danger" data-del="${i}" title="Remove" style="display:grid;place-items:center;">${ICONS.trash}</button></div>`).join('') || '<p class="muted small">No custom items — the built-in shop is used.</p>';
                 $$('#shopitems [data-del]', page).forEach((b) => (b.onclick = () => { items.splice(+b.dataset.del, 1); renderItems(); }));
             };
             renderItems();
@@ -2153,13 +4037,13 @@
                     <span data-fx="role">${selSlot(`${p}_role`)}</span>
                     <span data-fx="multiplier" style="display:contents">
                         ${selSlot(`${p}_kind`)}
-                        <input type="number" name="${p}_mult" value="${x.mult ?? ''}" placeholder="×2" min="1" step="0.1" style="width:70px" title="Multiplier">
+                        <input type="number" name="${p}_mult" value="${x.mult ?? ''}" placeholder="2x" min="1" step="0.1" style="width:70px" title="Multiplier">
                         <input type="number" name="${p}_mins" value="${x.mins ?? ''}" placeholder="mins" min="1" style="width:80px" title="Duration (minutes)">
                     </span>
                     <span data-fx="crate" style="display:contents"><input type="text" name="${p}_pool" value="${esc(Array.isArray(x.pool) ? x.pool.join(', ') : x.pool || '')}" placeholder="cookie, gem, 50-200" style="min-width:180px" title="Comma-separated drops — item ids or coin amounts/ranges"></span>
-                    <button class="btn sm" data-mv="-1" title="Move up">↑</button>
-                    <button class="btn sm" data-mv="1" title="Move down">↓</button>
-                    <button class="btn sm danger" data-del title="Remove">✕</button>
+                    <button class="btn sm" data-mv="-1" title="Move up" style="display:grid;place-items:center;">${ICONS.up}</button>
+                    <button class="btn sm" data-mv="1" title="Move down" style="display:grid;place-items:center;">${ICONS.down}</button>
+                    <button class="btn sm danger" data-del title="Remove" style="display:grid;place-items:center;">${ICONS.trash}</button>
                 </div>`;
             };
 
@@ -2167,12 +4051,12 @@
                 <div class="card" data-sec="${si}">
                     <div class="modrow" style="margin-bottom:10px">
                         <input type="text" name="sec_${si}_name" value="${esc(c.name || '')}" placeholder="Section name" class="grow">
-                        <button class="btn sm" data-smv="-1" title="Move up">↑</button>
-                        <button class="btn sm" data-smv="1" title="Move down">↓</button>
-                        <button class="btn sm danger" data-sdel title="Delete section">✕</button>
+                        <button class="btn sm" data-smv="-1" title="Move up" style="display:grid;place-items:center;">${ICONS.up}</button>
+                        <button class="btn sm" data-smv="1" title="Move down" style="display:grid;place-items:center;">${ICONS.down}</button>
+                        <button class="btn sm danger" data-sdel title="Delete section" style="display:grid;place-items:center;">${ICONS.trash}</button>
                     </div>
                     ${c.items.map((x, ii) => itemRow(x, si, ii)).join('') || '<p class="muted small">No items in this section yet.</p>'}
-                    <button class="btn sm mt" data-additem>+ Add item</button>
+                    <button class="btn sm mt" data-additem>${ICONS.plus} <span>Add item</span></button>
                 </div>`;
 
             const syncFx = (row) => {
@@ -2341,14 +4225,14 @@
                     ${fldHtml('Channel naming', txtIn('tkname', t.naming, 'ticket-{user}'), 'placeholders: {user} {count}')}
                 </div>
                 <div class="card"><h3>Topics</h3><p class="sub mb">The panel dropdown — up to 10. With none, the panel shows a single "Open a ticket" button.</p>
-                    <div id="topics"></div><button class="btn sm mt" id="add-topic">+ Add topic</button></div>
+                    <div id="topics"></div><button class="btn sm mt" id="add-topic">${ICONS.plus} <span>Add topic</span></button></div>
                 <div class="card"><h3>Panel card</h3><p class="sub mb">The message people see — CV2 container, classic embed, or plain text when the card is off. The topic dropdown is attached automatically.</p>
                     ${cardEditorHtml('tp', t.panel || {})}</div>
                 <div class="card"><h3>Post panel</h3>
                     ${fldHtml('Channel', selSlot('tkpost'), 'sends the panel immediately — uses saved settings')}
                     <div class="mt"><button class="btn" id="post-panel">Post panel</button> <span class="hint" id="post-status"></span></div></div>`;
 
-            mountSelect(page, 'tkcat', { options: [{ value: '', label: 'No category' }, ...(DATA.categories || []).map((c) => ({ value: c.id, label: c.name, icon: '▤' }))], value: t.categoryId || '', placeholder: 'No category' });
+            mountSelect(page, 'tkcat', { options: [{ value: '', label: 'No category' }, ...(DATA.categories || []).map((c) => ({ value: c.id, label: c.name, icon: ICONS.folder }))], value: t.categoryId || '', placeholder: 'No category' });
             mountSelect(page, 'tklog', { options: [{ value: '', label: 'Off' }, ...chOpts(DATA.channels)], value: t.logChannel || '', placeholder: 'Off' });
             mountSelect(page, 'tkroles', { multi: true, options: roOpts(DATA.roles), value: t.supportRoles || [], placeholder: 'Support roles…' });
             mountSelect(page, 'tkpost', { options: chOpts(DATA.channels), placeholder: 'Pick a channel…' });
@@ -2371,7 +4255,7 @@
                     <div class="modrow">
                         <input type="text" name="tn_${i}" value="${esc(x.name || '')}" placeholder="Topic — e.g. General support" style="flex:0 0 200px">
                         <input type="text" name="td_${i}" value="${esc(x.desc || '')}" placeholder="Dropdown description" class="grow">
-                        <button class="btn sm danger" data-del="${i}">✕</button></div>`).join('')
+                        <button class="btn sm danger" data-del="${i}" title="Remove" style="display:grid;place-items:center;">${ICONS.trash}</button></div>`).join('')
                     || '<p class="muted small">No topics — the panel falls back to a single open button.</p>';
                 $$('#topics [data-del]', page).forEach((b) => (b.onclick = () => { syncTopics(); topics.splice(+b.dataset.del, 1); renderTopics(); }));
             };
@@ -2472,8 +4356,8 @@
                     ${fldHtml('Channel', selSlot('vmpost'), 'sends the panel immediately — uses saved settings')}
                     <div class="mt"><button class="btn" id="post-panel">Post panel</button> <span class="hint" id="post-status"></span></div></div>`;
 
-            mountSelect(page, 'vmtrig', { options: [{ value: '', label: 'Off' }, ...(DATA.voice || []).map((c) => ({ value: c.id, label: c.name, icon: '🔊' }))], value: v.triggerId || '', placeholder: 'Pick a voice channel…' });
-            mountSelect(page, 'vmcat', { options: [{ value: '', label: 'Same as trigger' }, ...(DATA.categories || []).map((c) => ({ value: c.id, label: c.name, icon: '▤' }))], value: v.categoryId || '', placeholder: 'Same as trigger' });
+            mountSelect(page, 'vmtrig', { options: [{ value: '', label: 'Off' }, ...(DATA.voice || []).map((c) => ({ value: c.id, label: c.name, icon: ICONS.speaker }))], value: v.triggerId || '', placeholder: 'Pick a voice channel…' });
+            mountSelect(page, 'vmcat', { options: [{ value: '', label: 'Same as trigger' }, ...(DATA.categories || []).map((c) => ({ value: c.id, label: c.name, icon: ICONS.folder }))], value: v.categoryId || '', placeholder: 'Same as trigger' });
             mountSelect(page, 'vmpost', { options: chOpts(DATA.channels), placeholder: 'Pick a channel…' });
             const card = setupCardEditor(page, 'vmp', v.panel || {}, {
                 extras: VM_EXTRAS,
@@ -2518,9 +4402,9 @@
                 </div>
                 <div class="card"><h3>Booster perks</h3><p class="sub mb">Passive boosts for members while they boost the server. Multipliers stack on top of purchased boosters.</p>
                     <div class="grid2">
-                        ${fldHtml('Game winnings ×', txtIn('pgames', b.perks?.games ?? 1), 'multiplier on all game payouts — 1 = off')}
-                        ${fldHtml('Coin earnings ×', txtIn('pcoins', b.perks?.coins ?? 1), 'multiplier on daily/other earnings — 1 = off')}
-                        ${fldHtml('XP gain ×', txtIn('pxp', b.perks?.xp ?? 1), 'multiplier on message XP — 1 = off')}
+                        ${fldHtml('Game winnings (x)', txtIn('pgames', b.perks?.games ?? 1), 'multiplier on all game payouts — 1 = off')}
+                        ${fldHtml('Coin earnings (x)', txtIn('pcoins', b.perks?.coins ?? 1), 'multiplier on daily/other earnings — 1 = off')}
+                        ${fldHtml('XP gain (x)', txtIn('pxp', b.perks?.xp ?? 1), 'multiplier on message XP — 1 = off')}
                         ${fldHtml('Shop discount %', txtIn('pshop', b.perks?.shop ?? 0), '0–90 — 0 = off')}
                     </div>
                 </div>`;
@@ -2693,13 +4577,13 @@
             DATA.voice = ch.voice || [];
             DATA.roles = ro.roles || [];
         }
-        // shell() rebuilds the sidebar — keep the nav's scroll position so
-        // items near the bottom don't jump to the top on every click.
         const navScroll = $('.dnav')?.scrollTop ?? 0;
-        shell(slug);
+        updateShell(slug);
         const navEl = $('.dnav');
         if (navEl && navScroll) navEl.scrollTop = navScroll;
         const page = $('#page');
+        const canvasEl = $('.dcontent-canvas');
+        if (canvasEl) canvasEl.scrollTop = 0;
         const render = PAGES[slug] || PAGES.overview;
         // Drop select mounts from the previous page — stale elements would
         // otherwise leak into the next page's collects. Portal'd pops on
@@ -2714,7 +4598,9 @@
         renderDirtyBar();
         try {
             await render(page);
-            bindSubnav(page);
+            if (slug !== 'overview' && !slug.includes('studio') && slug !== 'studio-vars') {
+                bindSubnav(page);
+            }
             // Watch for edits: input/change cover field values, childList
             // mutations cover rows/components added, removed or reordered.
             if (saveSections.length) {

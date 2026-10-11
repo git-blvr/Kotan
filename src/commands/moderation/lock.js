@@ -12,8 +12,12 @@ async function run(ctx, channel, reason) {
     if (channel.permissionOverwrites.cache.get(everyone.id)?.deny.has(PermissionFlagsBits.SendMessages))
         return sendError(ctx, `${channel} is already locked.`);
 
-    await channel.permissionOverwrites.edit(everyone, { SendMessages: false },
-        { reason: `${reason} — by ${ctx.user.tag}` });
+    try {
+        await channel.permissionOverwrites.edit(everyone, { SendMessages: false },
+            { reason: `${reason} — by ${ctx.user.tag}` });
+    } catch (err) {
+        return sendError(ctx, `Failed to lock: ${err.message}`);
+    }
     logModAction(ctx.client, ctx.guild.id, {
         action: 'Lock',
         target: `#${channel.name}`,

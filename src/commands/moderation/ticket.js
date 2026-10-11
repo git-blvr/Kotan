@@ -44,7 +44,7 @@ async function run(ctx, action, targetUser, text) {
         // Members may close their own ticket; others need support perms.
         if (inside.rec.user !== ctx.user.id && !tk.isSupport(ctx.member, t))
             return sendError(ctx, 'Only the ticket owner or support staff can close this.');
-        return tk.closeTicket(ctx.channel, ctx.guild, ctx.user, settings);
+        return await tk.closeTicket(ctx.channel, ctx.guild, ctx.user, settings);
     }
 
     if (!tk.isSupport(ctx.member, t))
@@ -53,20 +53,28 @@ async function run(ctx, action, targetUser, text) {
 
     if (action === 'rename') {
         if (!text) return sendError(ctx, `Usage: \`${ctx.prefix}ticket rename <name>\``);
-        await ctx.channel.setName(text.toLowerCase().replace(/[^a-z0-9-_]+/g, '-').slice(0, 90)).catch(() => {});
-        return ctx.reply(cv2(success(`Renamed to \`${ctx.channel.name}\`.`, 'Tickets')));
+        const newName = text.toLowerCase().replace(/[^a-z0-9-_]+/g, '-').slice(0, 90);
+        try {
+            await ctx.channel.setName(newName);
+            return ctx.reply(cv2(success(`Renamed to \`${newName}\`.`, 'Tickets')));
+        } catch (err) {
+            return sendError(ctx, `Failed to rename ticket: ${err.message}`);
+        }
     }
 
     // add / remove
     if (!targetUser) return sendError(ctx, `Usage: \`${ctx.prefix}ticket ${action} <user>\``);
     const target = await resolveMember(ctx, targetUser).catch(() => null);
     if (!target) return sendError(ctx, `Couldn't find "${targetUser}".`);
-    await ctx.channel.permissionOverwrites
-        .edit(target.id, action === 'add'
-            ? { ViewChannel: true, SendMessages: true, ReadMessageHistory: true }
-            : { ViewChannel: false })
-        .catch(() => {});
-    return ctx.reply(cv2(success(`${target} ${action === 'add' ? 'added to' : 'removed from'} the ticket.`, 'Tickets')));
+    try {
+        await ctx.channel.permissionOverwrites
+            .edit(target.id, action === 'add'
+                ? { ViewChannel: true, SendMessages: true, ReadMessageHistory: true }
+                : { ViewChannel: false });
+        return ctx.reply(cv2(success(`${target} ${action === 'add' ? 'added to' : 'removed from'} the ticket.`, 'Tickets')));
+    } catch (err) {
+        return sendError(ctx, `Failed to update permissions: ${err.message}`);
+    }
 }
 
 async function executeComponent(i, client) {
@@ -112,7 +120,7 @@ async function executeComponent(i, client) {
         if (rec && rec.user !== i.user.id && !tk.isSupport(i.member, t))
             return i.reply(eph(cv2(error('Only the ticket owner or support staff can close this.')))).catch(() => {});
         await i.deferUpdate().catch(() => {});
-        return tk.closeTicket(i.channel, i.guild, i.user, settings);
+        return await tk.closeTicket(i.channel, i.guild, i.user, settings);
     }
 }
 

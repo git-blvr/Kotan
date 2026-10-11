@@ -73,6 +73,10 @@ async function gateCommand(message, command, client) {
     }
 
     if (message.guild) {
+        if (!message.member) {
+            try { message.member = await message.guild.members.fetch((message.author ?? message.user).id); }
+            catch { return sendError(message, 'Could not verify your permissions — try again.'), true; }
+        }
         const missingUser = (command.userPermissions || []).filter(
             (p) => !message.member.permissions.has(p)
         );
@@ -82,8 +86,10 @@ async function gateCommand(message, command, client) {
                 `You need these permissions: ${missingUser.map((p) => `\`${p}\``).join(', ')}`
             ), true;
 
+        const me = message.guild.members.me;
+        if (!me) return sendError(message, 'I cannot verify my own permissions — try again shortly.'), true;
         const missingBot = (command.botPermissions || []).filter(
-            (p) => !message.guild.members.me.permissions.has(p)
+            (p) => !me.permissions.has(p)
         );
         if (missingBot.length)
             return sendError(

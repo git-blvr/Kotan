@@ -1,4 +1,4 @@
-const { ApplicationCommandOptionType: Opt } = require('discord.js');
+const { ApplicationCommandOptionType: Opt, PermissionFlagsBits } = require('discord.js');
 const { info, error, base, cv2 } = require('../../helpers/embeds');
 const { fromMessage, fromInteraction } = require('../../helpers/ctx');
 const config = require('../../config');
@@ -10,7 +10,7 @@ const db = require('../../utils/database');
 
 const canUse = (ctx, cfg) =>
     !cfg.roles?.length ||
-    ctx.member?.permissions.has('ManageGuild') ||
+    ctx.member?.permissions.has(PermissionFlagsBits.ManageGuild) ||
     ctx.member?.roles.cache.some((r) => cfg.roles.includes(r.id));
 
 async function showPings(ctx) {

@@ -73,9 +73,12 @@ const DEFAULTS = {
         naming: "{user}'s channel", userLimit: 0, bitrate: 0,
         panel: { enabled: true, style: 'cv2', title: 'Voice channels', description: 'Join the trigger channel to get your own voice channel — manage it with the buttons below or by typing `.vc` in its chat.', color: '', colorMode: '', footer: '', thumbnail: false, thumb: '', components: [] },
     },
+    studio: {
+        variables: {},
+    },
 };
 
-const NESTED = ['automod', 'logging', 'welcome', 'roles', 'economy', 'leveling', 'access', 'overview', 'games', 'boosts', 'appearance', 'branding', 'shop', 'tickets', 'afk', 'captcha', 'voicemaster'];
+const NESTED = ['automod', 'logging', 'welcome', 'roles', 'economy', 'leveling', 'access', 'overview', 'games', 'boosts', 'appearance', 'branding', 'shop', 'tickets', 'afk', 'captcha', 'voicemaster', 'studio'];
 
 async function getSettings(guildId) {
     const s = await db.getGuildSettings(guildId);
@@ -542,6 +545,12 @@ const SECTIONS = {
         if (f.card) {
             const err = SECTIONS.welcomeEmbed(s.afk.card, f.card, true);
             if (err) return err;
+        }
+    },
+    studio(s, f) {
+        if (!s.studio) s.studio = { variables: {} };
+        if (f.variables && typeof f.variables === 'object') {
+            s.studio.variables = f.variables;
         }
     },
 };

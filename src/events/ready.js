@@ -18,11 +18,5 @@ module.exports = {
         });
 
         startTasks(client);
-
-        try {
-            require('../web/server').startWebsite(client);
-        } catch (err) {
-            logger.error('Website failed to start:', err);
-        }
     },
 };

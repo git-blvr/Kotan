@@ -15,7 +15,7 @@ async function fetchRetry(url, options = {}, retries = 2, baseDelay = 400) {
             lastError = new Error(`HTTP ${res.status}`);
             if (res.status === 429) {
                 const retryAfter = Number(res.headers.get('retry-after'));
-                if (retryAfter > 0) await sleep(retryAfter * 1000);
+                if (retryAfter > 0) { await sleep(retryAfter * 1000); continue; }
             }
         } catch (err) {
             lastError = err;

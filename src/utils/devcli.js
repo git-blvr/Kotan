@@ -140,7 +140,9 @@ module.exports = {
             async eval(...code) {
                 if (!code.length) return say(red('usage: eval <code…>'));
                 try {
-                    const result = await eval(code.join(' '));
+                    const raw = code.join(' ');
+                    const toEval = raw.includes('await') ? `(async () => { return (${raw}); })()` : raw;
+                    const result = await eval(toEval);
                     say(green(typeof result === 'object' ? JSON.stringify(result, null, 1)?.slice(0, 3000) : String(result)));
                 } catch (err) {
                     say(red(String(err.stack || err).slice(0, 1000)));

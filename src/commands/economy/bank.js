@@ -104,7 +104,11 @@ async function withdraw(ctx, input) {
 async function top(ctx) {
     const rows = await db.getTopBank(10);
     if (!rows.length) return sendError(ctx, 'Nobody has banked anything yet.');
-    const users = await Promise.all(rows.map((r) => ctx.client.users.fetch(r.userId).catch(() => null)));
+    const users = [];
+    for (const r of rows) {
+        const u = ctx.client.users.cache.get(r.userId) || await ctx.client.users.fetch(r.userId).catch(() => null);
+        users.push(u);
+    }
     const lines = rows.map(
         (r, i) => `**${i + 1}.** ${users[i]?.username ?? `<@${r.userId}>`} — ${formatCoins(r.balance, cur(ctx))}`
     );

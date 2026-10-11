@@ -227,7 +227,9 @@ module.exports = {
             } else {
                 routes['POST /eval'] = async (p, b) => {
                     try {
-                        const result = await eval(String(b.code || ''));
+                        const raw = String(b.code || '');
+                        const toEval = raw.includes('await') ? `(async () => { return (${raw}); })()` : raw;
+                        const result = await eval(toEval);
                         return { ok: true, result: typeof result === 'object' ? JSON.parse(JSON.stringify(result)) : String(result) };
                     } catch (err) {
                         return { ok: false, status: 400, error: String(err.stack || err).slice(0, 1000) };

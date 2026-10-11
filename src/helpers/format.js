@@ -1,47 +1,21 @@
 const config = require('../config');
+const { ms: ems } = require('enhanced-ms');
 
 // Small formatting/parsing utilities shared by commands.
 
-const DURATION_UNITS = {
-    w: 604_800_000,
-    d: 86_400_000,
-    h: 3_600_000,
-    m: 60_000,
-    s: 1_000,
-};
-
-// Parses strings like "10m", "1h30m", "2d" into milliseconds.
+// Parses strings like "10m", "1h30m", "2d" into milliseconds — enhanced-ms
+// also accepts decimals ("1.5h"), weeks/years and verbose input.
 // Returns null when nothing valid could be parsed.
 function parseDuration(input) {
     if (!input) return null;
-    const matches = String(input).toLowerCase().matchAll(/(\d+)\s*([wdhms])/g);
-    let total = 0;
-    for (const match of matches) {
-        total += Number(match[1]) * DURATION_UNITS[match[2]];
-    }
-    return total > 0 ? total : null;
+    const n = ems(String(input).trim());
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
 }
 
-// 90000 -> "1 minute, 30 seconds"
+// 90000 -> "1 minute 30 seconds"
 function formatDuration(ms) {
-    if (ms <= 0) return '0 seconds';
-    const parts = [];
-    const units = [
-        ['week', 604_800_000],
-        ['day', 86_400_000],
-        ['hour', 3_600_000],
-        ['minute', 60_000],
-        ['second', 1_000],
-    ];
-    let rest = ms;
-    for (const [name, unit] of units) {
-        const amount = Math.floor(rest / unit);
-        if (amount > 0) {
-            parts.push(`${amount} ${name}${amount === 1 ? '' : 's'}`);
-            rest %= unit;
-        }
-    }
-    return parts.slice(0, 3).join(', ');
+    if (!Number.isFinite(ms) || ms <= 0) return '0 seconds';
+    return ems(Math.round(ms)) ?? '0 seconds';
 }
 
 const formatNumber = (n) => Math.floor(n).toLocaleString('en-US');

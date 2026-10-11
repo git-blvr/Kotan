@@ -15,7 +15,11 @@ async function run(ctx, target) {
     if (!target.isCommunicationDisabled())
         return sendError(ctx, `**${target.user.tag}** is not muted.`);
 
-    await target.timeout(null, `Unmuted by ${ctx.user.tag}`);
+    try {
+        await target.timeout(null, `Unmuted by ${ctx.user.tag}`);
+    } catch (err) {
+        return sendError(ctx, `Failed to unmute: ${err.message}`);
+    }
     logModAction(ctx.client, ctx.guild.id, {
         action: 'Unmute',
         target: `${target.user.tag} (${target.id})`,

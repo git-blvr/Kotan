@@ -58,8 +58,8 @@ module.exports = function loadCommands(client) {
         if (entry.isFile() && entry.name.endsWith('.js')) {
             register(path.join(baseDir, entry.name), 'core');
         } else if (entry.isDirectory()) {
-            for (const file of fs.readdirSync(path.join(baseDir, entry.name))) {
-                if (file.endsWith('.js')) register(path.join(baseDir, entry.name, file), entry.name);
+            for (const file of fs.readdirSync(path.join(baseDir, entry.name), { withFileTypes: true })) {
+                if (file.isFile() && file.name.endsWith('.js')) register(path.join(baseDir, entry.name, file.name), entry.name);
             }
         }
     }

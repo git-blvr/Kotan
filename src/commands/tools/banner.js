@@ -8,7 +8,8 @@ async function run(ctx, target) {
     if (!target) return sendError(ctx, 'I could not find that user.');
 
     // force fetch — banner data is not included in cached users
-    const user = await ctx.client.users.fetch(target.id, { force: true });
+    const user = await ctx.client.users.fetch(target.id, { force: true }).catch(() => null);
+    if (!user) return sendError(ctx, 'Failed to fetch user profile.');
     const banner = user.bannerURL({ size: 1024 });
 
     if (!banner) {

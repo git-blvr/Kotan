@@ -17,7 +17,11 @@ async function run(ctx, target, role) {
     if (target.roles.cache.has(role.id))
         return sendError(ctx, `**${target.user.tag}** already has that role.`);
 
-    await target.roles.add(role, `Role added by ${ctx.user.tag}`);
+    try {
+        await target.roles.add(role, `Role added by ${ctx.user.tag}`);
+    } catch (err) {
+        return sendError(ctx, `Failed to add role: ${err.message}`);
+    }
     logModAction(ctx.client, ctx.guild.id, {
         action: 'Role add',
         target: `${target.user.tag} (${target.id})`,

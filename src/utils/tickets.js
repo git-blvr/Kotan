@@ -144,15 +144,19 @@ async function openTicket(guild, member, topicIdx, settings, client) {
         reason: `Kotan ticket #${data.count}`,
     });
 
-    data.byUser[member.id] = channel.id;
-    data.channels[channel.id] = {
+    // Re-read after the async channel creation to avoid overwriting
+    // a concurrent ticket open (same pattern as voicemaster.createFor).
+    const fresh = await db.getTickets(guild.id);
+    fresh.count = Math.max(fresh.count || 0, data.count);
+    fresh.byUser[member.id] = channel.id;
+    fresh.channels[channel.id] = {
         user: member.id,
         topic: topic?.name || null,
         number: data.count,
         openedAt: Date.now(),
         claimedBy: null,
     };
-    await db.saveTickets(guild.id, data);
+    await db.saveTickets(guild.id, fresh);
 
     const oc = new ContainerBuilder();
     const ocColor = await accentFor(t.panel, cardImgSrc(t.panel, (u) => gimg(u, guild), guild.iconURL({ size: 256 }) || ''), accent(t.panel?.color));

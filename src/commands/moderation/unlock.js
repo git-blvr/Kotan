@@ -13,8 +13,12 @@ async function run(ctx, channel) {
         return sendError(ctx, `${channel} is not locked.`);
 
     // null clears the deny — restores whatever the category/default allows.
-    await channel.permissionOverwrites.edit(everyone, { SendMessages: null },
-        { reason: `Unlocked by ${ctx.user.tag}` });
+    try {
+        await channel.permissionOverwrites.edit(everyone, { SendMessages: null },
+            { reason: `Unlocked by ${ctx.user.tag}` });
+    } catch (err) {
+        return sendError(ctx, `Failed to unlock: ${err.message}`);
+    }
     logModAction(ctx.client, ctx.guild.id, {
         action: 'Unlock',
         target: `#${channel.name}`,

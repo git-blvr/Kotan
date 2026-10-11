@@ -17,6 +17,7 @@ const fastify = require('fastify');
 const settings = require('../src/web/settings');
 const modules = require('../src/web/config/modules');
 const commands = require('../src/web/config/commands');
+const studioRenderer = require('../src/utils/studioRenderer');
 
 const WEB = path.join(__dirname, '..', 'src', 'web');
 const MIME = {
@@ -126,6 +127,7 @@ function fakeStats(days) {
         },
         growth: { series: growth, latest: 1284, pct: 4.2 },
         mod: { days: modDays, warnsTotal: 24, tempbansTotal: 3, warnsWeek: 4, warnsPrevWeek: 2, tempbansWeek: 1, tempbansPrevWeek: 0 },
+        bot: { uptime: 14 * DAY + 6 * 3600e3 + 22 * 60e3, status: 'online', activity: '/help · /rank · /play', atype: 3, guilds: 12 },
         audit: auditTrail.slice(0, 15),
         recent: [
             { type: 'warn', userId: members[3].id, moderatorId: members[1].id, reason: 'Spam in #general', at: Date.now() - 7_200_000 },
@@ -259,6 +261,103 @@ async function main() {
     app.delete('/api/guilds/:id/tags/:name', (req, reply) => {
         const ok = delete tagDoc[req.params.name];
         return reply.code(ok ? 200 : 404).send({ ok });
+    });
+
+    // ---------- Studio & Variables (Rust Accelerated) ----------
+    const studioVariables = {
+        welcome_banner: {
+            name: 'welcome_banner',
+            type: 'image',
+            config: {
+                width: 800, height: 300, bgColor: '0b0c10',
+                elements: [
+                    { type: 'media', shape: 'circle', x: 0.5, y: 0.35, size: 0.34, ring: 'e8622e' },
+                    { type: 'text', text: 'Welcome to {server}!', x: 0.5, y: 0.68, size: 0.09, color: 'ffffff', bold: true, align: 'center' },
+                    { type: 'text', text: 'Member #{members} · Enjoy your stay!', x: 0.5, y: 0.84, size: 0.05, color: 'fba57a', bold: false, align: 'center' },
+                ],
+            },
+            updatedAt: Date.now() - 3600000,
+        },
+        animated_badge: {
+            name: 'animated_badge',
+            type: 'gif',
+            config: {
+                width: 400, height: 200, fps: 10,
+                frames: [
+                    { bgColor: '0f1117', elements: [{ type: 'text', text: '✨ VIP LEVEL 1 ✨', size: 0.12, color: '6366f1', bold: true }] },
+                    { bgColor: '151824', elements: [{ type: 'text', text: '⚡ VIP LEVEL 1 ⚡', size: 0.13, color: 'e8622e', bold: true }] },
+                ],
+            },
+            updatedAt: Date.now() - 7200000,
+        },
+    };
+
+    app.post('/api/guilds/:id/studio/render', async (req, reply) => {
+        const { type = 'image', config = {}, vars = {} } = req.body || {};
+        try {
+            if (type === 'gif') {
+                const res = await studioRenderer.renderGif(config, {
+                    user: `@${USER.username}`, username: USER.username, server: GUILD.name, members: GUILD.memberCount,
+                    ...vars,
+                });
+                return reply.send({ ok: true, dataUrl: res.dataUrl, durationMs: res.renderTimeMs, engine: 'Rust (@napi-rs/canvas)' });
+            } else {
+                const res = await studioRenderer.renderImage(config, {
+                    user: `@${USER.username}`, username: USER.username, server: GUILD.name, members: GUILD.memberCount,
+                    ...vars,
+                });
+                return reply.send({ ok: true, dataUrl: res.dataUrl, durationMs: res.renderTimeMs, engine: 'Rust (@napi-rs/canvas)' });
+            }
+        } catch (err) {
+            return reply.code(400).send({ ok: false, error: err.message });
+        }
+    });
+
+    app.get('/api/guilds/:id/studio/variables', (req, reply) => {
+        return reply.send({ ok: true, variables: studioVariables });
+    });
+
+    app.post('/api/guilds/:id/studio/variables', async (req, reply) => {
+        const { name, type = 'image', config = {}, dataUrl = null } = req.body || {};
+        const cleanName = String(name || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+        if (!cleanName || cleanName.length > 40) {
+            return reply.code(400).send({ ok: false, error: 'Variable name must be 1-40 alphanumeric characters' });
+        }
+        studioVariables[cleanName] = {
+            name: cleanName,
+            type: type === 'gif' ? 'gif' : 'image',
+            config,
+            dataUrl,
+            updatedAt: Date.now(),
+        };
+        return reply.send({ ok: true, name: cleanName, variable: studioVariables[cleanName] });
+    });
+
+    app.delete('/api/guilds/:id/studio/variables/:name', (req, reply) => {
+        const cleanName = String(req.params.name || '').trim().toLowerCase();
+        const existed = delete studioVariables[cleanName];
+        return reply.code(existed ? 200 : 404).send({ ok: existed });
+    });
+
+    app.get('/api/guilds/:id/studio/asset/:name', async (req, reply) => {
+        const cleanName = String(req.params.name || '').trim().toLowerCase();
+        const v = studioVariables[cleanName];
+        if (!v) return reply.code(404).send({ error: 'Variable not found' });
+        try {
+            if (v.type === 'gif') {
+                const res = await studioRenderer.renderGif(v.config, {
+                    user: `@${USER.username}`, username: USER.username, server: GUILD.name, members: GUILD.memberCount,
+                });
+                return reply.type('image/gif').send(res.buffer);
+            } else {
+                const res = await studioRenderer.renderImage(v.config, {
+                    user: `@${USER.username}`, username: USER.username, server: GUILD.name, members: GUILD.memberCount,
+                });
+                return reply.type('image/png').send(res.buffer);
+            }
+        } catch (err) {
+            return reply.code(500).send({ error: err.message });
+        }
     });
 
     app.setNotFoundHandler((req, reply) =>

@@ -25,7 +25,7 @@ async function logModAction(client, guildId, { action, target, moderator, reason
             color: config.colors.warning,
             title: `Mod action — ${action}`,
             fields,
-            footer: { text: `<t:${Math.floor(Date.now() / 1000)}:f>` },
+            footer: { text: new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) },
         });
         await channel.send(cv2(container));
     } catch (err) {

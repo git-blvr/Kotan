@@ -7,7 +7,7 @@ const { sessionMiddleware, requireAuth, sameOriginOnly } = require('./auth');
 const { checkGuildAccess, isDeveloper } = require('./permissions');
 const authRoutes = require('./routes/auth');
 const apiRoutes = require('./routes/api');
-const { rateLimit } = require('./rateLimit');
+const { rateLimit, concurrencyCap } = require('./rateLimit');
 
 const WEB_DIR = __dirname;
 const page = (name) => path.join(WEB_DIR, 'pages', name);
@@ -48,8 +48,10 @@ async function startWebsite(client) {
     // Request decorators can't hold object values — attach via hook instead.
     app.addHook('preHandler', async (req) => { req.client = client; });
 
-    // Global per-IP cap — one shared bucket across every route, running
-    // before the per-route limits below.
+    // Concurrency cap runs first — burst floods die at the cheapest check —
+    // then the global per-IP cap (one shared bucket across every route),
+    // then the per-route limits below.
+    app.addHook('onRequest', concurrencyCap(30));
     app.addHook('onRequest', rateLimit({ windowMs: 60_000, max: 50, global: true }));
 
     // Security headers — the design uses inline styles in places, so CSP
@@ -146,6 +148,11 @@ async function startWebsite(client) {
     });
 
     await app.listen({ port: env.PORT, host: env.HOST });
+    // Socket-level flood hygiene — slowheaders, stalled request bodies and
+    // socket floods cost the event loop nothing more than a timer each.
+    app.server.headersTimeout = 20_000;  // Node default 60s — too generous
+    app.server.requestTimeout = 30_000;  // Node default 300s
+    app.server.maxConnections = 2048;    // refuse sockets beyond this
     const displayHost = env.HOST === '127.0.0.1' ? 'localhost' : env.HOST;
     const exposure = env.HOST === '0.0.0.0' ? ' (exposed to LAN)' : '';
     logger.success(`Dashboard listening on http://${displayHost}:${env.PORT}${exposure}`);

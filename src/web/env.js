@@ -3,6 +3,19 @@
 const crypto = require('node:crypto');
 
 const env = process.env;
+
+// Cloudflare edge network ranges (https://www.cloudflare.com/ips) — used by
+// TRUST_PROXY=cloudflare. They change rarely; a stale range only means that
+// edge's forwarded header isn't trusted, never a security hole.
+const CLOUDFLARE_RANGES = [
+    '173.245.48.0/20', '103.21.244.0/22', '103.22.200.0/22', '103.31.4.0/22',
+    '141.101.64.0/18', '108.162.192.0/18', '190.93.240.0/20', '188.114.96.0/20',
+    '197.234.240.0/22', '198.41.128.0/17', '162.158.0.0/15', '104.16.0.0/13',
+    '104.24.0.0/14', '172.64.0.0/13', '131.0.72.0/22',
+    '2400:cb00::/32', '2606:4700::/32', '2803:f800::/32', '2405:b500::/32',
+    '2405:8100::/32', '2a06:98c0::/29', '2c0f:f248::/32',
+];
+
 const required = ['CLIENT_ID', 'CLIENT_SECRET', 'SESSION_SECRET'];
 const missing = required.filter((k) => !env[k]);
 
@@ -52,16 +65,20 @@ module.exports = {
     // How much Fastify trusts proxy headers (X-Forwarded-For → req.ip, which
     // rate limiting keys on). Default 'loopback' only trusts a proxy running
     // on this machine — a bare `true` lets ANY client spoof their IP.
-    // TRUST_PROXY accepts: true | false | <hop count> | comma-separated
-    // trusted proxy IPs/CIDRs (e.g. "10.0.0.0/8,172.16.0.0/12").
+    // TRUST_PROXY accepts: true | false | cloudflare | <hop count> |
+    // comma-separated trusted proxy IPs/CIDRs (e.g. "10.0.0.0/8,172.16.0.0/12").
+    //   'cloudflare' — trusts the published Cloudflare edge ranges + loopback,
+    //   so CF-Connecting-IP/XFF are honored only when the peer really is an
+    //   edge node; direct hits to the origin get their true socket IP.
     TRUST_PROXY: (() => {
         const v = env.TRUST_PROXY;
         if (v == null || v === '') return 'loopback';
         if (v === 'true') {
-            console.warn('[env] TRUST_PROXY=true — any client can spoof X-Forwarded-For and bypass per-IP rate limits; prefer a proxy IP/CIDR list or hop count');
+            console.warn('[env] TRUST_PROXY=true — any client can spoof X-Forwarded-For and bypass per-IP rate limits; prefer "cloudflare", a proxy IP/CIDR list or hop count');
             return true;
         }
         if (v === 'false') return false;
+        if (v === 'cloudflare') return ['loopback', ...CLOUDFLARE_RANGES];
         if (/^\d+$/.test(v)) return Number(v);
         return v.split(',').map((s) => s.trim()).filter(Boolean);
     })(),

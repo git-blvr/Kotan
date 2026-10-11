@@ -13,7 +13,11 @@ async function run(ctx, user, reason) {
         const check = canModerate(ctx, target);
         if (!check.ok) return sendError(ctx, check.reason);
         if (!target.bannable) return sendError(ctx, 'I cannot ban that member.');
-        await target.ban({ reason: `${reason} — by ${ctx.user.tag}` });
+        try {
+            await target.ban({ reason: `${reason} — by ${ctx.user.tag}` });
+        } catch (err) {
+            return sendError(ctx, `Failed to ban: ${err.message}`);
+        }
         logModAction(ctx.client, ctx.guild.id, {
             action: 'Ban',
             target: `${target.user.tag} (${target.id})`,
@@ -33,7 +37,11 @@ async function run(ctx, user, reason) {
     const already = await ctx.guild.bans.fetch(id).catch(() => null);
     if (already) return sendError(ctx, 'That user is already banned.');
 
-    await ctx.guild.members.ban(id, { reason: `${reason} — by ${ctx.user.tag}` });
+    try {
+        await ctx.guild.members.ban(id, { reason: `${reason} — by ${ctx.user.tag}` });
+    } catch (err) {
+        return sendError(ctx, `Failed to ban: ${err.message}`);
+    }
     logModAction(ctx.client, ctx.guild.id, {
         action: 'Ban',
         target: id,

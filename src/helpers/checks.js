@@ -7,6 +7,8 @@ function canModerate(message, target) {
     const { guild, member: actor, author, client } = message;
     const me = guild.members.me;
 
+    if (!actor) return { ok: false, reason: 'Could not verify your permissions — try again.' };
+    if (!me) return { ok: false, reason: 'I cannot verify my own permissions — try again shortly.' };
     if (target.id === author.id) return { ok: false, reason: 'You cannot do that to yourself.' };
     if (target.id === client.user.id) return { ok: false, reason: 'I cannot do that to myself.' };
     if (target.id === guild.ownerId)

@@ -11,7 +11,11 @@ async function run(ctx, id, reason) {
     const ban = await ctx.guild.bans.fetch(id).catch(() => null);
     if (!ban) return sendError(ctx, 'That user is not banned.');
 
-    await ctx.guild.members.unban(id, `${reason} — by ${ctx.user.tag}`);
+    try {
+        await ctx.guild.members.unban(id, `${reason} — by ${ctx.user.tag}`);
+    } catch (err) {
+        return sendError(ctx, `Failed to unban: ${err.message}`);
+    }
     logModAction(ctx.client, ctx.guild.id, {
         action: 'Unban',
         target: `${ban.user.tag} (${id})`,

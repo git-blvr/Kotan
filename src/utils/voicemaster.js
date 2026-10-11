@@ -192,118 +192,128 @@ async function run(guild, member, action, arg) {
 
     const everyone = guild.roles.everyone;
     const finish = async (ok, msg, dirty) => {
-        if (dirty) await db.saveVM(guild.id, data).catch(() => {});
+        if (dirty) {
+            const fresh = await db.getVM(guild.id);
+            if (fresh.channels[ch.id]) {
+                fresh.channels[ch.id] = st;
+                await db.saveVM(guild.id, fresh).catch(() => {});
+            }
+        }
         return { ok, msg };
     };
 
-    switch (action) {
-        case 'lock':
-            await ch.permissionOverwrites.edit(everyone, { Connect: false });
-            st.locked = true;
-            return finish(true, 'Locked — only trusted members can join.', true);
-        case 'unlock':
-            await ch.permissionOverwrites.edit(everyone, { Connect: null });
-            st.locked = false;
-            return finish(true, 'Unlocked — anyone can join.', true);
-        case 'hide':
-            await ch.permissionOverwrites.edit(everyone, { ViewChannel: false });
-            st.hidden = true;
-            return finish(true, 'Hidden from the channel list.', true);
-        case 'show':
-            await ch.permissionOverwrites.edit(everyone, { ViewChannel: null });
-            st.hidden = false;
-            return finish(true, 'Visible again.', true);
-        case 'rename': {
-            const name = String(arg || '').trim().slice(0, 100);
-            if (!name) return finish(false, 'Give me a name — e.g. `vc rename Chill Zone`.');
-            await ch.setName(name, 'Kotan voicemaster');
-            return finish(true, `Renamed to **${name}**.`);
+    try {
+        switch (action) {
+            case 'lock':
+                await ch.permissionOverwrites.edit(everyone, { Connect: false });
+                st.locked = true;
+                return finish(true, 'Locked — only trusted members can join.', true);
+            case 'unlock':
+                await ch.permissionOverwrites.edit(everyone, { Connect: null });
+                st.locked = false;
+                return finish(true, 'Unlocked — anyone can join.', true);
+            case 'hide':
+                await ch.permissionOverwrites.edit(everyone, { ViewChannel: false });
+                st.hidden = true;
+                return finish(true, 'Hidden from the channel list.', true);
+            case 'show':
+                await ch.permissionOverwrites.edit(everyone, { ViewChannel: null });
+                st.hidden = false;
+                return finish(true, 'Visible again.', true);
+            case 'rename': {
+                const name = String(arg || '').trim().slice(0, 100);
+                if (!name) return finish(false, 'Give me a name — e.g. `vc rename Chill Zone`.');
+                await ch.setName(name, 'Kotan voicemaster');
+                return finish(true, `Renamed to **${name}**.`);
+            }
+            case 'limitup':
+            case 'limitdn':
+            case 'limit': {
+                let n;
+                if (action === 'limitup') n = (ch.userLimit || 0) + 1;
+                else if (action === 'limitdn') n = (ch.userLimit || 0) - 1;
+                else n = parseInt(arg, 10);
+                if (!Number.isFinite(n)) return finish(false, 'Give me a number — e.g. `vc limit 5` (0 removes the cap).');
+                n = Math.min(Math.max(n, 0), 99);
+                await ch.setUserLimit(n, 'Kotan voicemaster');
+                return finish(true, n ? `User limit set to **${n}**.` : 'User limit removed.');
+            }
+            case 'bitrate': {
+                const n = arg === 'default' || arg === '0' ? 64 : parseInt(arg, 10);
+                if (!Number.isFinite(n)) return finish(false, 'Give me kbps — e.g. `vc bitrate 96` (or `default`).');
+                const capped = clampKbps(guild, n);
+                await ch.setBitrate(capped * 1000, 'Kotan voicemaster');
+                return finish(true, `Bitrate set to **${capped} kbps**.`);
+            }
+            case 'trust': {
+                const t = uid(arg);
+                if (!t) return finish(false, 'Mention or give the ID of who to trust.');
+                st.trusted = [...new Set([...st.trusted, t])];
+                st.blocked = st.blocked.filter((x) => x !== t);
+                await ch.permissionOverwrites.edit(t, { ViewChannel: true, Connect: true });
+                return finish(true, `Trusted <@${t}> — they can always join, even locked.`, true);
+            }
+            case 'untrust': {
+                const t = uid(arg);
+                if (!t) return finish(false, 'Mention or give the ID of who to untrust.');
+                st.trusted = st.trusted.filter((x) => x !== t);
+                if (st.blocked.includes(t)) await ch.permissionOverwrites.edit(t, { ViewChannel: false, Connect: false });
+                else await ch.permissionOverwrites.delete(t).catch(() => {});
+                return finish(true, `Removed <@${t}> from trusted.`, true);
+            }
+            case 'block': {
+                const t = uid(arg);
+                if (!t) return finish(false, 'Mention or give the ID of who to block.');
+                if (t === member.id) return finish(false, "You can't block yourself.");
+                st.blocked = [...new Set([...st.blocked, t])];
+                st.trusted = st.trusted.filter((x) => x !== t);
+                await ch.permissionOverwrites.edit(t, { ViewChannel: false, Connect: false });
+                const inside = ch.members.get(t);
+                if (inside) await inside.voice.disconnect('Blocked from channel by its owner').catch(() => {});
+                return finish(true, `Blocked <@${t}> — they can't see or join the channel.`, true);
+            }
+            case 'unblock': {
+                const t = uid(arg);
+                if (!t) return finish(false, 'Mention or give the ID of who to unblock.');
+                st.blocked = st.blocked.filter((x) => x !== t);
+                if (st.trusted.includes(t)) await ch.permissionOverwrites.edit(t, { ViewChannel: true, Connect: true });
+                else await ch.permissionOverwrites.delete(t).catch(() => {});
+                return finish(true, `Unblocked <@${t}>.`, true);
+            }
+            case 'kick': {
+                const t = uid(arg);
+                const target = t && ch.members.get(t);
+                if (!target) return finish(false, 'That member is not in your channel.');
+                if (target.id === member.id) return finish(false, "You can't kick yourself — just leave.");
+                await target.voice.disconnect('Kicked by channel owner').catch(() => {});
+                return finish(true, `Kicked **${target.displayName}** out of the channel.`);
+            }
+            case 'transfer': {
+                const t = uid(arg);
+                const target = t && ch.members.get(t);
+                if (!target) return finish(false, 'They have to be in the channel to take it over.');
+                if (target.id === member.id) return finish(false, "It's already yours.");
+                st.owner = target.id;
+                await ch.permissionOverwrites.edit(target.id, { ViewChannel: true, Connect: true }).catch(() => {});
+                return finish(true, `Ownership transferred to **${target.displayName}**.`, true);
+            }
+            case 'invite': {
+                const inv = await ch.createInvite({ maxAge: 86400 }).catch(() => null);
+                if (!inv) return finish(false, "Couldn't create an invite — check my permissions.");
+                return finish(true, `Share this (expires in 24h): ${inv.url}`);
+            }
+            case 'info':
+                return finish(
+                    true,
+                    `**${ch.name}** — owner <@${st.owner}> · ${ch.members.size}${ch.userLimit ? `/${ch.userLimit}` : ''} connected · ` +
+                        `${st.locked ? E.lock : E.unlock} ${st.hidden ? `${E.hide} hidden`.trim() : 'visible'} · ` +
+                        `${st.trusted.length} trusted · ${st.blocked.length} blocked`
+                );
+            default:
+                return finish(false, 'Unknown action.');
         }
-        case 'limitup':
-        case 'limitdn':
-        case 'limit': {
-            let n;
-            if (action === 'limitup') n = (ch.userLimit || 0) + 1;
-            else if (action === 'limitdn') n = (ch.userLimit || 0) - 1;
-            else n = parseInt(arg, 10);
-            if (!Number.isFinite(n)) return finish(false, 'Give me a number — e.g. `vc limit 5` (0 removes the cap).');
-            n = Math.min(Math.max(n, 0), 99);
-            await ch.setUserLimit(n, 'Kotan voicemaster');
-            return finish(true, n ? `User limit set to **${n}**.` : 'User limit removed.');
-        }
-        case 'bitrate': {
-            const n = arg === 'default' || arg === '0' ? 64 : parseInt(arg, 10);
-            if (!Number.isFinite(n)) return finish(false, 'Give me kbps — e.g. `vc bitrate 96` (or `default`).');
-            const capped = clampKbps(guild, n);
-            await ch.setBitrate(capped * 1000, 'Kotan voicemaster');
-            return finish(true, `Bitrate set to **${capped} kbps**.`);
-        }
-        case 'trust': {
-            const t = uid(arg);
-            if (!t) return finish(false, 'Mention or give the ID of who to trust.');
-            st.trusted = [...new Set([...st.trusted, t])];
-            st.blocked = st.blocked.filter((x) => x !== t);
-            await ch.permissionOverwrites.edit(t, { ViewChannel: true, Connect: true });
-            return finish(true, `Trusted <@${t}> — they can always join, even locked.`, true);
-        }
-        case 'untrust': {
-            const t = uid(arg);
-            if (!t) return finish(false, 'Mention or give the ID of who to untrust.');
-            st.trusted = st.trusted.filter((x) => x !== t);
-            if (st.blocked.includes(t)) await ch.permissionOverwrites.edit(t, { ViewChannel: false, Connect: false });
-            else await ch.permissionOverwrites.delete(t).catch(() => {});
-            return finish(true, `Removed <@${t}> from trusted.`, true);
-        }
-        case 'block': {
-            const t = uid(arg);
-            if (!t) return finish(false, 'Mention or give the ID of who to block.');
-            if (t === member.id) return finish(false, "You can't block yourself.");
-            st.blocked = [...new Set([...st.blocked, t])];
-            st.trusted = st.trusted.filter((x) => x !== t);
-            await ch.permissionOverwrites.edit(t, { ViewChannel: false, Connect: false });
-            const inside = ch.members.get(t);
-            if (inside) await inside.voice.disconnect('Blocked from channel by its owner').catch(() => {});
-            return finish(true, `Blocked <@${t}> — they can't see or join the channel.`, true);
-        }
-        case 'unblock': {
-            const t = uid(arg);
-            if (!t) return finish(false, 'Mention or give the ID of who to unblock.');
-            st.blocked = st.blocked.filter((x) => x !== t);
-            if (st.trusted.includes(t)) await ch.permissionOverwrites.edit(t, { ViewChannel: true, Connect: true });
-            else await ch.permissionOverwrites.delete(t).catch(() => {});
-            return finish(true, `Unblocked <@${t}>.`, true);
-        }
-        case 'kick': {
-            const t = uid(arg);
-            const target = t && ch.members.get(t);
-            if (!target) return finish(false, 'That member is not in your channel.');
-            if (target.id === member.id) return finish(false, "You can't kick yourself — just leave.");
-            await target.voice.disconnect('Kicked by channel owner').catch(() => {});
-            return finish(true, `Kicked **${target.displayName}** out of the channel.`);
-        }
-        case 'transfer': {
-            const t = uid(arg);
-            const target = t && ch.members.get(t);
-            if (!target) return finish(false, 'They have to be in the channel to take it over.');
-            if (target.id === member.id) return finish(false, "It's already yours.");
-            st.owner = target.id;
-            await ch.permissionOverwrites.edit(target.id, { ViewChannel: true, Connect: true }).catch(() => {});
-            return finish(true, `Ownership transferred to **${target.displayName}**.`, true);
-        }
-        case 'invite': {
-            const inv = await ch.createInvite({ maxAge: 86400 }).catch(() => null);
-            if (!inv) return finish(false, "Couldn't create an invite — check my permissions.");
-            return finish(true, `Share this (expires in 24h): ${inv.url}`);
-        }
-        case 'info':
-            return finish(
-                true,
-                `**${ch.name}** — owner <@${st.owner}> · ${ch.members.size}${ch.userLimit ? `/${ch.userLimit}` : ''} connected · ` +
-                    `${st.locked ? E.lock : E.unlock} ${st.hidden ? `${E.hide} hidden`.trim() : 'visible'} · ` +
-                    `${st.trusted.length} trusted · ${st.blocked.length} blocked`
-            );
-        default:
-            return finish(false, 'Unknown action.');
+    } catch (err) {
+        return finish(false, `Action failed: ${err.message}`);
     }
 }
 

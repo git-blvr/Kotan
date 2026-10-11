@@ -26,10 +26,13 @@ async function awardXp(message, settings) {
     profile.lastXp = now;
 
     let leveled = false;
-    while (profile.xp >= xpForLevel(profile.level)) {
+    // Safety cap: prevent blocking the event loop on extreme XP grants.
+    let iterations = 0;
+    while (profile.xp >= xpForLevel(profile.level) && iterations < 500) {
         profile.xp -= xpForLevel(profile.level);
         profile.level++;
         leveled = true;
+        iterations++;
     }
     await db.saveProfile(message.guild.id, message.author.id, profile);
     if (!leveled) return;

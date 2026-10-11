@@ -18,6 +18,7 @@ const welcomeImg = require('../../utils/welcomeImg');
 const { dominantColor, toHex, ALLOWED_IMAGE_HOSTS } = require('../../utils/dominantColor');
 const commands = require('../config/commands');
 const modules = require('../config/modules');
+const studioRenderer = require('../../utils/studioRenderer');
 
 const permName = (bit) => {
     const key = Object.entries(PermissionFlagsBits).find(([, v]) => v === bit)?.[0];
@@ -162,8 +163,12 @@ module.exports = async (app) => {
             const v = (await settings.getSettings(req.guild.id)).voicemaster;
             if (!v?.enabled) return reply.code(400).send({ error: 'VoiceMaster is disabled — enable and save first' });
             if (!v.triggerId) return reply.code(400).send({ error: 'Pick a trigger channel first' });
-            await ch.send(await voicemaster.panelPayload(req.guild, v)).catch(() => {});
-            return reply.send({ ok: true });
+            try {
+                await ch.send(await voicemaster.panelPayload(req.guild, v));
+                return reply.send({ ok: true });
+            } catch (err) {
+                return reply.code(400).send({ error: `Failed to post panel: ${err.message}` });
+            }
         });
 
         // Posts the ticket panel into a channel — used by the dashboard's
@@ -173,8 +178,12 @@ module.exports = async (app) => {
             if (!ch || !ch.isTextBased()) return reply.code(400).send({ error: 'Unknown channel' });
             const t = (await settings.getSettings(req.guild.id)).tickets;
             if (!t?.enabled) return reply.code(400).send({ error: 'Tickets are disabled — enable and save first' });
-            await ch.send(await tickets.panelPayload(req.guild, t)).catch(() => {});
-            return reply.send({ ok: true });
+            try {
+                await ch.send(await tickets.panelPayload(req.guild, t));
+                return reply.send({ ok: true });
+            } catch (err) {
+                return reply.code(400).send({ error: `Failed to post panel: ${err.message}` });
+            }
         });
 
         // Posts the CAPTCHA verify panel — same "Post panel" pattern as tickets.
@@ -184,8 +193,12 @@ module.exports = async (app) => {
             const c = (await settings.getSettings(req.guild.id)).captcha;
             if (!c?.enabled) return reply.code(400).send({ error: 'CAPTCHA is disabled — enable and save first' });
             if (!c.roleId) return reply.code(400).send({ error: 'Pick a verified role first — nothing to grant otherwise' });
-            await ch.send(await captcha.panelPayload(req.guild, c)).catch(() => {});
-            return reply.send({ ok: true });
+            try {
+                await ch.send(await captcha.panelPayload(req.guild, c));
+                return reply.send({ ok: true });
+            } catch (err) {
+                return reply.code(400).send({ error: `Failed to post panel: ${err.message}` });
+            }
         });
 
         // Test-fire the welcome message — posts the draft from the editor
@@ -201,8 +214,12 @@ module.exports = async (app) => {
             const image = { elements: [] }; settings.SECTIONS.welcomeImage(image, req.body?.image || {});
             let payload = await memberPayload(member, embed, req.body?.message || 'Welcome {user}!');
             if (image.enabled) payload = await welcomeImg.attach(member, payload, image);
-            await ch.send(payload).catch(() => {});
-            return reply.send({ ok: true });
+            try {
+                await ch.send(payload);
+                return reply.send({ ok: true });
+            } catch (err) {
+                return reply.code(400).send({ error: `Failed to send test message: ${err.message}` });
+            }
         });
 
         // Card editors' "dominant color" button — picks the accent matching
@@ -236,7 +253,17 @@ module.exports = async (app) => {
                 db.getAudit(id, 15),
                 db.getRecentModActions(id, 5),
             ]);
-            return reply.send({ usage, growth, mod, audit, recent, ping: req.client?.ws.ping ?? -1 });
+            const pres = req.client?.user?.presence;
+            const act = pres?.activities?.find((a) => a.type !== 4) || pres?.activities?.[0];
+            return reply.send({
+                usage, growth, mod, audit, recent, ping: req.client?.ws.ping ?? -1,
+                bot: {
+                    uptime: req.client?.uptime ?? -1,
+                    status: pres?.status || 'online',
+                    activity: act?.name || act?.state || null, atype: act?.type ?? null,
+                    guilds: req.client?.guilds?.cache?.size ?? 0,
+                },
+            });
         });
 
         // Activity page leaderboards — per-user message/voice totals and
@@ -365,6 +392,85 @@ module.exports = async (app) => {
         gg.delete('/tags/:name', { preHandler: mutLimit }, async (req, reply) => {
             const ok = await db.deleteTag(req.guild.id, req.params.name);
             return reply.code(ok ? 200 : 404).send({ ok });
+        });
+
+        // Studio & Variables (Rust Skia Accelerated)
+        gg.post('/studio/render', { preHandler: uploadLimit }, async (req, reply) => {
+            const { type = 'image', config = {}, vars = {} } = req.body || {};
+            try {
+                const member = req.guild ? await req.guild.members.fetch(req.session.user.id).catch(() => null) : null;
+                const dynamicVars = {
+                    user: member ? `<@${member.id}>` : `@${req.session.user.username}`,
+                    username: member?.displayName || req.session.user.username,
+                    server: req.guild.name,
+                    members: req.guild.memberCount,
+                    ...vars,
+                };
+                if (type === 'gif') {
+                    const res = await studioRenderer.renderGif(config, dynamicVars);
+                    return reply.send({ ok: true, dataUrl: res.dataUrl, durationMs: res.renderTimeMs, engine: 'Rust (@napi-rs/canvas)' });
+                } else {
+                    const res = await studioRenderer.renderImage(config, dynamicVars);
+                    return reply.send({ ok: true, dataUrl: res.dataUrl, durationMs: res.renderTimeMs, engine: 'Rust (@napi-rs/canvas)' });
+                }
+            } catch (err) {
+                return reply.code(400).send({ ok: false, error: err.message });
+            }
+        });
+
+        gg.get('/studio/variables', async (req, reply) => {
+            const s = await settings.getSettings(req.guild.id);
+            return reply.send({ ok: true, variables: s.studio?.variables || {} });
+        });
+
+        gg.post('/studio/variables', { preHandler: mutLimit }, async (req, reply) => {
+            const { name, type = 'image', config = {}, dataUrl = null } = req.body || {};
+            const cleanName = String(name || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+            if (!cleanName || cleanName.length > 40) {
+                return reply.code(400).send({ ok: false, error: 'Variable name must be 1-40 alphanumeric characters' });
+            }
+            const s = await settings.getSettings(req.guild.id);
+            if (!s.studio) s.studio = { variables: {} };
+            s.studio.variables[cleanName] = {
+                name: cleanName,
+                type: type === 'gif' ? 'gif' : 'image',
+                config,
+                dataUrl,
+                updatedAt: Date.now(),
+            };
+            await db.saveGuildSettings(req.guild.id, s);
+            return reply.send({ ok: true, name: cleanName, variable: s.studio.variables[cleanName] });
+        });
+
+        gg.delete('/studio/variables/:name', { preHandler: mutLimit }, async (req, reply) => {
+            const cleanName = String(req.params.name || '').trim().toLowerCase();
+            const s = await settings.getSettings(req.guild.id);
+            if (!s.studio?.variables?.[cleanName]) return reply.code(404).send({ ok: false });
+            delete s.studio.variables[cleanName];
+            await db.saveGuildSettings(req.guild.id, s);
+            return reply.send({ ok: true });
+        });
+
+        gg.get('/studio/asset/:name', async (req, reply) => {
+            const cleanName = String(req.params.name || '').trim().toLowerCase();
+            const s = await settings.getSettings(req.guild.id);
+            const v = s.studio?.variables?.[cleanName];
+            if (!v) return reply.code(404).send({ error: 'Asset not found' });
+            try {
+                const dynamicVars = {
+                    server: req.guild.name,
+                    members: req.guild.memberCount,
+                };
+                if (v.type === 'gif') {
+                    const res = await studioRenderer.renderGif(v.config, dynamicVars);
+                    return reply.type('image/gif').send(res.buffer);
+                } else {
+                    const res = await studioRenderer.renderImage(v.config, dynamicVars);
+                    return reply.type('image/png').send(res.buffer);
+                }
+            } catch (err) {
+                return reply.code(500).send({ error: err.message });
+            }
         });
     }, { prefix: '/api/guilds/:id' });
 

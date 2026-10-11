@@ -5,7 +5,7 @@ const { dominantColor } = require('../../utils/dominantColor');
 const { fromMessage, fromInteraction } = require('../../helpers/ctx');
 
 async function run(ctx) {
-    const guild = await ctx.guild.fetch(); // fresh counts + boost data
+    const guild = await ctx.guild.fetch().catch(() => ctx.guild); // fresh counts + boost data
     const owner = await guild.fetchOwner().catch(() => null);
 
     const channels = guild.channels.cache;

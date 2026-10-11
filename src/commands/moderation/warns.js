@@ -102,12 +102,19 @@ module.exports = {
     slash: [
         { name: 'member', description: 'Whose warns to list (default: you)', type: Opt.User },
     ],
-    execute: async (message, args) =>
-        run(fromMessage(message), args[0] ? await resolveMember(message, args[0]) : message.member),
-    executeSlash: (interaction) =>
-        run(
-            fromInteraction(interaction),
-            interaction.options.getMember('member') ?? interaction.member
-        ),
+    execute: async (message, args) => {
+        let target = args[0] ? await resolveMember(message, args[0]) : message.member;
+        if (!target && !args[0] && message.guild) {
+            target = await message.guild.members.fetch(message.author.id).catch(() => null);
+        }
+        return run(fromMessage(message), target);
+    },
+    executeSlash: async (interaction) => {
+        let target = interaction.options.getMember('member') ?? interaction.member;
+        if (!target && interaction.guild) {
+            target = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+        }
+        return run(fromInteraction(interaction), target);
+    },
     executeComponent,
 };

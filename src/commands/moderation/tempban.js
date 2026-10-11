@@ -34,9 +34,13 @@ async function run(ctx, user, durationInput, reason) {
         tag = userId;
     }
 
-    await ctx.guild.members.ban(userId, {
-        reason: `Tempban ${formatDuration(duration)}: ${reason} — by ${ctx.user.tag}`,
-    });
+    try {
+        await ctx.guild.members.ban(userId, {
+            reason: `Tempban ${formatDuration(duration)}: ${reason} — by ${ctx.user.tag}`,
+        });
+    } catch (err) {
+        return sendError(ctx, `Failed to ban: ${err.message}`);
+    }
     await db.setTempban(ctx.guild.id, userId, {
         unbanAt,
         moderatorId: ctx.user.id,

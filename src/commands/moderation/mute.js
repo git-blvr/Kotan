@@ -21,7 +21,11 @@ async function run(ctx, target, durationInput, reason) {
         return sendError(ctx, 'Invalid duration. Examples: `30s`, `10m`, `1h30m`, `2d`.');
     if (duration > MAX_TIMEOUT) return sendError(ctx, 'Timeouts cannot exceed 28 days.');
 
-    await target.timeout(duration, `${reason} — by ${ctx.user.tag}`);
+    try {
+        await target.timeout(duration, `${reason} — by ${ctx.user.tag}`);
+    } catch (err) {
+        return sendError(ctx, `Failed to mute: ${err.message}`);
+    }
     logModAction(ctx.client, ctx.guild.id, {
         action: 'Mute',
         target: `${target.user.tag} (${target.id})`,

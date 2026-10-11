@@ -68,7 +68,7 @@ async function logEvent(client, guildId, type, fields) {
             color: config.colors[meta.color] || config.colors.main,
             title: meta.title,
             fields,
-            footer: { text: `<t:${Math.floor(Date.now() / 1000)}:f>` },
+            footer: { text: new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) },
         });
         await channel.send(cv2(container));
     } catch (err) {

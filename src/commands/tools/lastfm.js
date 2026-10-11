@@ -91,8 +91,8 @@ async function nowPlaying(ctx, user) {
     if (!t) return sendError(ctx, `**${name}** hasn't scrobbled anything yet.`);
 
     const playing = t['@attr']?.nowplaying === 'true' || t['@attr']?.nowplaying === true;
-    const artist = t.artist['#text'];
-    const album = t.album?.['#text'];
+    const artist = typeof t.artist === 'string' ? t.artist : t.artist?.['#text'] || t.artist?.name || 'Unknown Artist';
+    const album = t.album?.['#text'] || t.album?.name;
     // Extra call: the user's own playcount for this track.
     const ti = await fm.call('track.getInfo', { user: name, track: t.name, artist });
     const plays = ti.track?.userplaycount ? `${fm.num(ti.track.userplaycount)} plays` : null;
@@ -129,7 +129,8 @@ async function recentTracks(ctx, user, count = 10) {
     const lines = tracks.map((t, i) => {
         const np = t['@attr']?.nowplaying === 'true' || t['@attr']?.nowplaying === true;
         const when = np ? 'now' : t.date?.uts ? timestamp(t.date.uts * 1000) : '';
-        return `**${i + 1}.** [${t.name}](${t.url}) — ${t.artist['#text']}${when ? ` · ${when}` : ''}`;
+        const aName = typeof t.artist === 'string' ? t.artist : t.artist?.['#text'] || t.artist?.name || 'Unknown Artist';
+        return `**${i + 1}.** [${t.name}](${t.url}) — ${aName}${when ? ` · ${when}` : ''}`;
     });
     return ctx.reply(
         cv2(base({ color: RED, author: `Recent tracks — ${user.username}`, description: lines.join('\n'), footer: `last.fm/user/${name}` }))
@@ -320,7 +321,8 @@ async function plays(ctx, user, query) {
     if (!artist) {
         const r = await fm.call('user.getRecentTracks', { user: name, limit: 1 });
         if (r.err) return errMsg(ctx, r.err, name);
-        artist = r.recenttracks?.track?.[0]?.artist?.['#text'];
+        const t = r.recenttracks?.track?.[0];
+        artist = typeof t?.artist === 'string' ? t.artist : t?.artist?.['#text'] || t?.artist?.name;
         if (!artist) return sendError(ctx, `**${name}** hasn't scrobbled anything yet.`);
     }
     const d = await fm.call('artist.getInfo', { artist, username: name });
@@ -345,8 +347,10 @@ async function cover(ctx, user, query) {
     if (!p) {
         const r = await fm.call('user.getRecentTracks', { user: name, limit: 1 });
         const t = r.recenttracks?.track?.[0];
-        if (!t?.album?.['#text']) return sendError(ctx, 'No album to show — play something or give me `Artist - Album`.');
-        p = { artist: t.artist['#text'], name: t.album['#text'] };
+        const albumName = typeof t?.album === 'string' ? t.album : t?.album?.['#text'] || t?.album?.name;
+        const artistName = typeof t?.artist === 'string' ? t.artist : t?.artist?.['#text'] || t?.artist?.name;
+        if (!albumName) return sendError(ctx, 'No album to show — play something or give me `Artist - Album`.');
+        p = { artist: artistName, name: albumName };
     }
     const d = await fm.call('album.getInfo', { artist: p.artist, album: p.name });
     if (d.err) return errMsg(ctx, d.err, `${p.artist} - ${p.name}`);

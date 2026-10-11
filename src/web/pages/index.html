@@ -3,392 +3,521 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Kotan | Landpage</title>
+<title>Kotan — Next-Gen Discord Community Bot &amp; Dashboard</title>
 <link rel="icon" type="image/png" href="/assets/icon.png">
-<meta name="description" content="Kotan is a configurable Discord bot: moderation, automod, economy, games, leveling and logging — all per-server.">
+<meta name="description" content="Kotan is a high-performance modular Discord bot featuring automod, dynamic VoiceMaster channels, leveling, rich economy, and next-gen Components V2 embeds.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<style>
-    /* accent pulled from her hair: red-orange */
-    :root {
-        --accent: #E8622E;
-        --accent-2: #C94E20;
-        --accent-soft: rgba(232, 98, 46, 0.15);
-
-        --bg: #14151B;
-        --panel: #1D1F29;
-        --panel-2: #23252f;
-        --border: rgba(244, 240, 232, 0.09);
-        --text: #F4F0E8;
-        --text-2: #b8bcc9;
-        --muted: #9CA1B4;
-        --r: 18px;
-        --speed: .18s;
-    }
-    @media (prefers-color-scheme: light) {
-        :root:not([data-mode="dark"]) {
-            --bg: #FAF5EE;
-            --panel: #ffffff;
-            --panel-2: #f3ede2;
-            --border: rgba(42, 32, 22, 0.12);
-            --text: #26211b;
-            --text-2: #4d4438;
-            --muted: #84796a;
-            --accent: #D9541F;
-            --accent-2: #B8441A;
-            --accent-soft: rgba(217, 84, 31, 0.12);
-        }
-    }
-    :root[data-mode="light"] {
-        --bg: #FAF5EE; --panel: #ffffff; --panel-2: #f3ede2;
-        --border: rgba(42, 32, 22, 0.12);
-        --text: #26211b; --text-2: #4d4438; --muted: #84796a;
-        --accent: #D9541F; --accent-2: #B8441A; --accent-soft: rgba(217, 84, 31, 0.12);
-    }
-
-    * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
-    body {
-        margin: 0; background: var(--bg); color: var(--text);
-        font: 400 16px/1.6 'Inter', system-ui, sans-serif;
-        transition: background var(--speed), color var(--speed);
-        touch-action: pan-y;
-    }
-    h1, h2, h3, .brand { font-family: 'Baloo 2', 'Inter', system-ui, sans-serif; }
-    a { color: var(--accent); text-decoration: none; transition: color var(--speed); }
-    a:hover { color: var(--accent-2); }
-    .wrap { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
-
-    /* springy ease for anything that moves — transitions only */
-    :root { --spring: cubic-bezier(0.34, 1.56, 0.64, 1); --ease-out: cubic-bezier(0.22, 1, 0.36, 1); }
-
-    /* ---------- floating pill nav ---------- */
-    .nav-wrap {
-        position: sticky; top: 14px; z-index: 50;
-        max-width: 1060px; margin: 16px auto 0; padding: 0 20px;
-    }
-    .nav {
-        display: flex; align-items: center; gap: 24px;
-        height: 58px; padding: 0 10px 0 20px;
-        border-radius: 999px; border: 1px solid var(--border);
-        background: color-mix(in srgb, var(--panel) 78%, transparent);
-        backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-        box-shadow: 0 10px 34px rgba(0, 0, 0, 0.35);
-    }
-    .brand { display: flex; align-items: center; gap: 10px; color: var(--text); font-size: 21px; font-weight: 800; letter-spacing: .2px; }
-    .brand:hover { color: var(--text); }
-    .nav-links { display: flex; gap: 4px; margin: 0 auto; align-items: center; }
-    .nav-links a {
-        position: relative; width: 38px; height: 38px; flex: none;
-        display: flex; align-items: center; justify-content: center; justify-content: safe center;
-        color: var(--text-2); font-weight: 500; font-size: 15px;
-        background: var(--panel-2); border-radius: 999px; overflow: hidden;
-        transition: width 0.55s cubic-bezier(0.22, 1, 0.36, 1), color 0.35s ease,
-                    background-color 0.35s ease, transform 0.3s var(--spring);
-    }
-    .nav-links a:hover, .nav-links a:focus-visible { width: 132px; }
-    .nav-ic {
-        position: absolute; top: 50%; left: calc(50% - 9.5px);
-        width: 19px; height: 19px; transform: translateY(-50%);
-        transition: left 0.55s cubic-bezier(0.22, 1, 0.36, 1);
-    }
-    .nav-label {
-        position: absolute; top: 50%; left: 27px; white-space: nowrap;
-        max-width: calc(100% - 58px); overflow: hidden;
-        opacity: 0; transform: translateY(-50%);
-        transition: opacity 0.3s ease 0.06s, left 0.5s cubic-bezier(0.22, 1, 0.36, 1);
-    }
-    .nav-links a:hover .nav-ic, .nav-links a:focus-visible .nav-ic {
-        left: calc(100% - 30px);
-    }
-    .nav-links a:hover .nav-label, .nav-links a:focus-visible .nav-label {
-        opacity: 1; left: 17px;
-    }
-    .nav-links a:hover { color: var(--accent); background: var(--accent-soft); transform: translateY(-1px); }
-    .nav-links a.active { color: var(--accent); background: var(--accent-soft); }
-    #nav-user { display: flex; align-items: center; gap: 8px; color: var(--text-2); font-size: 14px; }
-    #nav-user img { width: 26px; height: 26px; border-radius: 50%; }
-
-    .btn {
-        display: inline-flex; align-items: center; gap: 8px;
-        font: 600 15px 'Inter', sans-serif; padding: 12px 22px;
-        border-radius: 12px; border: 1px solid transparent; cursor: pointer;
-        transition: background var(--speed), border-color var(--speed), color var(--speed),
-                    transform 0.3s var(--spring), box-shadow var(--speed);
-    }
-    .btn:active { transform: translateY(0) scale(0.97); }
-    .btn.sm { padding: 9px 16px; font-size: 13.5px; border-radius: 999px; }
-    .btn.js-cta.nav-cta { width: 40px; height: 38px; padding: 0; justify-content: center; justify-content: safe center; }
-    .nav-cta .cta-ic { width: 20px; height: 20px; }
-    .btn.primary { background: var(--accent); color: #fff; }
-    .btn.primary:hover { background: var(--accent-2); color: #fff; transform: translateY(-2px); box-shadow: 0 8px 22px rgba(232, 98, 46, 0.35); }
-    .btn.ghost { border-color: var(--border); color: var(--text-2); background: transparent; }
-    .btn.ghost:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-2px); }
-
-    /* ---------- hero ---------- */
-    .hero {
-        display: grid; grid-template-columns: minmax(280px, 400px) 1fr;
-        gap: 56px; align-items: center;
-        padding: 64px 0 56px; min-height: 480px;
-    }
-    .hero-img { position: relative; display: flex; justify-content: center; justify-content: safe center; }
-    .hero-img::before {
-        content: ''; position: absolute; left: 50%; top: 50%;
-        width: 115%; padding-top: 115%; transform: translate(-50%, -52%);
-        background: radial-gradient(circle, var(--accent-soft), rgba(232, 98, 46, 0.07) 46%, transparent 68%);
-        border-radius: 50%; pointer-events: none;
-    }
-    .hero-img img {
-        position: relative; width: 100%; max-width: 360px; height: auto;
-        filter: drop-shadow(0 18px 34px rgba(0, 0, 0, 0.4));
-    }
-    .hero h1 {
-        font-size: clamp(38px, 5.2vw, 56px); font-weight: 800;
-        line-height: 1.08; margin: 0 0 16px; letter-spacing: -0.5px;
-    }
-    .hero h1 em { font-style: normal; color: var(--accent); }
-    .sub { font-size: 17px; color: var(--text-2); max-width: 480px; margin: 0 0 26px; }
-    .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 30px; }
-
-    .stats { display: flex; gap: 34px; }
-    .bstat { display: flex; flex-direction: column; }
-    .bstat b { font-family: 'Baloo 2', sans-serif; font-size: 26px; font-weight: 800; color: var(--accent); line-height: 1.15; }
-    .bstat span { font-size: 13px; color: var(--muted); }
-
-    /* ---------- features ---------- */
-    .features { padding: 24px 0 70px; }
-    .features h2 { font-size: 30px; font-weight: 700; margin: 0 0 8px; }
-    .features > p { color: var(--text-2); margin: 0 0 30px; max-width: 520px; }
-    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-    .feature {
-        position: relative; overflow: hidden;
-        background: var(--panel); border: 1px solid var(--border);
-        border-radius: var(--r); padding: 22px;
-        transition: border-color var(--speed), transform 0.35s var(--spring);
-    }
-    /* accent hairline that draws itself across the card top */
-    .feature::after {
-        content: ''; position: absolute; top: 0; left: 22px; right: 22px;
-        height: 2px; border-radius: 2px; background: var(--accent);
-        transform: scaleX(0); transform-origin: left;
-        transition: transform 0.32s var(--ease-out);
-    }
-    /* soft accent wash fading in behind the content */
-    .feature::before {
-        content: ''; position: absolute; inset: 0;
-        background: radial-gradient(340px 170px at 18% -12%, var(--accent-soft), transparent 70%);
-        opacity: 0; transition: opacity 0.35s var(--ease-out);
-        pointer-events: none;
-    }
-    .feature > * { position: relative; }
-    .feature:hover { border-color: var(--accent); transform: translateY(-4px); }
-    .feature:hover::before { opacity: 1; }
-    .feature:hover::after { transform: scaleX(1); }
-    .feature .icon {
-        width: 42px; height: 42px; border-radius: 12px;
-        background: var(--accent-soft); color: var(--accent);
-        display: grid; place-items: center; margin-bottom: 14px;
-        transition: background var(--speed), transform 0.3s var(--spring);
-    }
-    .feature:hover .icon { transform: scale(1.08) rotate(-4deg); }
-    .feature h3 { font-size: 18px; font-weight: 700; margin: 0 0 6px; transition: color var(--speed); }
-    .feature:hover h3 { color: var(--accent); }
-    .feature h3 { font-size: 18px; font-weight: 700; margin: 0 0 6px; }
-    .feature p { font-size: 14.5px; color: var(--text-2); margin: 0; }
-
-    /* ---------- footer ---------- */
-    footer { border-top: 1px solid var(--border); padding: 26px 0; color: var(--muted); font-size: 13.5px; }
-    .foot { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
-    .foot .links { display: flex; gap: 18px; margin-left: auto; }
-    .foot .links a { color: var(--muted); position: relative; }
-    .foot .links a::after {
-        content: ''; position: absolute; left: 0; right: 0; bottom: -3px;
-        height: 1.5px; border-radius: 2px; background: var(--accent);
-        transform: scaleX(0); transform-origin: left;
-        transition: transform 0.25s var(--ease-out);
-    }
-    .foot .links a:hover { color: var(--accent); }
-    .foot .links a:hover::after { transform: scaleX(1); }
-
-    @media (max-width: 880px) {
-        .hero { grid-template-columns: 1fr; gap: 34px; padding: 40px 0 50px; text-align: center; }
-        .hero-img img { max-width: 280px; }
-        .sub { margin-left: auto; margin-right: auto; }
-        .hero-actions, .stats { justify-content: center; justify-content: safe center; }
-        .grid { grid-template-columns: repeat(2, 1fr); }
-        .nav-links a:not(.btn) { display: none; }
-        .nav { gap: 14px; }
-    }
-    @media (max-width: 560px) {
-        .grid { grid-template-columns: 1fr; }
-        .bstat { padding: 12px 18px; }
-        .hero { padding-top: 28px; }
-        .nav { height: 52px; padding-left: 16px; }
-    }
-    [data-motion="off"] *, [data-motion="off"] *::before, [data-motion="off"] *::after { animation: none !important; }
-    [data-motion="off"] html, html[data-motion="off"] { scroll-behavior: auto; }
-
-    /* ---------- stage slider: page never scrolls; wheel blurs one screen out, next in ---------- */
-    body.fppage { height: 100vh; height: 100dvh; overflow: hidden; }
-    .fp { height: 100vh; height: 100dvh; overflow: hidden; position: relative; }
-    .fp > .nav-wrap { position: fixed; top: 14px; left: 0; right: 0; z-index: 50; }
-    .fpsec {
-        position: absolute; inset: 0;
-        display: flex; flex-direction: column; justify-content: center; justify-content: safe center;
-        padding: 96px 24px 72px; /* clearance for the fixed nav + footer bar */
-        overflow-y: auto; /* escape hatch: ultra-tall content can still reach its top */
-        scrollbar-width: none; /* keep it swipeable without a visible bar */
-        -ms-overflow-style: none;
-        opacity: 0; transform: scale(.985); filter: blur(14px);
-        visibility: hidden; pointer-events: none;
-        transition: opacity .55s ease, transform .75s cubic-bezier(.2,.7,.3,1), filter .55s ease, visibility 0s .75s;
-    }
-    .fpsec::-webkit-scrollbar { display: none; }
-    .fpsec.on {
-        opacity: 1; transform: none; filter: none;
-        visibility: visible; pointer-events: auto;
-        transition-delay: 0s;
-    }
-    /* dead-end hint above the footer bar — shown when wheeling past the end */
-    .backhint {
-        position: fixed; left: 50%; bottom: 60px; transform: translate(-50%, 8px);
-        z-index: 60; padding: 7px 16px; border-radius: 999px;
-        background: rgba(20,22,28,.72); border: 1px solid var(--border);
-        backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-        color: var(--muted); font-size: 12.5px; letter-spacing: .02em;
-        opacity: 0; pointer-events: none;
-        transition: opacity .35s ease, transform .35s ease;
-    }
-    .backhint.on { opacity: 1; transform: translate(-50%, 0); }
-    @media (max-width: 900px) { .backhint { display: none; } }
-
-    /* compact footer bar pinned to the stage bottom (not its own screen) */
-    .fppage .fbar {
-        position: absolute; left: 0; right: 0; bottom: 0; z-index: 40;
-        padding: 10px 0;
-        background: color-mix(in srgb, var(--bg) 55%, transparent);
-        backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-    }
-    /* page-sweep veil: blurs the screen, then navigates */
-    .sweep {
-        position: fixed; inset: -2%; z-index: 999; pointer-events: all;
-        background: color-mix(in srgb, var(--bg) 78%, transparent);
-        backdrop-filter: blur(0px) saturate(1); -webkit-backdrop-filter: blur(0px) saturate(1);
-        opacity: 0; transform: scale(1.04);
-        transition: opacity .5s ease, transform .55s cubic-bezier(.2,.7,.3,1), backdrop-filter .5s ease;
-    }
-    .sweep.go { opacity: 1; backdrop-filter: blur(22px) saturate(1.3); -webkit-backdrop-filter: blur(22px) saturate(1.3); transform: none; }
-    /* children cascade in once their section is active */
-    .sdi {
-        opacity: 0; transform: translateY(26px); filter: blur(9px);
-        transition: opacity .6s cubic-bezier(.2,.7,.3,1), transform .6s cubic-bezier(.2,.7,.3,1), filter .6s cubic-bezier(.2,.7,.3,1);
-        transition-delay: var(--rvd, 0ms);
-        transition-property: opacity, transform, filter;
-    }
-    .fpsec.on .sdi { opacity: 1; transform: none; filter: none; }
-    /* fab Motion=off kills the transitions; OS prefers-reduced-motion is not
-       consulted — this page's core presentation is the animation */
-    [data-motion="off"] .fpsec, [data-motion="off"] .sdi,
-    [data-motion="off"] .backhint { transition: none; }
-    @media (max-width: 900px) {
-        body.fppage { height: auto; overflow: auto; }
-        .fp { height: auto; overflow: visible; }
-        .fpsec { position: static; min-height: 0; padding: 40px 0; opacity: 1; transform: none; filter: none; visibility: visible; pointer-events: auto; }
-        .fpsec .sdi, .sdi { opacity: 1; transform: none; filter: none; }
-        .fppage .fbar { position: static; }
-    }
-</style>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;750;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/stylesheets/tokens.css">
+<link rel="stylesheet" href="/stylesheets/site.css?v=20">
+<script src="/script/site.js?v=25" defer></script>
 </head>
-<body class="fppage">
+<body>
 
-<div class="fp">
+<!-- Floating Glass Navbar -->
 <div class="nav-wrap">
-    <nav class="nav">
-        <a class="brand" href="/">Kotan</a>
+    <nav class="nav" id="main-nav">
+        <a class="brand" href="/" aria-label="Kotan Home">
+            <span class="brand-mark">K</span>
+            <span>Kotan</span>
+        </a>
+
         <div class="nav-links">
-            <a href="/" data-nav="home"><span class="nav-label">Home</span><svg class="nav-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-7 8 7"/><path d="M6.5 9.5V19h11V9.5"/><path d="M10 19v-5h4v5"/></svg></a>
-            <a href="/doc" data-nav="doc"><span class="nav-label">Docs</span><svg class="nav-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4"/><path d="M9.5 12h6M9.5 16h6M9.5 8h2"/></svg></a>
-            <a href="/uptime" data-nav="uptime"><span class="nav-label">Status</span><svg class="nav-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l2.5-7 4 14 2.5-7H21"/></svg></a>
-            <a href="/dashboard" data-nav="dash"><span class="nav-label">Dashboard</span><svg class="nav-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></svg></a>
+            <a href="/" class="nav-item active" data-nav="home">Home</a>
+            <a href="/doc" class="nav-item" data-nav="doc">Docs</a>
+            <a href="/uptime" class="nav-item" data-nav="uptime">Status</a>
+            <a href="/dashboard" class="nav-item" data-nav="dash">Dashboard</a>
         </div>
-        <a class="btn ghost sm nav-inv" href="/invite" title="Add Kotan to your server">Invite</a>
-        <a class="btn primary sm js-cta nav-cta" href="/dashboard" aria-label="Open Dashboard" title="Open Dashboard"><svg class="cta-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>
-        <span id="nav-user"></span>
+
+        <div class="nav-actions">
+            <!-- Theme Customizer Toggle -->
+            <button type="button" class="theme-trigger-btn" id="open-theme-btn" title="Customize theme and appearance" aria-label="Customize theme">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18v-18z"/></svg>
+            </button>
+
+            <a class="btn ghost sm" href="/invite" target="_blank" rel="noopener">Invite</a>
+            <a class="btn primary sm js-cta" href="/dashboard" id="nav-cta-btn">Dashboard</a>
+            <span id="nav-user"></span>
+
+            <button type="button" class="mobile-toggle" id="mobile-toggle" aria-label="Toggle navigation menu">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+            </button>
+        </div>
     </nav>
 </div>
 
-<header class="wrap fpsec on">
-    <div class="hero">
-        <div class="hero-img">
-            <img src="https://i.imgur.com/7NQXaG3.png" alt="Kotan — the mascot, in her sailor uniform" width="680" height="1020">
-        </div>
-        <div class="hero-copy">
-            <h1>Meet <em>Kotan</em>, your server's ideal bot</h1>
-            <p class="sub">Moderation, automod, economy, games, leveling and logging — one configurable bot, tuned per server. She keeps the class in order so you don't have to.</p>
-            <div class="hero-actions">
-                <a class="btn primary js-cta" href="/dashboard">Open Dashboard</a>
+<!-- Mobile Navigation Drawer -->
+<div class="mobile-nav" id="mobile-nav">
+    <a href="/">Home</a>
+    <a href="/doc">Documentation</a>
+    <a href="/uptime">System Status</a>
+    <a href="/dashboard">Web Dashboard</a>
+    <a href="/invite" target="_blank" rel="noopener">Add Kotan to Server</a>
+</div>
+
+<!-- Hero Section -->
+<header class="hero-section">
+    <div class="wrap hero-grid">
+        <div class="hero-content">
+            <div class="hero-badge">
+                <span class="hero-badge-pulse"></span>
+                <span>Kotan v1.1 <span style="opacity:0.4;margin:0 4px;">/</span> Next-Gen Community Automation</span>
             </div>
-            <div class="stats" id="stats">
-                <div class="bstat"><b data-stat="guilds">—</b><span>servers</span></div>
-                <div class="bstat"><b data-stat="users">—</b><span>users</span></div>
-                <div class="bstat"><b data-stat="commands">—</b><span>commands</span></div>
+
+            <h1 class="hero-title">
+                The Discord bot <span class="gradient-text">built for communities</span> that demand more.
+            </h1>
+
+            <p class="hero-sub">
+                Intelligent automod, instant VoiceMaster temp channels, level progression, rich economy, and next-generation Discord CV2 interactive cards — all tuned per server in a blazingly responsive web studio.
+            </p>
+
+            <div class="hero-actions">
+                <a class="btn primary lg js-cta" href="/dashboard">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                    Open Dashboard
+                </a>
+                <a class="btn outline lg" href="/invite" target="_blank" rel="noopener">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.894.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg>
+                    Add to Server
+                </a>
+                <a class="btn ghost lg" href="/doc">
+                    <span>Docs</span>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                </a>
+            </div>
+
+            <!-- Live Bot Stats Bar -->
+            <div class="hero-stats-bar" id="stats">
+                <div class="h-stat-item">
+                    <b data-stat="guilds">1,240+</b>
+                    <span>Active Servers</span>
+                </div>
+                <div class="h-stat-sep"></div>
+                <div class="h-stat-item">
+                    <b data-stat="users">480,000+</b>
+                    <span>Members Protected</span>
+                </div>
+                <div class="h-stat-sep"></div>
+                <div class="h-stat-item">
+                    <b data-stat="commands">8.4M+</b>
+                    <span>Commands Run</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Interactive Hero Showcase: Discord Live Mockup Card -->
+        <div class="hero-showcase">
+            <div class="discord-mock-card">
+                <div class="dc-mock-head">
+                    <div class="dc-ch-name">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>
+                        <span>welcome-lounge</span>
+                    </div>
+                    <div class="dc-actions-dots">
+                        <span class="dc-dot"></span>
+                        <span class="dc-dot"></span>
+                        <span class="dc-dot"></span>
+                    </div>
+                </div>
+
+                <div class="dc-msg">
+                    <div class="dc-av">
+                        <img src="/assets/icon.png" alt="Kotan Avatar" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'">
+                    </div>
+                    <div class="dc-msg-content">
+                        <div class="dc-author-row">
+                            <span class="dc-bot-name">Kotan</span>
+                            <span class="dc-bot-badge">BOT</span>
+                            <span class="dc-timestamp">Today at 12:45 PM</span>
+                        </div>
+
+                        <!-- Discord Components V2 Container -->
+                        <div class="dc-container">
+                            <div class="dc-cont-title">
+                                <span>Welcome to our community, @Alex!</span>
+                                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;display:inline-block;"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                            </div>
+                            <div class="dc-cont-desc">
+                                Glad to have you here! You are member <strong>#1,482</strong>. Check out our rules channel and verify to unlock all community lounges.
+                            </div>
+                            <div class="dc-cont-banner">
+                                <span class="badge-txt">Kotan Canvas Studio</span>
+                            </div>
+                            <div class="dc-btn-row">
+                                <button type="button" class="dc-btn primary" onclick="this.innerHTML = 'Verified <svg width=\'13\' height=\'13\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'currentColor\' stroke-width=\'2.5\'><polyline points=\'20 6 9 17 4 12\'/></svg>'">Verify Identity</button>
+                                <button type="button" class="dc-btn secondary">Server Rules</button>
+                                <button type="button" class="dc-btn success">Voice Channels</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </header>
 
-<main class="wrap features fpsec">
-    <h2>Everything a server needs</h2>
-    <p>Each module toggles per server and per channel — turn on only what your community uses.</p>
-    <div class="grid">
-        <div class="feature">
-            <div class="icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 4.5-3.2 7.6-8 9-4.8-1.4-8-4.5-8-9V6l8-3z"/><path d="M9 12l2 2 4-4"/></svg></div>
-            <h3>Moderation</h3>
-            <p>Warn, mute, kick, ban and tempban with full audit trails — every action logged and reversible.</p>
+<!-- Bento Grid: Modules & Core Features -->
+<section class="wrap">
+    <div class="section-head">
+        <span class="section-tag">Modular Powerhouse</span>
+        <h2 class="section-title">Everything a modern community demands</h2>
+        <p class="section-desc">Toggle and fine-tune every feature on a per-channel basis. Enable only what your members use, with zero clutter.</p>
+    </div>
+
+    <div class="bento-grid">
+        <!-- 1. Automod -->
+        <div class="bento-card">
+            <div class="bento-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+            </div>
+            <h3>Intelligent Automod</h3>
+            <p>Shield your server with regex blacklists, invite blockers, anti-spam rate caps, and automated multi-tiered punishments before toxicity spreads.</p>
+            <span class="bento-tag">Instant Actions <span class="tag-dot"></span> Audit Trail</span>
         </div>
-        <div class="feature">
-            <div class="icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4.5 14H11l-1 8L18.5 10H12l1-8z"/></svg></div>
-            <h3>Automod</h3>
-            <p>Spam, caps, links, invites and custom word filters act before you even see the message.</p>
+
+        <!-- 2. Welcome Studio -->
+        <div class="bento-card">
+            <div class="bento-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            </div>
+            <h3>Visual Welcome Studio</h3>
+            <p>Design stunning graphical canvas banners with drag-and-drop member avatars, badges, and fonts, paired with custom greeting messages.</p>
+            <span class="bento-tag">Canvas Engine <span class="tag-dot"></span> WYSIWYG</span>
         </div>
-        <div class="feature">
-            <div class="icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="9" r="5.5"/><path d="M14.5 14.5a5.5 5.5 0 1 0 .5-.5"/><path d="M7 9h4M9 7v4"/></svg></div>
-            <h3>Economy</h3>
-            <p>Wallets, daily rewards, a configurable shop and pay commands — balances persist per guild.</p>
+
+        <!-- 3. Components V2 & Embeds -->
+        <div class="bento-card">
+            <div class="bento-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="M14 9h4"/><path d="M14 15h4"/></svg>
+            </div>
+            <h3>Components V2 &amp; Embeds</h3>
+            <p>Build native Discord Components V2 cards with responsive containers, link buttons, divider sections, and real-time Discord preview.</p>
+            <span class="bento-tag">Discord CV2 Native</span>
         </div>
-        <div class="feature">
-            <div class="icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="4"/><circle cx="9" cy="9" r="1.1" fill="currentColor" stroke="none"/><circle cx="15" cy="9" r="1.1" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.1" fill="currentColor" stroke="none"/><circle cx="9" cy="15" r="1.1" fill="currentColor" stroke="none"/><circle cx="15" cy="15" r="1.1" fill="currentColor" stroke="none"/></svg></div>
-            <h3>Games</h3>
-            <p>Coinflip, slots, rps, scramble, hilo and more — quick games that plug into your economy.</p>
+
+        <!-- 4. VoiceMaster -->
+        <div class="bento-card">
+            <div class="bento-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+            </div>
+            <h3>Dynamic VoiceMaster</h3>
+            <p>Automatic temporary voice channel generation. Members get their own private voice room with live in-chat controller buttons (Lock, Bitrate, Limit).</p>
+            <span class="bento-tag">Zero Leftover Voice Channels</span>
         </div>
-        <div class="feature">
-            <div class="icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5.5-5.5 3.5 3.5L20 7"/><path d="M15 7h5v5"/></svg></div>
-            <h3>Leveling</h3>
-            <p>XP per message, level-up roles and leaderboards — reward the members who show up.</p>
+
+        <!-- 5. Economy & Mini-games -->
+        <div class="bento-card">
+            <div class="bento-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 18V6"/></svg>
+            </div>
+            <h3>Server Economy &amp; Casino</h3>
+            <p>Wallets, daily streaks, customizable server shop with role purchases, and thrilling games: slots, blackjack, coinflip, and word scramble.</p>
+            <span class="bento-tag">Multi-tier Shop <span class="tag-dot"></span> Rewards</span>
         </div>
-        <div class="feature">
-            <div class="icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4"/><path d="M9.5 12h6M9.5 16h6M9.5 8h2"/></svg></div>
-            <h3>Logging</h3>
-            <p>Joins, leaves, edits, deletes and mod actions streamed to a channel of your choice.</p>
+
+        <!-- 6. Leveling -->
+        <div class="bento-card">
+            <div class="bento-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 2 4 4-12 12H6v-4L18 2z"/><path d="m14 6 4 4"/></svg>
+            </div>
+            <h3>Leveling &amp; Role Rewards</h3>
+            <p>Gamify your chat. Reward active conversationalists with custom XP multipliers, automated level roles, and visual rank cards.</p>
+            <span class="bento-tag">Chat &amp; Voice XP</span>
+        </div>
+
+        <!-- 7. Tickets -->
+        <div class="bento-card">
+            <div class="bento-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2z"/><line x1="3" y1="12" x2="21" y2="12"/></svg>
+            </div>
+            <h3>Ticket Support Desk</h3>
+            <p>One-click modal ticket dispatch with category dropdowns, staff role pings, private channel dispatch, and searchable HTML/text transcripts.</p>
+            <span class="bento-tag">Clean Transcripts</span>
+        </div>
+
+        <!-- 8. Logging -->
+        <div class="bento-card">
+            <div class="bento-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            </div>
+            <h3>Granular Audit Logging</h3>
+            <p>Stream deleted messages, edit histories, voice joins/leaves, role adjustments, and mod actions to specific staff channels with zero delay.</p>
+            <span class="bento-tag">Complete History</span>
+        </div>
+
+        <!-- 9. Customization -->
+        <div class="bento-card">
+            <div class="bento-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            </div>
+            <h3>Per-Server Branding</h3>
+            <p>Customize dashboard color themes, background artwork, embed accents, and custom bot nicknames to reflect your community's unique identity.</p>
+            <span class="bento-tag">Deep Personalization</span>
         </div>
     </div>
-</main>
+</section>
 
-<div class="backhint" id="backhint">To go back, scroll up.</div>
-<footer class="fbar">
-    <div class="wrap foot">
-        <span>© <span id="yr">2025</span> Kotan</span>
-        <div class="links">
-            <a href="#">GitHub</a>
-            <a href="https://discord.gg/UGc7BYrygZ" target="_blank" rel="noopener">Support server</a>
-            <a href="/privacy">Privacy</a>
-            <a href="/tos">Terms</a>
+<!-- Interactive Studio / Feature Switcher Playground -->
+<section class="wrap playground-section">
+    <div class="section-head">
+        <span class="section-tag">Interactive Playground</span>
+        <h2 class="section-title">See Kotan in action</h2>
+        <p class="section-desc">Experience how clean, modern, and engaging messages look directly inside Discord channels.</p>
+    </div>
+
+    <div class="studio-card">
+        <div class="studio-tabs" id="playground-tabs">
+            <button type="button" class="studio-tab active" data-tab="welcome">
+                <span class="studio-tab-ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></span>
+                <div>
+                    <div>Welcome Studio</div>
+                    <small style="color:var(--muted)">Canvas cards &amp; member greetings</small>
+                </div>
+            </button>
+            <button type="button" class="studio-tab" data-tab="voicemaster">
+                <span class="studio-tab-ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></span>
+                <div>
+                    <div>VoiceMaster Console</div>
+                    <small style="color:var(--muted)">Self-managed temp voice rooms</small>
+                </div>
+            </button>
+            <button type="button" class="studio-tab" data-tab="ticket">
+                <span class="studio-tab-ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="7" y1="8" x2="17" y2="8"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="7" y1="16" x2="13" y2="16"/></svg></span>
+                <div>
+                    <div>Support Ticket Desk</div>
+                    <small style="color:var(--muted)">Topic dropdowns &amp; modals</small>
+                </div>
+            </button>
+            <button type="button" class="studio-tab" data-tab="economy">
+                <span class="studio-tab-ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 18V6"/></svg></span>
+                <div>
+                    <div>Economy &amp; Leveling</div>
+                    <small style="color:var(--muted)">Rank cards &amp; shop items</small>
+                </div>
+            </button>
         </div>
+
+        <div class="studio-display" id="playground-display">
+            <!-- Dynamic interactive Discord mockup will be injected here by site.js -->
+        </div>
+    </div>
+</section>
+
+<!-- Frequently Asked Questions -->
+<section class="wrap faq-section">
+    <div class="section-head">
+        <span class="section-tag">Got Questions?</span>
+        <h2 class="section-title">Frequently Asked Questions</h2>
+        <p class="section-desc">Everything you need to know about setting up and operating Kotan.</p>
+    </div>
+
+    <div class="faq-list" id="faq-accordion">
+        <div class="faq-item open">
+            <button type="button" class="faq-q">
+                <span>Is Kotan free to use on my Discord server?</span>
+                <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="faq-a">
+                Yes! Kotan is free to invite with all core modules included: Automod, VoiceMaster temporary channels, Economy, Games, Tickets, and the Web Dashboard.
+            </div>
+        </div>
+
+        <div class="faq-item">
+            <button type="button" class="faq-q">
+                <span>Does the dashboard support live real-time editing?</span>
+                <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="faq-a">
+                Yes! The dashboard features instant live preview for Discord embeds, CV2 containers, and Welcome canvas graphics. You can edit text, colors, and components and see exactly what will be posted to Discord in real-time.
+            </div>
+        </div>
+
+        <div class="faq-item">
+            <button type="button" class="faq-q">
+                <span>What are Discord Components V2 (CV2)?</span>
+                <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="faq-a">
+                Discord Components V2 is Discord's modern layout system replacing legacy embeds. It allows full-width containers, clean text headers, divider lines, media galleries, and interactive buttons without clunky legacy borders. Kotan is built natively on CV2.
+            </div>
+        </div>
+
+        <div class="faq-item">
+            <button type="button" class="faq-q">
+                <span>Can I customize the dashboard color theme?</span>
+                <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="faq-a">
+                Absolutely! Click the theme icon in the top right to choose from 8 curated palettes (Indigo, Sunset Ember, Emerald, Crimson, Sakura, Blurple, Cyan, Amber), or pick any custom hex accent color. You can also toggle OLED pure black, light mode, and frosted glass.
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Final Conversion CTA -->
+<section class="wrap">
+    <div class="cta-banner">
+        <h2>Ready to transform your Discord server?</h2>
+        <p>Join thousands of community leaders managing safer, more engaging servers with Kotan today.</p>
+        <div class="btn-group">
+            <a class="btn primary lg js-cta" href="/dashboard">Launch Web Dashboard</a>
+            <a class="btn outline lg" href="/invite" target="_blank" rel="noopener">Add to Server</a>
+        </div>
+    </div>
+</section>
+
+<!-- Footer -->
+<footer class="foot">
+    <div class="wrap foot-grid">
+        <div class="foot-brand">
+            <a class="brand" href="/" style="margin-bottom:12px">
+                <span class="brand-mark">K</span>
+                <span>Kotan</span>
+            </a>
+            <p>Next-generation modular Discord bot engine with real-time web dashboard configuration.</p>
+            <div class="foot-status-pill">
+                <span class="dot ok" style="width:8px;height:8px;border-radius:50%;background:var(--ok)"></span>
+                <span>All Systems Operational</span>
+            </div>
+        </div>
+
+        <div class="foot-col">
+            <h4>Product</h4>
+            <a href="/dashboard">Dashboard</a>
+            <a href="/doc">Commands &amp; Docs</a>
+            <a href="/uptime">System Status</a>
+            <a href="/invite" target="_blank" rel="noopener">Invite Bot</a>
+        </div>
+
+        <div class="foot-col">
+            <h4>Legal</h4>
+            <a href="/privacy">Privacy Policy</a>
+            <a href="/tos">Terms of Service</a>
+        </div>
+
+        <div class="foot-col">
+            <h4>Community</h4>
+            <a href="https://discord.gg/UGc7BYrygZ" target="_blank" rel="noopener">Support Discord</a>
+            <a href="https://github.com" target="_blank" rel="noopener">GitHub</a>
+        </div>
+    </div>
+
+    <div class="wrap foot-bottom">
+        <span>&copy; <span id="yr">2026</span> Kotan <span class="tag-dot"></span> All rights reserved.</span>
+        <span>Crafted with precision <span class="tag-dot"></span> v1.1.0</span>
     </div>
 </footer>
-</div>
 
-<script src="/script/site.js?v=18" defer></script>
+<!-- Universal Theme Customizer Drawer & Backdrop -->
+<div class="theme-drawer-backdrop" id="theme-backdrop"></div>
+<aside class="theme-drawer" id="theme-drawer" aria-label="Theme Customizer">
+    <div class="theme-drawer-head">
+        <h3>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18v-18z"/></svg>
+            Theme &amp; Appearance
+        </h3>
+        <button type="button" class="theme-close-btn" id="close-theme-btn" aria-label="Close theme customizer">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+    </div>
+
+    <div class="theme-drawer-body">
+        <!-- Palette Presets -->
+        <div>
+            <div class="theme-sec-title">Color Palette</div>
+            <div class="palette-grid" id="palette-picker">
+                <button type="button" class="palette-btn" data-palette="indigo" title="Cyber Indigo">
+                    <span class="palette-swatch" style="background:#6366f1"></span>
+                    <span>Indigo</span>
+                </button>
+                <button type="button" class="palette-btn" data-palette="sunset" title="Sunset Ember / Tangerine">
+                    <span class="palette-swatch" style="background:#e8622e"></span>
+                    <span>Sunset</span>
+                </button>
+                <button type="button" class="palette-btn" data-palette="emerald" title="Matrix Emerald">
+                    <span class="palette-swatch" style="background:#10b981"></span>
+                    <span>Emerald</span>
+                </button>
+                <button type="button" class="palette-btn" data-palette="crimson" title="Ruby Crimson">
+                    <span class="palette-swatch" style="background:#f43f5e"></span>
+                    <span>Ruby</span>
+                </button>
+                <button type="button" class="palette-btn" data-palette="sakura" title="Sakura Rose">
+                    <span class="palette-swatch" style="background:#ec4899"></span>
+                    <span>Sakura</span>
+                </button>
+                <button type="button" class="palette-btn" data-palette="blurple" title="Discord Blurple">
+                    <span class="palette-swatch" style="background:#5865f2"></span>
+                    <span>Blurple</span>
+                </button>
+                <button type="button" class="palette-btn" data-palette="cyan" title="Neon Cyber Cyan">
+                    <span class="palette-swatch" style="background:#06b6d4"></span>
+                    <span>Cyan</span>
+                </button>
+                <button type="button" class="palette-btn" data-palette="amber" title="Gold Amber">
+                    <span class="palette-swatch" style="background:#f59e0b"></span>
+                    <span>Amber</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Custom Color -->
+        <div>
+            <div class="theme-sec-title">Custom Accent Color</div>
+            <div style="display:flex;gap:10px;align-items:center;">
+                <input type="color" id="custom-accent-picker" style="width:48px;height:40px;border-radius:8px;border:1px solid var(--border);background:var(--panel-2);cursor:pointer;">
+                <input type="text" id="custom-accent-hex" placeholder="#6366f1" maxlength="7" style="flex:1;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--mono);font-size:14px;">
+            </div>
+        </div>
+
+        <!-- Color Mode -->
+        <div>
+            <div class="theme-sec-title">Color Mode</div>
+            <div class="segmented-control" id="mode-control">
+                <button type="button" class="segmented-btn" data-mode="">Dark</button>
+                <button type="button" class="segmented-btn" data-mode="oled">OLED</button>
+                <button type="button" class="segmented-btn" data-mode="light">Light</button>
+            </div>
+        </div>
+
+        <!-- Surface Style (Glass) -->
+        <div>
+            <div class="theme-sec-title">Surface Style</div>
+            <div class="segmented-control" id="glass-control">
+                <button type="button" class="segmented-btn" data-glass="1">Frosted Glass</button>
+                <button type="button" class="segmented-btn" data-glass="0">Solid Modern</button>
+            </div>
+        </div>
+
+        <!-- UI Density -->
+        <div>
+            <div class="theme-sec-title">Interface Density</div>
+            <div class="segmented-control" id="density-control">
+                <button type="button" class="segmented-btn" data-density="">Comfortable</button>
+                <button type="button" class="segmented-btn" data-density="compact">Compact</button>
+            </div>
+        </div>
+
+        <!-- Live Preview Card in Customizer -->
+        <div>
+            <div class="theme-sec-title">Live Preview</div>
+            <div class="theme-preview-card">
+                <div class="th-prev-header">
+                    <span style="font-weight:700;font-size:14px;">Kotan Engine</span>
+                    <span class="th-prev-pill">Active Theme</span>
+                </div>
+                <p style="font-size:13px;color:var(--text-2);margin:0;">Theme changes apply instantly across the website and dashboard.</p>
+                <button type="button" class="th-prev-btn">Sample Button</button>
+            </div>
+        </div>
+
+        <div>
+            <button type="button" class="btn outline" id="reset-theme-btn" style="width:100%;font-size:13px;">Reset to Defaults</button>
+        </div>
+    </div>
+</aside>
+
 </body>
 </html>

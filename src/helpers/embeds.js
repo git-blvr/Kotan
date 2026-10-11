@@ -100,7 +100,16 @@ const warning = (description) => base({ color: config.colors.warning, descriptio
 // Shortcut used all over commands and the message handler for user-facing
 // failures. Always resolves so callers can safely `return sendError(...)`.
 function sendError(message, description) {
-    return message.reply(cv2(error(description))).catch(() => {});
+    const payload = cv2(error(description));
+    if (message.deferred || message.replied) {
+        if (typeof message.editReply === 'function') {
+            return message.editReply(payload).catch(() => {});
+        }
+        if (typeof message.followUp === 'function') {
+            return message.followUp(payload).catch(() => {});
+        }
+    }
+    return message.reply(payload).catch(() => {});
 }
 
 module.exports = { base, info, success, error, warning, sendError, cv2 };

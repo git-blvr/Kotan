@@ -1,4 +1,4 @@
-require('dotenv').config({ quiet: true }); // index.js already loads+logs .env
+require('dotenv').config(); // index.js already loads+logs .env
 const { Client, GatewayIntentBits, Collection, Options, Partials, Events } = require('discord.js');
 const config = require('./config');
 const logger = require('./utils/logger');
@@ -80,7 +80,16 @@ if (!config.token) {
     process.exit(1);
 }
 
-client.login(config.token);
+client.login(config.token).catch((err) => {
+    logger.error('Failed to login:', err);
+    process.exit(1);
+});
+
+// Dashboard starts concurrently with the gateway handshake — module loading
+// and route registration are local work that overlaps the network wait
+// instead of stacking on top of it (~1s saved). Guild-backed endpoints see
+// empty caches during the handshake window; /invite guards on req.client.user.
+require('./web/server').startWebsite(client);
 
 // Localhost dev REST API (restart/close/commands/guilds/…) — starts only
 // when DEV_API_KEY is set. Independent of the public dashboard listener.
