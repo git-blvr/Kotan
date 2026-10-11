@@ -135,7 +135,11 @@ module.exports = async (app) => {
         gg.addHook('preHandler', guildGate);
 
         gg.get('/', async (req, reply) => reply.send({
-            guild: { id: req.guild.id, name: req.guild.name, icon: req.guild.icon, memberCount: req.guild.memberCount },
+            guild: {
+                id: req.guild.id, name: req.guild.name, icon: req.guild.icon, memberCount: req.guild.memberCount,
+                iconUrl: req.guild.iconURL?.({ size: 256 }) || null,
+                bannerUrl: req.guild.bannerURL?.({ size: 1024 }) || null,
+            },
             bot: {
                 id: req.client.user.id,
                 username: req.client.user.username,
@@ -394,6 +398,18 @@ module.exports = async (app) => {
             return reply.code(ok ? 200 : 404).send({ ok });
         });
 
+        // Resolve {mavatar:<id>} member ids referenced anywhere in a studio
+        // config into avatar URLs (capped so configs can't spam fetches).
+        const resolveMavatars = async (config) => {
+            const ids = [...new Set([...JSON.stringify(config || {}).matchAll(/\{mavatar:(\w+)\}/g)].map((m) => m[1]))].slice(0, 6);
+            const map = {};
+            await Promise.all(ids.map(async (id) => {
+                const m = await req.guild.members.fetch(id).catch(() => null);
+                if (m) map[id] = m.displayAvatarURL({ size: 128 });
+            }));
+            return map;
+        };
+
         // Studio & Variables (Rust Skia Accelerated)
         gg.post('/studio/render', { preHandler: uploadLimit }, async (req, reply) => {
             const { type = 'image', config = {}, vars = {} } = req.body || {};
@@ -404,6 +420,11 @@ module.exports = async (app) => {
                     username: member?.displayName || req.session.user.username,
                     server: req.guild.name,
                     members: req.guild.memberCount,
+                    avatar: member?.displayAvatarURL({ size: 256 }) ||
+                        (req.session.user.avatar ? `https://cdn.discordapp.com/avatars/${req.session.user.id}/${req.session.user.avatar}.png?size=256` : ''),
+                    icon: req.guild.iconURL?.({ size: 256 }) || '',
+                    banner: req.guild.bannerURL?.({ size: 1024 }) || '',
+                    mavatars: await resolveMavatars(config),
                     ...vars,
                 };
                 if (type === 'gif') {
@@ -460,6 +481,9 @@ module.exports = async (app) => {
                 const dynamicVars = {
                     server: req.guild.name,
                     members: req.guild.memberCount,
+                    icon: req.guild.iconURL?.({ size: 256 }) || '',
+                    banner: req.guild.bannerURL?.({ size: 1024 }) || '',
+                    mavatars: await resolveMavatars(v.config),
                 };
                 if (v.type === 'gif') {
                     const res = await studioRenderer.renderGif(v.config, dynamicVars);

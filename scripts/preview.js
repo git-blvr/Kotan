@@ -42,8 +42,12 @@ const dayKey = (ts) => new Date(ts).toISOString().slice(0, 10);
 // `200_000_… + n` arithmetic would collapse every id to the same value.
 const RID = (n) => `2${String(n).padStart(17, '0')}`;
 
-const USER = { id: '300000000000000000', username: 'preview', global_name: 'Preview Tester', avatar: null };
-const GUILD = { id: '111111111111111111', name: 'Preview Server', icon: null, memberCount: 1284 };
+const USER = { id: '300000000000000000', username: 'preview', global_name: 'Preview Tester', avatar: null, avatarUrl: 'https://i.pravatar.cc/128?img=5' };
+const GUILD = {
+    id: '111111111111111111', name: 'Preview Server', icon: null, memberCount: 1284,
+    iconUrl: 'https://picsum.photos/seed/kotan-icon/128/128',
+    bannerUrl: 'https://picsum.photos/seed/kotan-banner/1024/512',
+};
 
 const categories = [
     { id: RID(1), name: 'INFO' },
@@ -144,7 +148,7 @@ function fakeActivity(days) {
     const info = {};
     members.forEach((m, i) => {
         users[m.id] = { msg: 420 - i * 43 + Math.floor(r() * 20), voice: 1_800 - i * 187 };
-        info[m.id] = { name: m.name, user: m.user, avatar: null, color: m.color, roles: m.roles };
+        info[m.id] = { name: m.name, user: m.user, avatar: `https://i.pravatar.cc/128?img=${11 + i}`, color: m.color, roles: m.roles };
     });
     channels.forEach((c, i) => { chans[c.id] = 380 - i * 53; });
     return { days, users, channels: chans, joins: 34, leaves: 19, members: info };
@@ -294,18 +298,23 @@ async function main() {
 
     app.post('/api/guilds/:id/studio/render', async (req, reply) => {
         const { type = 'image', config = {}, vars = {} } = req.body || {};
+        // Fake member avatars for {mavatar:<id>} placeholders in studio configs.
+        const fakeAct = fakeActivity(30);
+        const mavatars = {};
+        for (const m of [...JSON.stringify(config).matchAll(/\{mavatar:(\w+)\}/g)].map((x) => x[1])) {
+            if (fakeAct.members[m]?.avatar) mavatars[m] = fakeAct.members[m].avatar;
+        }
+        const studioVars = {
+            user: `@${USER.username}`, username: USER.username, server: GUILD.name, members: GUILD.memberCount,
+            avatar: USER.avatarUrl, icon: GUILD.iconUrl, banner: GUILD.bannerUrl, mavatars,
+            ...vars,
+        };
         try {
             if (type === 'gif') {
-                const res = await studioRenderer.renderGif(config, {
-                    user: `@${USER.username}`, username: USER.username, server: GUILD.name, members: GUILD.memberCount,
-                    ...vars,
-                });
+                const res = await studioRenderer.renderGif(config, studioVars);
                 return reply.send({ ok: true, dataUrl: res.dataUrl, durationMs: res.renderTimeMs, engine: 'Rust (@napi-rs/canvas)' });
             } else {
-                const res = await studioRenderer.renderImage(config, {
-                    user: `@${USER.username}`, username: USER.username, server: GUILD.name, members: GUILD.memberCount,
-                    ...vars,
-                });
+                const res = await studioRenderer.renderImage(config, studioVars);
                 return reply.send({ ok: true, dataUrl: res.dataUrl, durationMs: res.renderTimeMs, engine: 'Rust (@napi-rs/canvas)' });
             }
         } catch (err) {

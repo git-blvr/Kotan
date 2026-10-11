@@ -51,7 +51,39 @@ function replaceVars(str, vars = {}) {
         .replaceAll('{members}', String(vars.members || '1,284'))
         .replaceAll('{level}', String(vars.level || '42'))
         .replaceAll('{xp}', String(vars.xp || '2,450'))
-        .replaceAll('{tag}', vars.tag || '#0001');
+        .replaceAll('{tag}', vars.tag || '#0001')
+        // Asset URLs — resolved by the route layer (avatar/icon/banner of the
+        // acting member or guild, {mavatar:<id>} for picked members).
+        .replaceAll('{avatar}', vars.avatar || '')
+        .replaceAll('{icon}', vars.icon || '')
+        .replaceAll('{banner}', vars.banner || '')
+        .replace(/\{mavatar:(\w+)\}/g, (m, id) => vars.mavatars?.[id] || '');
+}
+
+/**
+ * Draw an image cover-fit into the canvas, optionally softened by drawing it
+ * through a downscaled offscreen canvas (cheap cross-impl blur).
+ */
+function drawCoverImage(ctx, img, W, H, blur = 0) {
+    const s = Math.max(W / img.width, H / img.height);
+    const bw = img.width * s, bh = img.height * s;
+    const bx = (W - bw) / 2, by = (H - bh) / 2;
+    if (blur > 0.5) {
+        const f = Math.min(32, Math.max(2, Math.round(blur)));
+        const off = createCanvas(Math.max(1, Math.round(W / f)), Math.max(1, Math.round(H / f)));
+        const oc = off.getContext('2d');
+        oc.drawImage(img, bx / f, by / f, bw / f, bh / f);
+        ctx.imageSmoothingEnabled = true;
+        ctx.drawImage(off, 0, 0, W, H);
+    } else {
+        ctx.drawImage(img, bx, by, bw, bh);
+    }
+}
+
+function drawDim(ctx, W, H, dim = 0) {
+    if (!(dim > 0)) return;
+    ctx.fillStyle = `rgba(0,0,0,${Math.min(0.85, Math.max(0, dim))})`;
+    ctx.fillRect(0, 0, W, H);
 }
 
 /**
@@ -87,17 +119,14 @@ async function renderImage(cfg = {}, vars = {}) {
         ctx.fillRect(0, 0, W, H);
     }
 
-    // Background Image
-    if (isHttp(cfg.background)) {
+    // Background Image — URL may carry {avatar}/{icon}/{banner}/{mavatar:id}
+    // placeholders; blur via offscreen downscale, dim as a dark overlay.
+    const bgUrl = replaceVars(cfg.background || '', vars);
+    if (isHttp(bgUrl)) {
         try {
-            const bg = await loadImage(cfg.background);
-            const s = Math.max(W / bg.width, H / bg.height);
-            const bw = bg.width * s;
-            const bh = bg.height * s;
-            ctx.save();
-            if (cfg.bgDim) ctx.globalAlpha = Math.max(0.1, 1 - (cfg.bgDim || 0.4));
-            ctx.drawImage(bg, (W - bw) / 2, (H - bh) / 2, bw, bh);
-            ctx.restore();
+            const bg = await loadImage(bgUrl);
+            drawCoverImage(ctx, bg, W, H, +cfg.bgBlur || 0);
+            drawDim(ctx, W, H, +cfg.bgDim || 0);
         } catch {
             // Bad URL falls back to solid/gradient
         }
@@ -105,14 +134,15 @@ async function renderImage(cfg = {}, vars = {}) {
 
     const elements = Array.isArray(cfg.elements) ? cfg.elements : [];
 
-    // Preload media URLs
+    // Preload media URLs (placeholders resolved first)
     const mediaImgs = new Map();
-    const mediaUrls = elements
-        .filter((e) => e && (e.type === 'media' || e.type === 'avatar') && e.url && isHttp(e.url))
-        .map((e) => e.url);
+    const mediaUrls = [...new Set(elements
+        .filter((e) => e && (e.type === 'media' || e.type === 'avatar') && e.url)
+        .map((e) => replaceVars(e.url, vars))
+        .filter((u) => u && isHttp(u)))];
 
     await Promise.all(
-        [...new Set(mediaUrls)].map(async (u) => {
+        mediaUrls.map(async (u) => {
             try {
                 const img = await loadImage(u);
                 if (img) mediaImgs.set(u, img);
@@ -139,7 +169,7 @@ async function renderImage(cfg = {}, vars = {}) {
                 ctx.shadowBlur = el.glowBlur || 24;
             }
 
-            const img = el.url ? mediaImgs.get(el.url) : null;
+            const img = el.url ? mediaImgs.get(replaceVars(el.url, vars)) : null;
             if (img) {
                 shapePath(ctx, cx, cy, r, shape);
                 ctx.clip();
@@ -497,7 +527,7 @@ function sampleGifKeyframes(kfs, tn, easeFn) {
     };
 }
 
-function drawGifElement(ctx, el, W, H, vars) {
+function drawGifElement(ctx, el, W, H, vars, mediaImgs) {
     if (!el || el.hidden) return;
     ctx.save();
     ctx.globalAlpha = el.opacity ?? 1;
@@ -510,16 +540,28 @@ function drawGifElement(ctx, el, W, H, vars) {
         const cy = num01(el.y, 0.5) * H;
         ctx.fillStyle = el.color ? (String(el.color).startsWith('#') ? el.color : `#${el.color}`) : '#ffffff';
         ctx.fillText(replaceVars(el.text || '', vars), cx, cy);
-    } else if (el.type === 'media') {
+    } else if (el.type === 'media' || el.type === 'avatar') {
         const r = Math.max(4, num01(el.size, 0.3) * H * 0.5);
         const cx = num01(el.x, 0.5) * W;
         const cy = num01(el.y, 0.5) * H;
+        const img = el.url ? mediaImgs?.get(replaceVars(el.url, vars)) : null;
         shapePath(ctx, cx, cy, r, el.shape || 'circle');
-        ctx.fillStyle = `#${String(el.fill || '5865f2').replace('#', '')}`;
-        ctx.fill();
+        if (img) {
+            ctx.clip();
+            ctx.drawImage(img, cx - r, cy - r, r * 2, r * 2);
+        } else {
+            ctx.fillStyle = `#${String(el.fill || '5865f2').replace('#', '')}`;
+            ctx.fill();
+            ctx.fillStyle = '#ffffff';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.font = `bold ${Math.round(r * 0.8)}px ${FONT}`;
+            ctx.fillText((vars.username || 'K')[0].toUpperCase(), cx, cy);
+        }
         if (el.ring) {
             ctx.strokeStyle = `#${String(el.ring).replace('#', '')}`;
             ctx.lineWidth = Math.max(2, r * 0.1);
+            shapePath(ctx, cx, cy, r - ctx.lineWidth / 2, el.shape || 'circle');
             ctx.stroke();
         }
     } else if (el.type === 'bar') {
@@ -569,14 +611,42 @@ async function renderGif(gifCfg = {}, vars = {}) {
     const fps = Math.min(24, Math.max(2, Math.round(gifCfg.fps) || 10));
     const frameDelay = Math.round(1000 / fps);
 
+    // Preload every media URL referenced across frames/keyframes (placeholders
+    // resolved once so per-frame drawing stays synchronous).
+    const mediaUrls = new Set();
+    const collect = (list) => (list || []).forEach((e) => {
+        if (e && (e.type === 'media' || e.type === 'avatar') && e.url) {
+            const u = replaceVars(e.url, vars);
+            if (isHttp(u)) mediaUrls.add(u);
+        }
+    });
+    for (const kf of gifCfg.keyframes || []) collect(kf.elements);
+    for (const f of gifCfg.frames || []) collect(f.elements);
+    collect(gifCfg.elements);
+    const mediaImgs = new Map();
+    await Promise.all([...mediaUrls].map(async (u) => {
+        try { mediaImgs.set(u, await loadImage(u)); } catch { /* ignore */ }
+    }));
+
+    // Shared background image across the timeline (blur/dim applied per frame).
+    let bgImg = null;
+    const gifBgUrl = replaceVars(gifCfg.background || '', vars);
+    if (isHttp(gifBgUrl)) {
+        try { bgImg = await loadImage(gifBgUrl); } catch { /* ignore */ }
+    }
+
     const renderedFrames = [];
     const pushFrame = (frameCfg, delay) => {
         const cv = createCanvas(W, H);
         const ctx = cv.getContext('2d');
         ctx.fillStyle = `#${String(frameCfg.bgColor || gifCfg.bgColor || '0f1117').replace('#', '')}`;
         ctx.fillRect(0, 0, W, H);
+        if (bgImg) {
+            drawCoverImage(ctx, bgImg, W, H, +gifCfg.bgBlur || 0);
+            drawDim(ctx, W, H, +gifCfg.bgDim || 0);
+        }
         const elements = Array.isArray(frameCfg.elements) ? frameCfg.elements : (gifCfg.elements || []);
-        for (const el of elements) drawGifElement(ctx, el, W, H, vars);
+        for (const el of elements) drawGifElement(ctx, el, W, H, vars, mediaImgs);
         renderedFrames.push({ data: ctx.getImageData(0, 0, W, H).data, delay });
     };
 

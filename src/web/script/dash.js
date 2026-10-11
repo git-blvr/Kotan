@@ -47,6 +47,8 @@
         image: svg('<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>', 24, 24, '2'),
         film: svg('<rect x="2" y="2" width="20" height="20" rx="2.2"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/>', 24, 24, '2'),
         variable: svg('<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>', 24, 24, '2'),
+        play: svg('<polygon points="7 4 20 12 7 20 7 4" fill="currentColor" stroke="none"/>', 24, 24, '2'),
+        pause: svg('<rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none"/>', 24, 24, '2'),
         settings: svg('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>', 24, 24, '2'),
     };
 
@@ -877,6 +879,43 @@
     const normHex = (v, fb) => (/^#?[0-9a-f]{6}$/i.test(String(v || '').trim()) ? `#${String(v).trim().replace(/^#/, '')}` : fb);
     const dcdnAv = (id, hash) => (hash ? `https://cdn.discordapp.com/avatars/${id}/${hash}.png?size=128` : '');
     const dcdnIcon = (id, hash) => (hash ? `https://cdn.discordapp.com/icons/${id}/${hash}.png?size=128` : '');
+    const dcdnBanner = (id, hash) => (hash ? `https://cdn.discordapp.com/banners/${id}/${hash}.png?size=512` : '');
+
+    // Shared studio asset resolution — turns {avatar}/{icon}/{banner}/
+    // {mavatar:id} template tokens into loadable URLs, with an image cache
+    // and a lazily-fetched member list for the "someone in server" picker.
+    const makeStudioAssets = (redraw) => {
+        const memberAv = CTX.user.avatarUrl || dcdnAv(CTX.user.id, CTX.user.avatar) || '';
+        const guildIconU = CTX.guild.iconUrl || dcdnIcon(CTX.guild.id, CTX.guild.icon) || '';
+        const guildBannerU = CTX.guild.bannerUrl || '';
+        const cache = new Map();
+        let memberMap = null, memberP = null;
+        const loadMembers = () => (memberP ||= api(`/api/guilds/${CTX.guild.id}/activity?days=90`)
+            .then((d) => { memberMap = d?.members || {}; return memberMap; })
+            .catch(() => ({})));
+        const tplResolve = (s) => String(s || '')
+            .replaceAll('{avatar}', memberAv)
+            .replaceAll('{icon}', guildIconU)
+            .replaceAll('{banner}', guildBannerU)
+            .replace(/\{mavatar:(\w+)\}/g, (m, id) => memberMap?.[id]?.avatar || '');
+        const imgFor = (u) => {
+            const url = tplResolve(u);
+            if (!url || !/^https?:\/\//.test(url)) return null;
+            let i = cache.get(url);
+            if (!i) { i = new Image(); i.crossOrigin = 'anonymous'; i.onload = redraw; i.src = url; cache.set(url, i); }
+            return i.complete && i.naturalWidth ? i : null;
+        };
+        const srcOf = (el) => {           // element url template → source kind
+            const u = String(el.url || '');
+            if (u === '{icon}') return 'icon';
+            if (u === '{banner}') return 'banner';
+            if (u.startsWith('{mavatar:')) return 'member';
+            if (u === '{avatar}' || !u) return 'avatar';
+            return 'url';
+        };
+        const memberIdOf = (el) => (String(el.url || '').match(/\{mavatar:(\w+)\}/) || [])[1] || '';
+        return { memberAv, guildIconU, guildBannerU, imgFor, tplResolve, srcOf, memberIdOf, loadMembers, getMemberMap: () => memberMap };
+    };
 
     const wrapTxt = (str, maxChars) => {
         const out = [];
@@ -2541,7 +2580,7 @@
 
             page.innerHTML = `
                 <div>
-                    <div class="page-title">Image Studio <span class="chip ok" style="vertical-align:3px;font-size:11px;">⚡ FAST RENDER</span></div>
+                    <div class="page-title">Image Studio <span class="chip ok" style="vertical-align:3px;font-size:11px;display:inline-flex;align-items:center;gap:3px;">${ICONS.zap} FAST RENDER</span></div>
                     <p class="page-desc">Design ultra-fast vector & bitmap banners, rank cards, and embeds. Save graphics as named variables to use anywhere across Discord.</p>
                 </div>
 
@@ -2579,11 +2618,11 @@
 
                         <div class="studio-sec-title mt"><span>Templates</span></div>
                         <div class="studio-templates-grid">
-                            <button type="button" class="studio-tmpl-chip" id="tmpl-sunset">🌅 Sunset Glow</button>
-                            <button type="button" class="studio-tmpl-chip" id="tmpl-cyber">⚡ Cyberpunk</button>
-                            <button type="button" class="studio-tmpl-chip" id="tmpl-rank">🏆 Gamer Rank</button>
-                            <button type="button" class="studio-tmpl-chip" id="tmpl-event">📢 Event Alert</button>
-                            <button type="button" class="studio-tmpl-chip" id="tmpl-minimal">🖤 Minimalist</button>
+                            <button type="button" class="studio-tmpl-chip" id="tmpl-sunset">${ICONS.sunset} Sunset Glow</button>
+                            <button type="button" class="studio-tmpl-chip" id="tmpl-cyber">${ICONS.zap} Cyberpunk</button>
+                            <button type="button" class="studio-tmpl-chip" id="tmpl-rank">${ICONS.crown} Gamer Rank</button>
+                            <button type="button" class="studio-tmpl-chip" id="tmpl-event">${ICONS.announcement} Event Alert</button>
+                            <button type="button" class="studio-tmpl-chip" id="tmpl-minimal">${ICONS.image} Minimalist</button>
                         </div>
                     </div>
 
@@ -2608,9 +2647,22 @@
 
                         <div class="studio-sec-title mt"><span>Background</span></div>
                         <div style="display:flex;flex-direction:column;gap:8px;">
-                            <div style="display:flex;gap:8px;align-items:center;">
-                                <input type="color" id="im-bg-col" value="#0b0c10" style="width:36px;height:32px;border-radius:6px;border:1px solid var(--border);cursor:pointer;">
-                                <input type="text" id="im-bg-img" placeholder="Background Image URL..." style="flex:1;padding:6px 10px;font-size:12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);">
+                            <div class="grid2">
+                                <div class="fld"><label>Source</label><select id="im-bg-src">
+                                    <option value="color">Solid Color</option>
+                                    <option value="avatar">My Avatar</option>
+                                    <option value="icon">Server Icon</option>
+                                    <option value="banner">Server Banner</option>
+                                    <option value="member">Member…</option>
+                                    <option value="url">Image URL</option>
+                                </select></div>
+                                <div class="fld"><label>Color</label><input type="color" id="im-bg-col" value="#0b0c10"></div>
+                            </div>
+                            <div class="fld" id="im-bg-urlwrap" style="display:none"><label>Image URL</label><input type="text" id="im-bg-img" placeholder="https://… or {avatar} {icon} {banner}"></div>
+                            <div class="fld" id="im-bg-memwrap" style="display:none"><label>Member</label><select id="im-bg-member"></select></div>
+                            <div class="grid2">
+                                <div class="fld"><label>Blur — <span id="im-bgl-lbl">0</span>px</label><input type="range" id="im-bg-blur" min="0" max="20" step="1" value="0"></div>
+                                <div class="fld"><label>Dim — <span id="im-bgd-lbl">0</span>%</label><input type="range" id="im-bg-dim" min="0" max="80" step="5" value="0"></div>
                             </div>
                         </div>
 
@@ -2633,23 +2685,43 @@
             const layersEl = $('#im-layers', page);
             const statusPill = $('#im-status-pill', page);
             const bgColIn = $('#im-bg-col', page);
+            const bgSrcIn = $('#im-bg-src', page);
             const bgImgIn = $('#im-bg-img', page);
+            const bgMemIn = $('#im-bg-member', page);
+            const bgBlurIn = $('#im-bg-blur', page);
+            const bgDimIn = $('#im-bg-dim', page);
 
-            let loadedBg = null;
-            const loadBg = () => {
-                if (bgUrl && /^https?:\/\//.test(bgUrl)) {
-                    const img = new Image();
-                    img.crossOrigin = 'anonymous';
-                    img.onload = () => { loadedBg = img; draw(); };
-                    img.src = bgUrl;
-                } else {
-                    loadedBg = null;
-                    draw();
-                }
+            const assets = makeStudioAssets(draw);
+            let bgSrc = bgUrl ? 'url' : 'color';
+            let bgMemberId = '';
+            let bgBlur = 0, bgDim = 0;
+            const bgTpl = () => (bgSrc === 'avatar' ? '{avatar}'
+                : bgSrc === 'icon' ? '{icon}'
+                : bgSrc === 'banner' ? '{banner}'
+                : bgSrc === 'member' ? (bgMemberId ? `{mavatar:${bgMemberId}}` : '')
+                : bgSrc === 'url' ? bgUrl : '');
+
+            const syncBgUi = () => {
+                $('#im-bg-urlwrap', page).style.display = bgSrc === 'url' ? '' : 'none';
+                $('#im-bg-memwrap', page).style.display = bgSrc === 'member' ? '' : 'none';
             };
-
+            const fillMembers = async (sel, curId) => {
+                sel.innerHTML = '<option value="">Loading…</option>';
+                const mm = await assets.loadMembers();
+                sel.innerHTML = '<option value="">Pick member…</option>' + Object.entries(mm)
+                    .map(([id, m]) => `<option value="${esc(id)}" ${id === curId ? 'selected' : ''}>${esc(m.name)}${m.user ? ` (@${esc(m.user)})` : ''}</option>`).join('');
+            };
+            bgSrcIn.onchange = () => {
+                bgSrc = bgSrcIn.value;
+                syncBgUi();
+                if (bgSrc === 'member') fillMembers(bgMemIn, bgMemberId);
+                draw();
+            };
+            bgMemIn.onchange = () => { bgMemberId = bgMemIn.value; draw(); };
             bgColIn.oninput = () => { bgColor = bgColIn.value.slice(1); draw(); };
-            bgImgIn.oninput = () => { bgUrl = bgImgIn.value.trim(); loadBg(); };
+            bgImgIn.oninput = () => { bgUrl = bgImgIn.value.trim(); draw(); };
+            bgBlurIn.oninput = () => { bgBlur = +bgBlurIn.value; $('#im-bgl-lbl', page).textContent = bgBlur; draw(); };
+            bgDimIn.oninput = () => { bgDim = (+bgDimIn.value) / 100; $('#im-bgd-lbl', page).textContent = bgDimIn.value; draw(); };
 
             // Canvas drawing routine
             function draw() {
@@ -2659,9 +2731,24 @@
                 ctx.fillStyle = `#${bgColor}`;
                 ctx.fillRect(0, 0, curWidth, curHeight);
 
-                if (loadedBg) {
-                    const s = Math.max(curWidth / loadedBg.width, curHeight / loadedBg.height);
-                    ctx.drawImage(loadedBg, (curWidth - loadedBg.width * s) / 2, (curHeight - loadedBg.height * s) / 2, loadedBg.width * s, loadedBg.height * s);
+                const bimg = assets.imgFor(bgTpl());
+                if (bimg) {
+                    const s = Math.max(curWidth / bimg.width, curHeight / bimg.height);
+                    const bw = bimg.width * s, bh = bimg.height * s;
+                    ctx.save();
+                    if (bgBlur) {
+                        ctx.filter = `blur(${bgBlur}px)`;
+                        // Overscan so the softened edges don't show a gap.
+                        const b = bgBlur;
+                        ctx.drawImage(bimg, (curWidth - bw) / 2 - b, (curHeight - bh) / 2 - b, bw + b * 2, bh + b * 2);
+                    } else {
+                        ctx.drawImage(bimg, (curWidth - bw) / 2, (curHeight - bh) / 2, bw, bh);
+                    }
+                    ctx.restore();
+                    if (bgDim > 0) {
+                        ctx.fillStyle = `rgba(0,0,0,${bgDim})`;
+                        ctx.fillRect(0, 0, curWidth, curHeight);
+                    }
                 }
 
                 // Elements
@@ -2678,14 +2765,22 @@
                         else if (el.shape === 'rounded') ctx.roundRect(cx - r, cy - r, r * 2, r * 2, r * 0.35);
                         else ctx.arc(cx, cy, r, 0, Math.PI * 2);
 
-                        ctx.fillStyle = el.fill || '#5865f2';
-                        ctx.fill();
+                        const mi = el.url ? assets.imgFor(el.url) : null;
+                        if (mi) {
+                            ctx.save();
+                            ctx.clip();
+                            ctx.drawImage(mi, cx - r, cy - r, r * 2, r * 2);
+                            ctx.restore();
+                        } else {
+                            ctx.fillStyle = el.fill || '#5865f2';
+                            ctx.fill();
 
-                        ctx.fillStyle = '#ffffff';
-                        ctx.textAlign = 'center';
-                        ctx.textBaseline = 'middle';
-                        ctx.font = `bold ${Math.round(r * 0.8)}px sans-serif`;
-                        ctx.fillText((CTX.user.username || 'K')[0].toUpperCase(), cx, cy);
+                            ctx.fillStyle = '#ffffff';
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'middle';
+                            ctx.font = `bold ${Math.round(r * 0.8)}px sans-serif`;
+                            ctx.fillText((CTX.user.username || 'K')[0].toUpperCase(), cx, cy);
+                        }
 
                         if (el.ring) {
                             ctx.strokeStyle = el.ring.startsWith('#') ? el.ring : `#${el.ring}`;
@@ -2748,7 +2843,7 @@
                 layersEl.innerHTML = els.map((e, idx) => `
                     <div class="studio-layer-item ${e === sel ? 'selected' : ''}" data-idx="${idx}">
                         <span class="studio-layer-name">${esc(e.type.toUpperCase())}: ${esc(e.text || e.shape || e.id)}</span>
-                        <button type="button" class="studio-layer-btn" data-dup="${idx}" title="Duplicate">${ICONS.duplicate || '⎘'}</button>
+                        <button type="button" class="studio-layer-btn" data-dup="${idx}" title="Duplicate">${ICONS.duplicate}</button>
                         <button type="button" class="studio-layer-btn" data-del="${idx}" title="Delete">${ICONS.trash}</button>
                     </div>`).join('');
 
@@ -2803,7 +2898,18 @@
                     $('#pr-align', propsEl).onchange = (e) => { sel.align = e.target.value; draw(); };
                     $('#pr-bold', propsEl).onchange = (e) => { sel.bold = e.target.checked; draw(); };
                 } else if (sel.type === 'media') {
+                    const msrc = assets.srcOf(sel);
+                    const memId = assets.memberIdOf(sel);
                     propsEl.innerHTML = `
+                        <div class="fld"><label>Image Source</label><select id="pr-src">
+                            <option value="avatar" ${msrc==='avatar'?'selected':''}>My Avatar</option>
+                            <option value="icon" ${msrc==='icon'?'selected':''}>Server Icon</option>
+                            <option value="banner" ${msrc==='banner'?'selected':''}>Server Banner</option>
+                            <option value="member" ${msrc==='member'?'selected':''}>Member…</option>
+                            <option value="url" ${msrc==='url'?'selected':''}>Image URL</option>
+                        </select></div>
+                        <div class="fld" id="pr-memwrap" style="display:${msrc==='member'?'':'none'}"><label>Member</label><select id="pr-member"></select></div>
+                        <div class="fld" id="pr-urlwrap" style="display:${msrc==='url'?'':'none'}"><label>Image URL</label><input type="text" id="pr-url" value="${msrc==='url' ? esc(sel.url || '') : ''}" placeholder="https://… or {avatar} {icon}"></div>
                         <div class="grid2">
                             <div class="fld"><label>Shape</label><select id="pr-shape"><option value="circle" ${sel.shape==='circle'?'selected':''}>Circle</option><option value="rounded" ${sel.shape==='rounded'?'selected':''}>Rounded</option><option value="square" ${sel.shape==='square'?'selected':''}>Square</option></select></div>
                             <div class="fld"><label>Size</label><input type="range" id="pr-size" min="0.1" max="0.6" step="0.01" value="${sel.size || 0.35}"></div>
@@ -2812,6 +2918,18 @@
                             <div class="fld"><label>Ring Color</label><input type="color" id="pr-ring" value="${sel.ring?.startsWith('#') ? sel.ring : '#' + (sel.ring || 'e8622e')}"></div>
                             <div class="fld"><label>Ring Width</label><input type="range" id="pr-ringw" min="0" max="12" step="1" value="${sel.ringWidth || 4}"></div>
                         </div>`;
+                    $('#pr-src', propsEl).onchange = (e) => {
+                        const v = e.target.value;
+                        sel.url = v === 'url' ? (sel.url?.startsWith('{') ? '' : (sel.url || ''))
+                            : v === 'member' ? (memId ? `{mavatar:${memId}}` : '')
+                            : `{${v}}`;
+                        renderProps();
+                        if (v === 'member') fillMembers($('#pr-member', propsEl), memId);
+                        draw();
+                    };
+                    if (msrc === 'member') fillMembers($('#pr-member', propsEl), memId);
+                    $('#pr-member', propsEl).onchange = (e) => { sel.url = e.target.value ? `{mavatar:${e.target.value}}` : ''; draw(); };
+                    $('#pr-url', propsEl).oninput = (e) => { sel.url = e.target.value.trim(); draw(); };
                     $('#pr-shape', propsEl).onchange = (e) => { sel.shape = e.target.value; draw(); renderLayers(); };
                     $('#pr-size', propsEl).oninput = (e) => { sel.size = +e.target.value; draw(); };
                     $('#pr-ring', propsEl).oninput = (e) => { sel.ring = e.target.value; draw(); };
@@ -2880,7 +2998,7 @@
                 els.push(item); sel = item; renderProps(); renderLayers(); draw();
             };
             $('#im-add-media', page).onclick = () => {
-                const item = { id: `e${++uid}`, type: 'media', shape: 'circle', x: 0.5, y: 0.4, size: 0.35, ring: 'e8622e', ringWidth: 4 };
+                const item = { id: `e${++uid}`, type: 'media', src: 'avatar', url: '{avatar}', shape: 'circle', x: 0.5, y: 0.4, size: 0.35, ring: 'e8622e', ringWidth: 4 };
                 els.push(item); sel = item; renderProps(); renderLayers(); draw();
             };
             $('#im-add-bar', page).onclick = () => {
@@ -2917,27 +3035,29 @@
                 bgColIn.value = bg;
                 bgUrl = url;
                 bgImgIn.value = url;
+                bgSrc = url ? 'url' : 'color';
+                bgSrcIn.value = bgSrc;
+                syncBgUi();
                 sel = els[0] || null;
-                loadBg();
                 renderProps(); renderLayers(); draw();
                 toast('Template loaded');
             };
 
             $('#tmpl-sunset', page).onclick = () => applyTmpl([
-                { type: 'media', shape: 'circle', x: 0.5, y: 0.35, size: 0.35, ring: 'e8622e', ringWidth: 4 },
+                { type: 'media', url: '{avatar}', shape: 'circle', x: 0.5, y: 0.35, size: 0.35, ring: 'e8622e', ringWidth: 4 },
                 { type: 'text', text: 'Welcome to {server}!', x: 0.5, y: 0.68, size: 0.09, color: 'ffffff', bold: true, align: 'center' },
                 { type: 'text', text: 'Member #{members} · Have a wonderful time!', x: 0.5, y: 0.84, size: 0.05, color: 'fba57a', bold: false, align: 'center' },
             ], '#1c0f0a');
 
             $('#tmpl-cyber', page).onclick = () => applyTmpl([
                 { type: 'badge', text: 'SYSTEM ACCESS GRANTED', x: 0.5, y: 0.18, size: 0.04, bgColor: '#0891b2' },
-                { type: 'media', shape: 'rounded', x: 0.5, y: 0.44, size: 0.32, ring: '06b6d4', ringWidth: 3 },
+                { type: 'media', url: '{avatar}', shape: 'rounded', x: 0.5, y: 0.44, size: 0.32, ring: '06b6d4', ringWidth: 3 },
                 { type: 'text', text: '{username}', x: 0.5, y: 0.74, size: 0.09, color: 'ffffff', bold: true, align: 'center' },
                 { type: 'bar', x: 0.5, y: 0.88, w: 0.4, h: 0.04, progress: 0.9, fill: '#06b6d4' },
             ], '#05060a');
 
             $('#tmpl-rank', page).onclick = () => applyTmpl([
-                { type: 'media', shape: 'circle', x: 0.2, y: 0.5, size: 0.55, ring: 'f59e0b', ringWidth: 5 },
+                { type: 'media', url: '{avatar}', shape: 'circle', x: 0.2, y: 0.5, size: 0.55, ring: 'f59e0b', ringWidth: 5 },
                 { type: 'badge', text: 'LEVEL 42', x: 0.65, y: 0.32, size: 0.05, bgColor: '#f59e0b' },
                 { type: 'text', text: '{username}', x: 0.48, y: 0.52, size: 0.09, color: 'ffffff', bold: true, align: 'left' },
                 { type: 'bar', x: 0.62, y: 0.72, w: 0.52, h: 0.08, progress: 0.68, fill: '#f59e0b' },
@@ -2950,19 +3070,18 @@
             ], '#180a0a');
 
             $('#tmpl-minimal', page).onclick = () => applyTmpl([
-                { type: 'media', shape: 'circle', x: 0.5, y: 0.36, size: 0.32, ring: '6366f1', ringWidth: 3 },
+                { type: 'media', url: '{avatar}', shape: 'circle', x: 0.5, y: 0.36, size: 0.32, ring: '6366f1', ringWidth: 3 },
                 { type: 'text', text: '{username}', x: 0.5, y: 0.68, size: 0.08, color: 'ffffff', bold: true, align: 'center' },
                 { type: 'text', text: 'Member #{members} of {server}', x: 0.5, y: 0.82, size: 0.045, color: '94a3b8', bold: false, align: 'center' },
             ], '#090a0f');
 
-            // ⚡ RUST Skia native render button!
             $('#im-btn-rust', page).onclick = async () => {
-                toast('⚡ Rendering…');
-                const cfg = { width: curWidth, height: curHeight, bgColor, background: bgUrl, elements: els };
+                toast('Rendering…');
+                const cfg = { width: curWidth, height: curHeight, bgColor, background: bgTpl(), bgBlur, bgDim, elements: els };
                 const r = await api(`/api/guilds/${guildId}/studio/render`, { body: { type: 'image', config: cfg } });
                 if (r?.ok) {
-                    toast(`⚡ Rendered in ${r.durationMs}ms!`);
-                    statusPill.textContent = `⚡ Rendered in ${r.durationMs}ms`;
+                    toast(`Rendered in ${r.durationMs}ms!`);
+                    statusPill.textContent = `Rendered in ${r.durationMs}ms`;
                 } else {
                     toast(r?.error || 'Render error', 'err');
                 }
@@ -3081,15 +3200,15 @@
             const nid = () => `e${++eUid}`;
             const kfs = [
                 { t: 0, bgColor: '0b0c10', elements: [
-                    { id: nid(), type: 'text', text: '✨ WELCOME ✨', x: 0.5, y: 0.4, size: 0.12, color: '6366f1', bold: true },
+                    { id: nid(), type: 'text', text: 'WELCOME', x: 0.5, y: 0.4, size: 0.12, color: '6366f1', bold: true },
                     { id: nid(), type: 'text', text: '{username}', x: 0.5, y: 0.68, size: 0.14, color: 'ffffff', bold: true },
                 ] },
                 { t: 0.5, bgColor: '16121e', elements: [
-                    { id: 'e1', type: 'text', text: '✨ WELCOME ✨', x: 0.5, y: 0.4, size: 0.16, color: 'e8622e', bold: true },
+                    { id: 'e1', type: 'text', text: 'WELCOME', x: 0.5, y: 0.4, size: 0.16, color: 'e8622e', bold: true },
                     { id: 'e2', type: 'text', text: '{username}', x: 0.5, y: 0.68, size: 0.17, color: 'ffd9a0', bold: true },
                 ] },
                 { t: 1, bgColor: '0b0c10', elements: [
-                    { id: 'e1', type: 'text', text: '✨ WELCOME ✨', x: 0.5, y: 0.4, size: 0.12, color: '6366f1', bold: true },
+                    { id: 'e1', type: 'text', text: 'WELCOME', x: 0.5, y: 0.4, size: 0.12, color: '6366f1', bold: true },
                     { id: 'e2', type: 'text', text: '{username}', x: 0.5, y: 0.68, size: 0.14, color: 'ffffff', bold: true },
                 ] },
             ];
@@ -3097,7 +3216,7 @@
 
             page.innerHTML = `
                 <div>
-                    <div class="page-title">GIF Studio <span class="chip ok" style="vertical-align:3px;font-size:11px;">🎬 ANIMATED FRAMES</span></div>
+                    <div class="page-title">GIF Studio <span class="chip ok" style="vertical-align:3px;font-size:11px;display:inline-flex;align-items:center;gap:3px;">${ICONS.film} KEYFRAMES</span></div>
                     <p class="page-desc">Design animated Discord cards, pulsing badges, and GIF attachments. Play live in browser and save directly as GIF variables.</p>
                 </div>
 
@@ -3157,17 +3276,17 @@
                         <div class="studio-sec-title mt"><span>Auto Generators</span></div>
                         <p class="muted small" style="margin:0;">Generate animated frame sequences instantly:</p>
                         <div style="display:flex;flex-direction:column;gap:6px;">
-                            <button type="button" class="btn sm outline" id="gen-pulse">⚡ Pulsing Glow</button>
-                            <button type="button" class="btn sm outline" id="gen-rainbow">🌈 Rainbow Hue Shift</button>
-                            <button type="button" class="btn sm outline" id="gen-bar">📊 Level Up Fill Animation</button>
-                            <button type="button" class="btn sm outline" id="gen-flash">🚨 Flashing Alert Beacon</button>
+                            <button type="button" class="btn sm outline" id="gen-pulse">${ICONS.zap} Pulsing Glow</button>
+                            <button type="button" class="btn sm outline" id="gen-rainbow">${ICONS.sparkle} Rainbow Hue Shift</button>
+                            <button type="button" class="btn sm outline" id="gen-bar">${ICONS.up} Level Up Fill</button>
+                            <button type="button" class="btn sm outline" id="gen-flash">${ICONS.announcement} Flashing Alert</button>
                         </div>
 
                         <div class="studio-sec-title mt"><span>GIF Templates</span></div>
                         <div style="display:flex;flex-direction:column;gap:6px;">
-                            <button type="button" class="studio-tmpl-chip" id="gtmpl-welcome">✨ Animated Welcome Pulse</button>
-                            <button type="button" class="studio-tmpl-chip" id="gtmpl-rank">🏆 Shimmering Level Up</button>
-                            <button type="button" class="studio-tmpl-chip" id="gtmpl-alert">🚨 Server Announcement</button>
+                            <button type="button" class="studio-tmpl-chip" id="gtmpl-welcome">${ICONS.sparkle} Welcome Pulse</button>
+                            <button type="button" class="studio-tmpl-chip" id="gtmpl-rank">${ICONS.crown} Shimmering Level Up</button>
+                            <button type="button" class="studio-tmpl-chip" id="gtmpl-alert">${ICONS.announcement} Announcement</button>
                         </div>
                     </div>
 
@@ -3181,7 +3300,7 @@
 
                         <!-- Play bar -->
                         <div class="gif-playbar">
-                            <button type="button" class="gif-play-btn" id="gif-toggle-play">⏸</button>
+                            <button type="button" class="gif-play-btn" id="gif-toggle-play">${ICONS.pause}</button>
                             <input type="range" id="gif-scrub" min="0" max="${durationMs}" value="0" step="10">
                             <span class="gif-time" id="gif-time">0.00s / ${(durationMs / 1000).toFixed(2)}s</span>
                         </div>
@@ -3211,6 +3330,24 @@
                         <div class="studio-sec-title mt"><span>Element Properties</span></div>
                         <div id="gif-props" style="display:flex;flex-direction:column;gap:12px;"></div>
 
+                        <div class="studio-sec-title mt"><span>Background</span></div>
+                        <div style="display:flex;flex-direction:column;gap:8px;">
+                            <div class="fld"><label>Source</label><select id="gif-bg-src">
+                                <option value="color">Solid Color</option>
+                                <option value="avatar">My Avatar</option>
+                                <option value="icon">Server Icon</option>
+                                <option value="banner">Server Banner</option>
+                                <option value="member">Member…</option>
+                                <option value="url">Image URL</option>
+                            </select></div>
+                            <div class="fld" id="gif-bg-urlwrap" style="display:none"><label>Image URL</label><input type="text" id="gif-bg-img" placeholder="https://… or {avatar} {icon} {banner}"></div>
+                            <div class="fld" id="gif-bg-memwrap" style="display:none"><label>Member</label><select id="gif-bg-member"></select></div>
+                            <div class="grid2">
+                                <div class="fld"><label>Blur — <span id="gif-bgl-lbl">0</span>px</label><input type="range" id="gif-bg-blur" min="0" max="20" step="1" value="0"></div>
+                                <div class="fld"><label>Dim — <span id="gif-bgd-lbl">0</span>%</label><input type="range" id="gif-bg-dim" min="0" max="80" step="5" value="0"></div>
+                            </div>
+                        </div>
+
                         <div class="studio-sec-title mt"><span>Save as GIF Variable</span></div>
                         <p class="muted small" style="margin:0;">Save this animation as a variable to attach to welcome embeds or cards.</p>
                         <div style="display:flex;gap:6px;">
@@ -3234,6 +3371,20 @@
             const scrubEl = $('#gif-scrub', page);
             const timeEl = $('#gif-time', page);
 
+            const gAssets = makeStudioAssets(() => drawAtPlayhead());
+            let gBgSrc = 'color', gBgMemberId = '', gBgUrl = '', gBgBlur = 0, gBgDim = 0;
+            const gBgTpl = () => (gBgSrc === 'avatar' ? '{avatar}'
+                : gBgSrc === 'icon' ? '{icon}'
+                : gBgSrc === 'banner' ? '{banner}'
+                : gBgSrc === 'member' ? (gBgMemberId ? `{mavatar:${gBgMemberId}}` : '')
+                : gBgSrc === 'url' ? gBgUrl : '');
+            const gFillMembers = async (sel, curId) => {
+                sel.innerHTML = '<option value="">Loading…</option>';
+                const mm = await gAssets.loadMembers();
+                sel.innerHTML = '<option value="">Pick member…</option>' + Object.entries(mm)
+                    .map(([id, m]) => `<option value="${esc(id)}" ${id === curId ? 'selected' : ''}>${esc(m.name)}${m.user ? ` (@${esc(m.user)})` : ''}</option>`).join('');
+            };
+
             function shapePathL(cx, cy, r, shape) {
                 ctx.beginPath();
                 if (shape === 'square') ctx.rect(cx - r, cy - r, r * 2, r * 2);
@@ -3248,6 +3399,26 @@
                 ctx.globalAlpha = 1;
                 ctx.fillStyle = `#${String(frame.bgColor || '0b0c10').replace('#', '')}`;
                 ctx.fillRect(0, 0, width, height);
+
+                // Shared background image (same for every keyframe).
+                const bimg = gAssets.imgFor(gBgTpl());
+                if (bimg) {
+                    const s = Math.max(width / bimg.width, height / bimg.height);
+                    const bw = bimg.width * s, bh = bimg.height * s;
+                    ctx.save();
+                    if (gBgBlur) {
+                        ctx.filter = `blur(${gBgBlur}px)`;
+                        const b = gBgBlur;
+                        ctx.drawImage(bimg, (width - bw) / 2 - b, (height - bh) / 2 - b, bw + b * 2, bh + b * 2);
+                    } else {
+                        ctx.drawImage(bimg, (width - bw) / 2, (height - bh) / 2, bw, bh);
+                    }
+                    ctx.restore();
+                    if (gBgDim > 0) {
+                        ctx.fillStyle = `rgba(0,0,0,${gBgDim})`;
+                        ctx.fillRect(0, 0, width, height);
+                    }
+                }
 
                 for (const el of frame.elements || []) {
                     if (!el || el.hidden) continue;
@@ -3266,8 +3437,21 @@
                     } else if (el.type === 'media') {
                         const r = Math.max(4, (el.size || 0.3) * height * 0.5);
                         shapePathL(cx, cy, r, el.shape || 'circle');
-                        ctx.fillStyle = `#${String(el.fill || '5865f2').replace('#', '')}`;
-                        ctx.fill();
+                        const mi = el.url ? gAssets.imgFor(el.url) : null;
+                        if (mi) {
+                            ctx.save();
+                            ctx.clip();
+                            ctx.drawImage(mi, cx - r, cy - r, r * 2, r * 2);
+                            ctx.restore();
+                        } else {
+                            ctx.fillStyle = `#${String(el.fill || '5865f2').replace('#', '')}`;
+                            ctx.fill();
+                            ctx.fillStyle = '#ffffff';
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'middle';
+                            ctx.font = `bold ${Math.round(r * 0.8)}px Inter, sans-serif`;
+                            ctx.fillText((CTX.user.username || 'K')[0].toUpperCase(), cx, cy);
+                        }
                         if (el.ring) {
                             ctx.strokeStyle = `#${String(el.ring).replace('#', '')}`;
                             ctx.lineWidth = Math.max(2, r * 0.1);
@@ -3324,7 +3508,7 @@
             }
             function setPlaying(v) {
                 playing = v;
-                playBtn.textContent = playing ? '⏸' : '▶';
+                playBtn.innerHTML = playing ? ICONS.pause : ICONS.play;
             }
 
             // Real-time playback — smooth interpolation across the duration.
@@ -3345,14 +3529,40 @@
                     kfs.map((k, i) => `<button type="button" class="gif-kf-dot${i === selKf ? ' active' : ''}" style="left:${k.t * 100}%" data-i="${i}" title="Keyframe ${i + 1} — ${(k.t * 100).toFixed(0)}%"></button>`).join('');
                 $('#gif-frame-count', page).textContent = kfs.length;
                 $$('.gif-kf-dot', trackEl).forEach((d) => {
-                    d.onclick = (ev) => {
+                    // Click selects; dragging scrubs the keyframe's time live.
+                    d.onclick = (ev) => ev.stopPropagation();
+                    d.onpointerdown = (ev) => {
+                        ev.preventDefault();
                         ev.stopPropagation();
                         selKf = +d.dataset.i;
-                        playT = kfs[selKf].t * durationMs;
+                        const k = kfs[selKf];
+                        playT = k.t * durationMs;
                         setPlaying(false);
                         syncKfProps();
-                        renderTrack();
+                        $$('.gif-kf-dot', trackEl).forEach((x) => x.classList.toggle('active', x === d));
                         drawAtPlayhead();
+                        const tr = trackEl.getBoundingClientRect();
+                        let moved = false;
+                        const move = (me) => {
+                            moved = true;
+                            k.t = Math.min(1, Math.max(0, (me.clientX - tr.left) / tr.width));
+                            d.style.left = `${k.t * 100}%`;
+                            const tpct = Math.round(k.t * 100);
+                            $('#gif-kf-t', page).value = tpct;
+                            $('#gif-kf-tlbl', page).textContent = `${tpct}%`;
+                        };
+                        const up = () => {
+                            window.removeEventListener('pointermove', move);
+                            window.removeEventListener('pointerup', up);
+                            if (moved) {
+                                kfs.sort((a, b) => a.t - b.t);
+                                selKf = kfs.indexOf(k);
+                                renderTrack();
+                                syncKfProps();
+                            }
+                        };
+                        window.addEventListener('pointermove', move);
+                        window.addEventListener('pointerup', up);
                     };
                 });
             }
@@ -3387,7 +3597,7 @@
                 layersEl.innerHTML = els.map((e, idx) => `
                     <div class="studio-layer-item ${e === selEl ? 'selected' : ''}" data-idx="${idx}">
                         <span class="studio-layer-name">${esc(e.type.toUpperCase())}: ${esc(e.text || e.shape || e.id || '')}</span>
-                        <button type="button" class="studio-layer-btn" data-gdup="${idx}" title="Duplicate">${ICONS.duplicate || '⎘'}</button>
+                        <button type="button" class="studio-layer-btn" data-gdup="${idx}" title="Duplicate">${ICONS.duplicate}</button>
                         <button type="button" class="studio-layer-btn" data-gdel="${idx}" title="Remove from all keyframes">${ICONS.trash}</button>
                     </div>`).join('') || '<p class="muted small" style="margin:0;">No elements on this keyframe — add some on the left.</p>';
 
@@ -3465,7 +3675,18 @@
                     $('#gp-bold', propsEl).onchange = (e) => { selEl.bold = e.target.checked; drawAtPlayhead(); };
                     $('#gp-op', propsEl).oninput = (e) => { selEl.opacity = +e.target.value; drawAtPlayhead(); };
                 } else if (selEl.type === 'media') {
+                    const msrc = gAssets.srcOf(selEl);
+                    const memId = gAssets.memberIdOf(selEl);
                     propsEl.innerHTML = `
+                        <div class="fld"><label>Image Source</label><select id="gp-src">
+                            <option value="avatar" ${msrc==='avatar'?'selected':''}>My Avatar</option>
+                            <option value="icon" ${msrc==='icon'?'selected':''}>Server Icon</option>
+                            <option value="banner" ${msrc==='banner'?'selected':''}>Server Banner</option>
+                            <option value="member" ${msrc==='member'?'selected':''}>Member…</option>
+                            <option value="url" ${msrc==='url'?'selected':''}>Image URL</option>
+                        </select></div>
+                        <div class="fld" id="gp-memwrap" style="display:${msrc==='member'?'':'none'}"><label>Member</label><select id="gp-member"></select></div>
+                        <div class="fld" id="gp-urlwrap" style="display:${msrc==='url'?'':'none'}"><label>Image URL</label><input type="text" id="gp-url" value="${msrc==='url' ? esc(selEl.url || '') : ''}" placeholder="https://… or {avatar} {icon}"></div>
                         ${fldPos()}
                         <div class="grid2">
                             <div class="fld"><label>Shape</label><select id="gp-shape"><option value="circle" ${(selEl.shape || 'circle') === 'circle' ? 'selected' : ''}>Circle</option><option value="rounded" ${selEl.shape === 'rounded' ? 'selected' : ''}>Rounded</option><option value="square" ${selEl.shape === 'square' ? 'selected' : ''}>Square</option></select></div>
@@ -3476,6 +3697,18 @@
                             <div class="fld"><label>Ring</label><input type="color" id="gp-ring" value="${selEl.ring?.startsWith('#') ? selEl.ring : '#' + (selEl.ring || 'e8622e')}"></div>
                         </div>
                         <div class="fld"><label>Opacity</label><input type="range" id="gp-op" min="0" max="1" step="0.05" value="${selEl.opacity ?? 1}"></div>`;
+                    $('#gp-src', propsEl).onchange = (e) => {
+                        const v = e.target.value;
+                        selEl.url = v === 'url' ? (selEl.url?.startsWith('{') ? '' : (selEl.url || ''))
+                            : v === 'member' ? (memId ? `{mavatar:${memId}}` : '')
+                            : `{${v}}`;
+                        renderGifProps();
+                        if (v === 'member') gFillMembers($('#gp-member', propsEl), memId);
+                        drawAtPlayhead();
+                    };
+                    if (msrc === 'member') gFillMembers($('#gp-member', propsEl), memId);
+                    $('#gp-member', propsEl).onchange = (e) => { selEl.url = e.target.value ? `{mavatar:${e.target.value}}` : ''; drawAtPlayhead(); };
+                    $('#gp-url', propsEl).oninput = (e) => { selEl.url = e.target.value.trim(); drawAtPlayhead(); };
                     $('#gp-shape', propsEl).onchange = (e) => { selEl.shape = e.target.value; renderGifLayers(); drawAtPlayhead(); };
                     $('#gp-size', propsEl).oninput = (e) => { selEl.size = +e.target.value; drawAtPlayhead(); };
                     $('#gp-fill', propsEl).oninput = (e) => { selEl.fill = e.target.value; drawAtPlayhead(); };
@@ -3519,7 +3752,7 @@
             // element exists for the whole animation; unchecked = current only.
             const EL_DEFS = {
                 text: () => ({ id: nid(), type: 'text', text: 'New Text', x: 0.5, y: 0.5, size: 0.1, color: 'ffffff', bold: true }),
-                media: () => ({ id: nid(), type: 'media', x: 0.5, y: 0.4, size: 0.3, shape: 'circle', fill: '5865f2', ring: 'e8622e' }),
+                media: () => ({ id: nid(), type: 'media', x: 0.5, y: 0.4, size: 0.3, shape: 'circle', url: '{avatar}', fill: '5865f2', ring: 'e8622e' }),
                 bar: () => ({ id: nid(), type: 'bar', x: 0.5, y: 0.75, w: 0.6, h: 0.1, progress: 0.6, bgColor: '2b2d31', fill: '10b981' }),
                 badge: () => ({ id: nid(), type: 'badge', text: 'NEW', x: 0.5, y: 0.25, size: 0.05, bgColor: '6366f1', color: 'ffffff' }),
             };
@@ -3606,6 +3839,22 @@
                 drawAtPlayhead();
             };
 
+            // Shared background (image source / blur / dim — same every frame).
+            const gBgSrcIn = $('#gif-bg-src', page);
+            const gBgImgIn = $('#gif-bg-img', page);
+            const gBgMemIn = $('#gif-bg-member', page);
+            gBgSrcIn.onchange = () => {
+                gBgSrc = gBgSrcIn.value;
+                $('#gif-bg-urlwrap', page).style.display = gBgSrc === 'url' ? '' : 'none';
+                $('#gif-bg-memwrap', page).style.display = gBgSrc === 'member' ? '' : 'none';
+                if (gBgSrc === 'member') gFillMembers(gBgMemIn, gBgMemberId);
+                drawAtPlayhead();
+            };
+            gBgMemIn.onchange = () => { gBgMemberId = gBgMemIn.value; drawAtPlayhead(); };
+            gBgImgIn.oninput = () => { gBgUrl = gBgImgIn.value.trim(); drawAtPlayhead(); };
+            $('#gif-bg-blur', page).oninput = (e) => { gBgBlur = +e.target.value; $('#gif-bgl-lbl', page).textContent = gBgBlur; drawAtPlayhead(); };
+            $('#gif-bg-dim', page).oninput = (e) => { gBgDim = (+e.target.value) / 100; $('#gif-bgd-lbl', page).textContent = e.target.value; drawAtPlayhead(); };
+
             playBtn.onclick = () => setPlaying(!playing);
             scrubEl.oninput = () => {
                 playT = +scrubEl.value;
@@ -3657,9 +3906,9 @@
                 easing = 'easeInOut'; easeSel.value = 'easeInOut';
                 kfs.length = 0;
                 kfs.push(
-                    { t: 0, bgColor: '0b0c10', elements: [{ type: 'text', text: '⚡ KOTAN ACTIVE ⚡', x: 0.5, y: 0.45, size: 0.1, color: 'e8622e', bold: true }] },
-                    { t: 0.5, bgColor: '140f14', elements: [{ type: 'text', text: '⚡ KOTAN ACTIVE ⚡', x: 0.5, y: 0.45, size: 0.15, color: 'fbbf24', bold: true }] },
-                    { t: 1, bgColor: '0b0c10', elements: [{ type: 'text', text: '⚡ KOTAN ACTIVE ⚡', x: 0.5, y: 0.45, size: 0.1, color: 'e8622e', bold: true }] },
+                    { t: 0, bgColor: '0b0c10', elements: [{ type: 'text', text: 'KOTAN ACTIVE', x: 0.5, y: 0.45, size: 0.1, color: 'e8622e', bold: true }] },
+                    { t: 0.5, bgColor: '140f14', elements: [{ type: 'text', text: 'KOTAN ACTIVE', x: 0.5, y: 0.45, size: 0.15, color: 'fbbf24', bold: true }] },
+                    { t: 1, bgColor: '0b0c10', elements: [{ type: 'text', text: 'KOTAN ACTIVE', x: 0.5, y: 0.45, size: 0.1, color: 'e8622e', bold: true }] },
                 );
                 applyGen('Pulse animation generated');
             };
@@ -3670,7 +3919,7 @@
                 kfs.length = 0;
                 colors.forEach((c, i) => kfs.push({
                     t: i / colors.length, bgColor: '0b0c10',
-                    elements: [{ type: 'text', text: '🌈 RAINBOW GLOW', x: 0.5, y: 0.45, size: 0.13, color: c, bold: true }],
+                    elements: [{ type: 'text', text: 'RAINBOW GLOW', x: 0.5, y: 0.45, size: 0.13, color: c, bold: true }],
                 }));
                 applyGen('Rainbow animation generated');
             };
@@ -3697,7 +3946,7 @@
                 for (let i = 0; i < 4; i++) {
                     kfs.push({
                         t: i / 4, bgColor: i % 2 === 0 ? '1f0a0a' : '0b0c10',
-                        elements: [{ type: 'text', text: '🚨 PRIORITY ALERT 🚨', x: 0.5, y: 0.5, size: 0.12, color: i % 2 === 0 ? '#ef4444' : '#ffffff', bold: true }],
+                        elements: [{ type: 'text', text: 'PRIORITY ALERT', x: 0.5, y: 0.5, size: 0.12, color: i % 2 === 0 ? '#ef4444' : '#ffffff', bold: true }],
                     });
                 }
                 applyGen('Alert flash animation generated');
@@ -3711,7 +3960,7 @@
                 tints.forEach((col, i) => kfs.push({
                     t: i / tints.length, bgColor: '0b0c10',
                     elements: [
-                        { type: 'text', text: '✨ WELCOME TO THE SERVER ✨', x: 0.5, y: 0.38, size: 0.09, color: col, bold: true },
+                        { type: 'text', text: 'WELCOME TO THE SERVER', x: 0.5, y: 0.38, size: 0.09, color: col, bold: true },
                         { type: 'text', text: '{username}', x: 0.5, y: 0.65, size: 0.13, color: '#ffffff', bold: true },
                     ],
                 }));
@@ -3744,7 +3993,7 @@
             $('#gtmpl-alert', page).onclick = () => {
                 easing = 'steps'; easeSel.value = 'steps';
                 kfs.length = 0;
-                const msgs = ['📢 SERVER ANNOUNCEMENT', '⚠️ READ #announcements'];
+                const msgs = ['SERVER ANNOUNCEMENT', 'READ #announcements'];
                 msgs.forEach((m, i) => kfs.push({
                     t: i / 2, bgColor: i % 2 === 0 ? '1a0d0d' : '0f0d1a',
                     elements: [{ type: 'text', text: m, x: 0.5, y: 0.5, size: 0.1, color: i % 2 === 0 ? '#fbbf24' : '#818cf8', bold: true }],
@@ -3752,14 +4001,14 @@
                 applyGen('Announcement template applied');
             };
 
-            const gifCfg = () => ({ width, height, durationMs, fps, easing, loop: true, keyframes: kfs });
+            const gifCfg = () => ({ width, height, durationMs, fps, easing, loop: true, keyframes: kfs, background: gBgTpl(), bgBlur: gBgBlur, bgDim: gBgDim });
 
-            // ⚡ Render with Rust
+            // Native render
             $('#gif-btn-rust', page).onclick = async () => {
-                toast('⚡ Rendering GIF…');
+                toast('Rendering GIF…');
                 const r = await api(`/api/guilds/${guildId}/studio/render`, { body: { type: 'gif', config: gifCfg() } });
                 if (r?.ok) {
-                    toast(`⚡ GIF encoded in ${r.durationMs}ms!`);
+                    toast(`GIF encoded in ${r.durationMs}ms!`);
                 } else {
                     toast(r?.error || 'Render failed', 'err');
                 }
@@ -3820,7 +4069,7 @@
 
                 <div class="card" style="background:linear-gradient(135deg, rgba(99,102,241,0.12), rgba(232,98,46,0.08));border-color:var(--accent);">
                     <div style="display:flex;align-items:center;gap:12px;">
-                        <span style="font-size:24px;">💡</span>
+                        <span style="font-size:24px;display:inline-flex;align-items:center;">${ICONS.sparkle}</span>
                         <div>
                             <b>How to use your variables in Discord</b>
                             <p class="sub" style="margin-top:2px;">Type or paste any variable tag (e.g. <code>{img:welcome_banner}</code> or <code>{gif:welcome_anim}</code>) into any embed image field, card thumbnail, or welcome message. Kotan resolves and renders them live!</p>
@@ -3854,7 +4103,7 @@
                             </div>
                         </div>`).join('') : `
                         <div class="card" style="grid-column:1/-1;text-align:center;padding:48px 24px;">
-                            <div style="font-size:32px;margin-bottom:8px;">🎨</div>
+                            <div style="margin-bottom:8px;opacity:0.7;display:inline-block;">${ICONS.image}</div>
                             <h3>No variables saved yet</h3>
                             <p class="sub mb">Create custom banners or animated GIFs in Image Studio or GIF Studio, then click "Save as Variable"!</p>
                             <a class="btn" href="#/image-studio" style="margin-top:12px;">Open Image Studio</a>
