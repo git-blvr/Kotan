@@ -1,7 +1,7 @@
-/* Kotan dashboard SPA — served as a static shell, all data via /api.
+﻿/* Kotan dashboard SPA â€” served as a static shell, all data via /api.
    Routes: /dashboard -> server picker; /dashboard/:id -> guild app with
-   hash sub-routes (#/overview … #/settings). Server-side guards and the
-   API enforce access independently — this is presentation only. */
+   hash sub-routes (#/overview â€¦ #/settings). Server-side guards and the
+   API enforce access independently â€” this is presentation only. */
 
 (function () {
     'use strict';
@@ -90,7 +90,7 @@
     const COLOR_THEMES = {
         cream: {
             label: 'Cream Latte (Light)',
-            desc: 'Warm Cream Rail · Soft Sand Cards · Toasted Orange Accent',
+            desc: 'Warm Cream Rail Â· Soft Sand Cards Â· Toasted Orange Accent',
             accent: '#e2792b',
             accent2: '#c96a20',
             shell: '#ead6c1',
@@ -104,7 +104,7 @@
         },
         cocoa: {
             label: 'Cocoa Roast (Dark)',
-            desc: 'Roasted Cocoa Shell · Espresso Panels · Amber Orange Accent',
+            desc: 'Roasted Cocoa Shell Â· Espresso Panels Â· Amber Orange Accent',
             accent: '#f08a3c',
             accent2: '#e2792b',
             shell: '#26170f',
@@ -118,7 +118,7 @@
         },
         dark: {
             label: 'Obsidian Dark (Default)',
-            desc: 'Deep Neutral Charcoal · Soft Dark Canvas · Clean Blurple Accent',
+            desc: 'Deep Neutral Charcoal Â· Soft Dark Canvas Â· Clean Blurple Accent',
             accent: '#5865f2',
             accent2: '#4752c4',
             shell: '#16171b',
@@ -132,7 +132,7 @@
         },
         oled: {
             label: 'OLED Pitch Black',
-            desc: 'True Deep Pitch Black · Charcoal Panels · Crisp Monochrome Accent',
+            desc: 'True Deep Pitch Black Â· Charcoal Panels Â· Crisp Monochrome Accent',
             accent: '#ffffff',
             accent2: '#dbdee1',
             shell: '#0c0c0e',
@@ -146,7 +146,7 @@
         },
         zinc: {
             label: 'Zinc Slate',
-            desc: 'Cool Neutral Zinc · Clean Slate Dock · Electric Indigo Accent',
+            desc: 'Cool Neutral Zinc Â· Clean Slate Dock Â· Electric Indigo Accent',
             accent: '#6366f1',
             accent2: '#4f46e5',
             shell: '#16181e',
@@ -160,7 +160,7 @@
         },
         charcoal: {
             label: 'Warm Charcoal',
-            desc: 'Smoky Warm Charcoal · Soft Dark Canvas · Amber Gold Accent',
+            desc: 'Smoky Warm Charcoal Â· Soft Dark Canvas Â· Amber Gold Accent',
             accent: '#f59e0b',
             accent2: '#d97706',
             shell: '#181716',
@@ -174,7 +174,7 @@
         },
     };
 
-    // Relative luminance of a hex color — picks readable text on custom accents.
+    // Relative luminance of a hex color â€” picks readable text on custom accents.
     function accentLum(hex) {
         const m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(hex || '').trim());
         if (!m) return 0;
@@ -223,7 +223,7 @@
         root.style.setProperty('--dock-accent', acc);
         root.style.setProperty('--dock-accent-2', acc2);
         root.style.setProperty('--chart', acc);
-        // Text drawn on accent-colored buttons/pills — light accents need dark text.
+        // Text drawn on accent-colored buttons/pills â€” light accents need dark text.
         const onAcc = t.customAccent
             ? (accentLum(acc) > 0.45 ? '#1c1208' : '#ffffff')
             : (ctheme.onAccent || '#ffffff');
@@ -394,7 +394,7 @@
     }
 
     // ---------- search-select component ----------
-    // options: [{value,label,icon,color}] — renders a .dsel dropdown; get()
+    // options: [{value,label,icon,color}] â€” renders a .dsel dropdown; get()
     // returns the value (string) or array (multi).
     function dsel(opts = {}) {
         const el = document.createElement('div');
@@ -408,17 +408,17 @@
 
         const options = opts.options || [];
         const label = () => {
-            if (opts.multi) return values.size ? `${values.size} selected` : (opts.placeholder || 'Select…');
+            if (opts.multi) return values.size ? `${values.size} selected` : (opts.placeholder || 'Selectâ€¦');
             const v = [...values][0];
             const o = options.find((o) => String(o.value) === v);
-            return o ? o.label : (v ? `#${v}` : (opts.placeholder || 'Select…'));
+            return o ? o.label : (v ? `#${v}` : (opts.placeholder || 'Selectâ€¦'));
         };
         const renderBtn = () => { btn.innerHTML = `<span class="${values.size ? '' : 'ph'}">${esc(label())}</span><span class="caret">${ICONS.chevronDown}</span>`; };
         renderBtn();
 
         function renderPop(filter = '') {
             const list = options.filter((o) => o.label.toLowerCase().includes(filter));
-            pop.innerHTML = (options.length > 10 ? '<div class="search"><input type="text" placeholder="Search…"></div>' : '')
+            pop.innerHTML = (options.length > 10 ? '<div class="search"><input type="text" placeholder="Searchâ€¦"></div>' : '')
                 + (list.length ? list.map((o) => `
                     <div class="opt${values.has(String(o.value)) ? ' sel' : ''}" data-v="${esc(String(o.value))}">
                         ${o.icon ? `<span class="tic">${o.icon}</span>` : ''}
@@ -434,7 +434,7 @@
             $$('.dselpop').forEach((p) => (p.style.display = 'none'));
             pop.style.display = open ? 'none' : 'block';
             if (!open) {
-                // portal to <body> — ancestor backdrop-filter/transform creates a
+                // portal to <body> â€” ancestor backdrop-filter/transform creates a
                 // containing block that would break position:fixed anchoring
                 if (pop.parentElement !== document.body) document.body.appendChild(pop);
                 pop.classList.add('dselpop');
@@ -443,7 +443,7 @@
                 const w = Math.min(r.width, innerWidth - 16);
                 pop.style.width = `${w}px`;
                 pop.style.left = `${Math.max(8, Math.min(r.left, innerWidth - w - 8))}px`;
-                // Fit inside the viewport — the pop is fixed, so it can't ride
+                // Fit inside the viewport â€” the pop is fixed, so it can't ride
                 // a page scroll; options must be reachable where it opens.
                 // Open downward unless the full list won't fit and there's
                 // more room above, then flip up.
@@ -460,7 +460,7 @@
             }
         };
         pop.onclick = (e) => {
-            // dsel often sits inside a <label class="fld"> — the label would
+            // dsel often sits inside a <label class="fld"> â€” the label would
             // forward clicks on the pop to the toggle button, re-opening it.
             e.preventDefault();
             const opt = e.target.closest('.opt');
@@ -480,10 +480,10 @@
     }
 
     // ---------- small render helpers ----------
-    const fld = (label, inner, hint) => `<label class="fld"><span>${esc(label)}${hint ? ` <span class="hint">— ${esc(hint)}</span>` : ''}</span></label>`;
+    const fld = (label, inner, hint) => `<label class="fld"><span>${esc(label)}${hint ? ` <span class="hint">â€” ${esc(hint)}</span>` : ''}</span></label>`;
     // fld() leaves inner injection to callers that need real nodes; use fldText
     // for simple html inputs:
-    const fldHtml = (label, inner, hint) => `<label class="fld"><span>${esc(label)}${hint ? ` <span class="hint">— ${esc(hint)}</span>` : ''}</span>${inner}</label>`;
+    const fldHtml = (label, inner, hint) => `<label class="fld"><span>${esc(label)}${hint ? ` <span class="hint">â€” ${esc(hint)}</span>` : ''}</span>${inner}</label>`;
     const tgl = (name, label, on) => `<label class="tgl"><input type="checkbox" name="${name}" ${on ? 'checked' : ''}><span class="trk"></span><span class="lbl">${esc(label)}</span></label>`;
     const numIn = (name, v, min, max) => `<input type="number" name="${name}" value="${v ?? ''}" ${min != null ? `min="${min}"` : ''} ${max != null ? `max="${max}"` : ''}>`;
     const txtIn = (name, v, ph = '') => `<input type="text" name="${name}" value="${esc(v ?? '')}" placeholder="${esc(ph)}">`;
@@ -507,9 +507,9 @@
     }
     const selSlot = (key) => `<span data-mount="${key}"></span>`;
 
-    // Fixed-position dropdowns don't follow their trigger on scroll — close
+    // Fixed-position dropdowns don't follow their trigger on scroll â€” close
     // them instead (capture picks up scrolls inside nested containers too).
-    // Scrolls INSIDE the popover's own option list are exempt — that list is
+    // Scrolls INSIDE the popover's own option list are exempt â€” that list is
     // scrollable itself and must not nuke the open dropdown.
     window.addEventListener('scroll', (e) => {
         $$('.dselpop').forEach((p) => {
@@ -589,7 +589,7 @@
             <div class="pk-head">
                 <div><h1 class="pk-title">Your servers</h1>
                 <p class="pk-sub">Servers where you have Manage Server and Kotan is installed.</p></div>
-                <input class="pk-search" id="srvq" type="search" placeholder="Search servers…">
+                <input class="pk-search" id="srvq" type="search" placeholder="Search serversâ€¦">
             </div>
             <div class="pk-label">Manageable <span class="pkcount" id="srvn"></span></div>
             <div class="srvgrid" id="srvs"><div class="skeleton" style="height:180px"></div></div>
@@ -824,12 +824,12 @@
         }
     }
 
-    // In-page subnav — built automatically from each page's section headings.
+    // In-page subnav â€” built automatically from each page's section headings.
     // Sits above the title, jump-scrolls to a section, and tracks scroll.
     let scrollSpy = null;
     function bindSubnav(page) {
         const heads = $$('.card h3', page);
-        // Only worth a subnav when there's actually a lot to jump between —
+        // Only worth a subnav when there's actually a lot to jump between â€”
         // few sections or a page that fits the viewport gets none.
         if (heads.length < 4 || page.scrollHeight < window.innerHeight * 1.15) return;
         const seen = new Map();
@@ -864,10 +864,10 @@
 
     // ---------- Discord-style SVG previews ----------
     // Inline SVG mocks of Discord UI: message rows, embeds, CV2 containers,
-    // and the profile popout. Text wraps by estimated width — it's a preview.
+    // and the profile popout. Text wraps by estimated width â€” it's a preview.
     const DC = { bg: '#313338', panel: '#2b2d31', border: '#43444c', text: '#dbdee1', head: '#f2f3f5', muted: '#949ba4', brand: '#5865f2', green: '#23a55a' };
     const DFONT = `'gg sans','Segoe UI','Helvetica Neue',Arial,sans-serif`;
-    // Discord-style "Today at h:mm AM" — .dsvg-ts nodes refresh on a 2s tick.
+    // Discord-style "Today at h:mm AM" â€” .dsvg-ts nodes refresh on a 2s tick.
     const tsNow = () => {
         const d = new Date();
         const h = d.getHours() % 12 || 12, ap = d.getHours() < 12 ? 'AM' : 'PM';
@@ -881,7 +881,7 @@
     const dcdnIcon = (id, hash) => (hash ? `https://cdn.discordapp.com/icons/${id}/${hash}.png?size=128` : '');
     const dcdnBanner = (id, hash) => (hash ? `https://cdn.discordapp.com/banners/${id}/${hash}.png?size=512` : '');
 
-    // Shared studio asset resolution — turns {avatar}/{icon}/{banner}/
+    // Shared studio asset resolution â€” turns {avatar}/{icon}/{banner}/
     // {mavatar:id} template tokens into loadable URLs, with an image cache
     // and a lazily-fetched member list for the "someone in server" picker.
     const makeStudioAssets = (redraw) => {
@@ -905,7 +905,7 @@
             if (!i) { i = new Image(); i.crossOrigin = 'anonymous'; i.onload = redraw; i.src = url; cache.set(url, i); }
             return i.complete && i.naturalWidth ? i : null;
         };
-        const srcOf = (el) => {           // element url template → source kind
+        const srcOf = (el) => {           // element url template â†’ source kind
             const u = String(el.url || '');
             if (u === '{icon}') return 'icon';
             if (u === '{banner}') return 'banner';
@@ -934,7 +934,7 @@
     const txtLines = (lines, x, y, { size = 14, fill = DC.text, weight = 400, lh = 1.4 } = {}) =>
         lines.map((l, i) => `<text x="${x}" y="${y + i * size * lh}" font-family="${DFONT}" font-size="${size}" font-weight="${weight}" fill="${fill}">${xesc(l)}</text>`).join('');
 
-    // Circular avatar — CDN image when available, else a default silhouette.
+    // Circular avatar â€” CDN image when available, else a default silhouette.
     const svgAv = (url, cx, cy, r) => {
         const id = `av${++svgUid}`;
         const inner = url
@@ -943,7 +943,7 @@
         return `<defs><clipPath id="${id}"><circle cx="${cx}" cy="${cy}" r="${r}"/></clipPath></defs>${inner}`;
     };
 
-    // Rounded image — CDN URL or a dark placeholder with an icon glyph.
+    // Rounded image â€” CDN URL or a dark placeholder with an icon glyph.
     const svgImg = (url, x, y, w, h, rx = 8) => {
         const id = `im${++svgUid}`;
         const inner = /^https?:\/\//.test(url || '')
@@ -952,7 +952,7 @@
         return `<defs><clipPath id="${id}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rx}"/></clipPath></defs>${inner}`;
     };
 
-    // Classic embed — accent bar, title, wrapped description, thumbnail, footer.
+    // Classic embed â€” accent bar, title, wrapped description, thumbnail, footer.
     const svgEmbed = (e, x, y, w) => {
         const pad = 14, iw = w - 32;
         const thumb = e.thumbUrl ? 80 : 0;
@@ -980,7 +980,7 @@
         return { h, svg: `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="${DC.panel}"/><rect x="${x}" y="${y}" width="4" height="${h}" fill="${color}"/>${img}${body}` };
     };
 
-    // Button/select rows — pseudo-comps the preview layers onto feature
+    // Button/select rows â€” pseudo-comps the preview layers onto feature
     // panels (voicemaster grid, ticket topic picker, verify button). One
     // call renders one action row; `color` picks the Discord button tint.
     const BTN_COLORS = { primary: '#5865f2', success: '#248046', danger: '#da373c' };
@@ -1003,7 +1003,7 @@
         return { svg: out, h: 42 };
     };
 
-    // CV2 container — stacked components, per-type rendering, optional accent bar.
+    // CV2 container â€” stacked components, per-type rendering, optional accent bar.
     const svgContainer = (comps, x, y, w, accent) => {
         const pad = 16, iw = w - pad * 2;
         let cy = y + pad, body = '';
@@ -1034,7 +1034,7 @@
                 body += txtLines(ls, x + pad, cy + 10 + Math.max(0, (sh - ls.length * lh) / 2),
                     big ? { size: 16, fill: DC.head, weight: 700 } : {});
                 if (c.btnUrl || c.btnLabel) {
-                    // button accessory — Discord renders link buttons gray
+                    // button accessory â€” Discord renders link buttons gray
                     const bl = (c.btnLabel || 'Link').slice(0, 16);
                     const bw = Math.max(64, bl.length * 8.4 + 34);
                     body += `<rect x="${x + w - pad - bw}" y="${cy + (sh - 34) / 2}" width="${bw}" height="34" rx="8" fill="#4e5058"/>
@@ -1085,7 +1085,7 @@
         return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${h}" width="${W}" height="${h}" class="dsvg" role="img"><rect width="${W}" height="${h}" fill="${cTheme.bg}"/>${body}</svg>`;
     };
 
-    // Discord profile popout — banner (image or accent), avatar + status,
+    // Discord profile popout â€” banner (image or accent), avatar + status,
     // name, meta. Clickable zones carry data-pick for the upload pickers.
     const svgProfile = ({ name, username, avatar, banner, bannerImg }) => {
         const W = 300, H = 238;
@@ -1135,7 +1135,7 @@
     function imgEditorHtml(p, img) {
         return `
             <div class="card"><h3>Welcome image Studio</h3>
-                <p class="sub mb">Visual canvas studio — drag elements around the preview. Smart guidelines snap elements to center. Text placeholders: <code class="mono">{username}</code> <code class="mono">{user}</code> <code class="mono">{server}</code> <code class="mono">{members}</code></p>
+                <p class="sub mb">Visual canvas studio â€” drag elements around the preview. Smart guidelines snap elements to center. Text placeholders: <code class="mono">{username}</code> <code class="mono">{user}</code> <code class="mono">{server}</code> <code class="mono">{members}</code></p>
                 ${tgl(`${p}img_on`, 'Welcome image enabled', img?.enabled)}
 
                 <div class="cedit-templates-row" style="margin-top:12px;">
@@ -1240,7 +1240,7 @@
                 : raw === '{icon}' ? guildIcon
                 : /^https?:\/\//.test(raw) ? raw
                 : (memberAv || guildIcon);
-            if (!src) return toast('No image to sample — set a background image first', 'err');
+            if (!src) return toast('No image to sample â€” set a background image first', 'err');
             ev.target.disabled = true;
             const r = await api(`/api/guilds/${guildId}/dominant-color?src=${encodeURIComponent(src)}`).catch(() => null);
             ev.target.disabled = false;
@@ -1399,7 +1399,7 @@
                         <div class="fld"><label>Source</label><select data-k="src">
                             ${[['avatar', 'Member avatar'], ['icon', 'Server icon'], ['url', 'Image URL']].map(([v, l]) => `<option value="${v}" ${sel.src === v ? 'selected' : ''}>${l}</option>`).join('')}
                         </select></div>
-                        <div class="fld grow" data-uwrap ${sel.src === 'url' ? '' : 'style="display:none"'}><label>Image URL</label><input type="text" data-k="url" value="${esc(sel.url || '')}" placeholder="https://… or {avatar}"></div>
+                        <div class="fld grow" data-uwrap ${sel.src === 'url' ? '' : 'style="display:none"'}><label>Image URL</label><input type="text" data-k="url" value="${esc(sel.url || '')}" placeholder="https://â€¦ or {avatar}"></div>
                         <div class="fld"><label>Shape</label><select data-k="shape">
                             ${[['circle', 'Circle'], ['rounded', 'Rounded'], ['square', 'Square']].map(([v, l]) => `<option value="${v}" ${sel.shape === v ? 'selected' : ''}>${l}</option>`).join('')}
                         </select></div>
@@ -1591,7 +1591,7 @@
     }
 
     // ---------- unsaved-changes bar ----------
-    // bindSave() registers a section collector — no per-section button is
+    // bindSave() registers a section collector â€” no per-section button is
     // rendered. Each section's collected fields are snapshotted at bind time;
     // edits are diffed against that snapshot, and the fixed bottom bar shows
     // while any section differs. Save commits every dirty section, Cancel
@@ -1615,8 +1615,7 @@
             dirtyBar = document.createElement('div');
             dirtyBar.className = 'savebar';
             dirtyBar.innerHTML = `<span class="sb-msg"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--warn)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>You have unsaved changes! <kbd class="kbd-hint" style="margin-left:8px;font-size:11px;background:rgba(255,255,255,0.15);padding:2px 6px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);">Ctrl+S</kbd></span>
-                <div class="sb-btns"><button class="btn sm" data-x>Cancel</button>
-                <button class="btn primary sm" data-ok>Save</button></div>`;
+                <div class="sb-btns"><button class="btn sm btn-anim ghost" data-x><span class="btn-anim-label">Cancel</span><span class="btn-anim-hover">Cancel <svg class="btn-anim-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span></button><button class="btn primary sm btn-anim" data-ok><span class="btn-anim-label">Save</span><span class="btn-anim-hover">Save <svg class="btn-anim-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span></button></div>`;
             dirtyBar.querySelector('[data-x]').onclick = () => {
                 // Discard: immediately hide the bar and reset dirty flags
                 for (const s of saveSections) s.dirty = false;
@@ -1632,7 +1631,7 @@
         document.body.classList.toggle('has-dirty', dirty);
     }
 
-    // Scans are microtask-coalesced — typing, preview re-renders and row
+    // Scans are microtask-coalesced â€” typing, preview re-renders and row
     // re-draws each fire a burst of events/mutations per gesture.
     const queueDirtyScan = () => {
         if (dirtyQueued) return;
@@ -1657,7 +1656,7 @@
         for (const s of pending) {
             let saved = false;
             try { saved = await save(s.section, s.collect(s.container), null, true); }
-            catch { /* network hiccup — leave it dirty */ }
+            catch { /* network hiccup â€” leave it dirty */ }
             ok = saved && ok;
             if (saved) {
                 s.baseline = secSnap(s) ?? s.baseline;
@@ -1703,7 +1702,7 @@
         ['image', 'Image'], ['section', 'Section'], ['link', 'Link button'],
     ];
 
-    // Markup for one card editor — prefix `p` namespaces every field/id so
+    // Markup for one card editor â€” prefix `p` namespaces every field/id so
     // several editors can coexist on a page. The live component list is a
     // clone held inside setupCardEditor, not on `e`.
     function cardEditorHtml(p, e, extraChips = []) {
@@ -1744,12 +1743,12 @@
                     </select>
 
                     <div class="cesec"><span class="ceic">${svg('<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M7 9h10M7 13h6"/>')}</span>
-                        <div><b>Basics & Colors</b><p class="sub">Style and accent — clear fields to hide them.</p></div></div>
+                        <div><b>Basics & Colors</b><p class="sub">Style and accent â€” clear fields to hide them.</p></div></div>
                     <div class="grid2">
                         ${fldHtml('Color Mode', `<select name="${p}e_colmode">
                             <option value="" ${e.colorMode !== 'dominant' && e.colorMode !== 'none' ? 'selected' : ''}>Custom / brand</option>
                             <option value="dominant" ${e.colorMode === 'dominant' ? 'selected' : ''}>Dominant (auto)</option>
-                            <option value="none" ${e.colorMode === 'none' ? 'selected' : ''}>None — no accent</option>
+                            <option value="none" ${e.colorMode === 'none' ? 'selected' : ''}>None â€” no accent</option>
                         </select>`, 'dominant = tinted from the card image/avatar')}
                     </div>
                     <div id="${p}e_colrow">
@@ -1769,7 +1768,7 @@
                             <button type="button" class="color-preset-dot" data-col="#e8622e" style="background:#e8622e" title="Sunset"></button>
                             <button type="button" class="color-preset-dot" data-col="#06b6d4" style="background:#06b6d4" title="Cyan"></button>
                             <button type="button" class="color-preset-dot" data-col="#2b2d31" style="background:#2b2d31" title="Slate"></button>
-                        </div>`, 'hex — empty = brand color')}
+                        </div>`, 'hex â€” empty = brand color')}
                     </div>
                     <div id="${p}e_embed">
                         <div class="cesec"><span class="ceic">${svg('<path d="M4 6h16M4 12h10M4 18h13"/>')}</span>
@@ -1790,7 +1789,7 @@
                                     <b>Components</b>
                                     <span class="badge sm" id="${p}comp_count" style="font-size:11px;font-weight:700;">${(e.components || []).length}/10 slots</span>
                                 </div>
-                                <p class="sub">Drag to reorder — max 10 — <code class="mono">+</code> on a text row attaches an accessory.</p>
+                                <p class="sub">Drag to reorder â€” max 10 â€” <code class="mono">+</code> on a text row attaches an accessory.</p>
                             </div>
                         </div>
                         <div class="inschips mb"><span>Insert</span>${chips}</div>
@@ -1816,23 +1815,23 @@
     const cardCompFields = (c) => {
         switch (c.type) {
             case 'text':
-                return `<textarea data-k="text" rows="2" placeholder="Markdown text — placeholders allowed">${esc(c.text || '')}</textarea>`;
+                return `<textarea data-k="text" rows="2" placeholder="Markdown text â€” placeholders allowed">${esc(c.text || '')}</textarea>`;
             case 'heading':
                 return `<input type="text" data-k="text" value="${esc(c.text || '')}" placeholder="Big heading text">`;
             case 'separator':
                 return `<select data-k="size"><option value="small" ${c.size !== 'large' ? 'selected' : ''}>Small gap</option><option value="large" ${c.size === 'large' ? 'selected' : ''}>Large gap</option></select>`;
             case 'image':
-                return `<input type="text" data-k="url" value="${esc(c.url || '')}" placeholder="https://… or {avatar} / {icon}">`;
+                return `<input type="text" data-k="url" value="${esc(c.url || '')}" placeholder="https://â€¦ or {avatar} / {icon}">`;
             case 'section': {
                 const acc = (c.btnUrl !== undefined || c.btnLabel !== undefined)
                     ? `<input type="text" data-k="btnLabel" value="${esc(c.btnLabel || '')}" placeholder="Button label" style="flex:0 0 120px">
-                       <input type="text" data-k="btnUrl" value="${esc(c.btnUrl || '')}" placeholder="https://…" style="flex:0 0 150px">`
+                       <input type="text" data-k="btnUrl" value="${esc(c.btnUrl || '')}" placeholder="https://â€¦" style="flex:0 0 150px">`
                     : `<input type="text" data-k="image" value="${esc(c.image || '')}" placeholder="{avatar} or URL" style="flex:0 0 160px">`;
                 return `<input type="text" data-k="text" value="${esc(c.text || '')}" placeholder="Text beside the accessory" class="grow">${acc}`;
             }
             case 'link':
                 return `<input type="text" data-k="label" value="${esc(c.label || '')}" placeholder="Button label" style="flex:0 0 140px">
-                        <input type="text" data-k="url" value="${esc(c.url || '')}" placeholder="https://…" class="grow">`;
+                        <input type="text" data-k="url" value="${esc(c.url || '')}" placeholder="https://â€¦" class="grow">`;
             default: return '';
         }
     };
@@ -1840,11 +1839,11 @@
     // Wires one card editor already rendered into `page`. Returns a
     // collector producing the saved embed/card object.
     function setupCardEditor(page, p, e, opts = {}) {
-        // Working copy — edits never touch the settings object, so cancelling
+        // Working copy â€” edits never touch the settings object, so cancelling
         // (re-render from CTX.settings) restores the saved card.
         const list = (e.components || []).map((c) => ({ ...c }));
         // Feature panels can attach fixed controls (voicemaster button grid,
-        // ticket topic picker…) — preview them exactly where the posted
+        // ticket topic pickerâ€¦) â€” preview them exactly where the posted
         // payload puts them.
         const extras = opts.extras || [];
 
@@ -1870,7 +1869,7 @@
             }
             return str;
         };
-        // Dominant-mode preview — the real accent is extracted at send time;
+        // Dominant-mode preview â€” the real accent is extracted at send time;
         // the preview approximates it by fetching the same source once.
         let domCol = null, domSrc = '';
         const domSource = () => {
@@ -1906,7 +1905,7 @@
             const f = formVals(page);
             const b = { avatar: botAv, name: botName };
             if (!f[`${p}e_on`]) {
-                // Card off — panels still post plain text + controls.
+                // Card off â€” panels still post plain text + controls.
                 el.innerHTML = extras.length
                     ? svgMessage({ ...b, content: sampleFill(f[`${p}e_desc`]) || opts.plain || '', rows: extras, light: isLightPrev })
                     : '';
@@ -1918,7 +1917,7 @@
                 const comps = list.map((c) => ({ ...c, text: sampleFill(c.text), url: sampleFill(c.url), image: sampleFill(c.image), label: sampleFill(c.label) }));
                 if (!comps.length && !extras.length) { el.innerHTML = '<p class="muted small">Add components to preview the card.</p>'; return; }
                 // Controls ride inside the container up to Discord's
-                // 10-per-container cap — a packed card spills them below,
+                // 10-per-container cap â€” a packed card spills them below,
                 // matching the posted payload.
                 const inside = comps.length + extras.length <= 10;
                 el.innerHTML = svgMessage({ ...b, container: [...comps, ...(inside ? extras : [])], accent: mode === 'none' ? '' : acv, rows: inside ? null : extras, light: isLightPrev });
@@ -1939,7 +1938,7 @@
                     <span class="ctype">${COMP_DEFS.find(([t]) => t === c.type)?.[1] || c.type}</span>
                     ${cardCompFields(c)}
                     <span class="cbtns">${c.type === 'text' || c.type === 'heading' ? `<button class="cbtn acc" data-acc="${i}" title="Attach accessory">${ICONS.plus}</button>` : ''}<button class="cbtn" data-dup="${i}" title="Duplicate">${ICONS.duplicate}</button><button class="cbtn" data-up="${i}" title="Move up">${ICONS.up}</button><button class="cbtn" data-dn="${i}" title="Move down">${ICONS.down}</button><button class="cbtn danger" data-del="${i}" title="Remove">${ICONS.trash}</button></span>
-                </div>`).join('') || '<p class="muted small">No components — add some below.</p>';
+                </div>`).join('') || '<p class="muted small">No components â€” add some below.</p>';
             const cntBadge = $(`#${p}comp_count`, page);
             if (cntBadge) {
                 cntBadge.textContent = `${list.length}/10 slots`;
@@ -1960,7 +1959,7 @@
             $$('.comprow [data-up]', el).forEach((b) => (b.onclick = () => { const i = +b.dataset.up; if (i > 0) { [list[i - 1], list[i]] = [list[i], list[i - 1]]; renderComps(); } }));
             $$('.comprow [data-dn]', el).forEach((b) => (b.onclick = () => { const i = +b.dataset.dn; if (i < list.length - 1) { [list[i + 1], list[i]] = [list[i], list[i + 1]]; renderComps(); } }));
             $$('.comprow [data-del]', el).forEach((b) => (b.onclick = () => { list.splice(+b.dataset.del, 1); renderComps(); }));
-            // "+" on a text row — turn it into a section with a thumbnail or
+            // "+" on a text row â€” turn it into a section with a thumbnail or
             // link-button accessory (that's how CV2 attaches media to text).
             $$('.comprow [data-acc]', el).forEach((b) => (b.onclick = (ev) => {
                 ev.stopPropagation();
@@ -1972,7 +1971,7 @@
                 menu.querySelectorAll('[data-accto]').forEach((mb) => (mb.onclick = () => {
                     const i = +b.dataset.acc;
                     const c = list[i];
-                    // Headings become sections too — big:true keeps the
+                    // Headings become sections too â€” big:true keeps the
                     // heading-size text so the conversion doesn't shrink it.
                     const big = c.type === 'heading' ? { big: true } : {};
                     list[i] = mb.dataset.accto === 'thumb'
@@ -2104,7 +2103,7 @@
         $(`#${p}ecard`, page).addEventListener('input', updPrev);
         $(`#${p}ecard`, page).addEventListener('change', () => { updPrev(); maybeFetchDom(); });
 
-        // Accent color row — swatch picker, dominant-from-image, clear.
+        // Accent color row â€” swatch picker, dominant-from-image, clear.
         const colIn = $(`[name=${p}e_color]`, page);
         const colPick = $(`#${p}e_colpick`, page);
         colPick.oninput = () => { colIn.value = colPick.value; updPrev(); };
@@ -2170,7 +2169,7 @@
         });
 
         // ---------- payload import/export ----------
-        // Export shape: { kotan: 'card', card: <collect()> } — the marker lets
+        // Export shape: { kotan: 'card', card: <collect()> } â€” the marker lets
         // import tell kotan exports from raw Discord message payloads, which
         // get converted into our component schema on the way in.
         const COMP_KEYS = {
@@ -2204,7 +2203,7 @@
         };
 
         // Accepts a kotan export ({kotan:'card',card}), a bare card object, a
-        // Discord message payload (embeds/CV2 container), or a lone embed —
+        // Discord message payload (embeds/CV2 container), or a lone embed â€”
         // returns our card shape or null when nothing recognizable.
         const cardFromPayload = (raw) => {
             if (!raw || typeof raw !== 'object') return null;
@@ -2260,13 +2259,13 @@
 
         $(`#${p}e_exp`, page).onclick = async () => {
             const text = JSON.stringify({ kotan: 'card', card: collect(formVals(page)) }, null, 2);
-            try { await navigator.clipboard.writeText(text); } catch { /* clipboard needs https — download still works */ }
+            try { await navigator.clipboard.writeText(text); } catch { /* clipboard needs https â€” download still works */ }
             const a = document.createElement('a');
             a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
             a.download = 'kotan-card.json';
             a.click();
             URL.revokeObjectURL(a.href);
-            toast('Card exported — copied to clipboard and downloaded');
+            toast('Card exported â€” copied to clipboard and downloaded');
         };
 
         $(`#${p}e_imp`, page).onclick = () => {
@@ -2275,9 +2274,9 @@
             ov.innerHTML = `<div class="modal">
                 <h3>Import card payload</h3>
                 <p>Paste a kotan card export or a raw Discord message JSON, or load a .json file.</p>
-                <textarea class="mono ceimp" rows="9" placeholder='{"kotan":"card","card":{…}}'></textarea>
+                <textarea class="mono ceimp" rows="9" placeholder='{"kotan":"card","card":{â€¦}}'></textarea>
                 <div class="actions"><button class="btn" data-x>Cancel</button>
-                    <button class="btn" data-file>Choose file…</button>
+                    <button class="btn" data-file>Choose fileâ€¦</button>
                     <button class="btn" data-ok>Import</button></div></div>`;
             const ta = ov.querySelector('.ceimp');
             const doImport = (text) => {
@@ -2287,7 +2286,7 @@
                 if (!card) return toast('No card or message payload found in that JSON', 'err');
                 applyCard(card);
                 ov.remove();
-                toast('Card imported — review it, then save');
+                toast('Card imported â€” review it, then save');
             };
             ov.addEventListener('click', (e) => {
                 if (e.target === ov || e.target.hasAttribute('data-x')) ov.remove();
@@ -2308,13 +2307,13 @@
 
     // ---------- pages ----------
 
-    // The VoiceMaster control grid as pseudo-comps — identical to the
+    // The VoiceMaster control grid as pseudo-comps â€” identical to the
     // action rows utils/voicemaster.js attaches under the card.
     const VM_EXTRAS = [
         { type: 'buttons', labels: ['Lock', 'Unlock', 'Hide', 'Show', 'Rename'] },
         { type: 'buttons', labels: ['Limit +', 'Limit -', 'Invite', 'Trust', 'Untrust'] },
         { type: 'buttons', labels: ['Kick', 'Block', 'Unblock', 'Transfer', 'Claim'] },
-        { type: 'select', label: 'Select bitrate quality…' },
+        { type: 'select', label: 'Select bitrate qualityâ€¦' },
     ];
 
     const PAGES = {
@@ -2337,22 +2336,22 @@
             const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
             const fmtN = (n) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
 
-            // Messages per day — last 7 days, busiest bar highlighted.
+            // Messages per day â€” last 7 days, busiest bar highlighted.
             const msgBars = series.slice(-7).map((d) => ({ day: DOW[new Date(`${d.date}T00:00:00`).getDay()], v: d.count || 0, date: d.date }));
             const barMax = Math.max(...msgBars.map((b) => b.v), 1);
             const barsHtml = msgBars.length ? msgBars.map((b) =>
                 `<div class="ovm-col"><div class="ovm-bar${b.v === barMax && b.v ? ' hi' : ''}" style="height:${Math.max(4, Math.round((b.v / barMax) * 100))}%" title="${b.date}: ${b.v} msgs"></div><span>${b.day}</span></div>`).join('')
                 : '<div class="empty-state">No data yet</div>';
 
-            // Recent activity — newest mod actions + command runs.
+            // Recent activity â€” newest mod actions + command runs.
             const feed = [
-                ...(stats.recent || []).map((r) => ({ at: r.at, ic: (r.type || '?')[0].toUpperCase(), html: `<b>${esc(r.type)}</b> <span class="mono">${esc(String(r.userId))}</span>${r.reason ? ` — ${esc(r.reason)}` : ''}` })),
+                ...(stats.recent || []).map((r) => ({ at: r.at, ic: (r.type || '?')[0].toUpperCase(), html: `<b>${esc(r.type)}</b> <span class="mono">${esc(String(r.userId))}</span>${r.reason ? ` â€” ${esc(r.reason)}` : ''}` })),
                 ...(stats.usage?.recent || []).map((r) => ({ at: r.at, ic: '/', html: `<span class="mono">${esc(String(r.userId))}</span> ran <b>/${esc(r.cmd)}</b>` })),
             ].sort((a, b) => b.at - a.at).slice(0, 5);
             const feedHtml = feed.length ? feed.map((f) => `<div class="ovm-feeditem"><div class="ovm-av">${esc(f.ic)}</div><div>${f.html}<small>${timeAgo(f.at)}</small></div></div>`).join('')
                 : '<p class="muted small">No recent activity.</p>';
 
-            // Member growth — line chart over <=8 evenly sampled points.
+            // Member growth â€” line chart over <=8 evenly sampled points.
             const gser = stats.growth?.series || [];
             let growthHtml = '<div class="empty-state">No data yet</div>';
             if (gser.length > 1) {
@@ -2374,7 +2373,7 @@
                 </svg><div class="ovm-linelabels">${lbl}</div>`;
             }
 
-            // Command usage donut — top 3 commands + other.
+            // Command usage donut â€” top 3 commands + other.
             const cmdTotal = top.reduce((a, t) => a + (t.count || 0), 0);
             let donutHtml = '<div class="empty-state">No data yet</div>';
             if (cmdTotal > 0) {
@@ -2393,31 +2392,31 @@
                     <div class="ovm-dlabel"><b>${fmtN(cmdTotal)}</b><span>runs</span></div></div><div class="ovm-legend">${legend}</div>`;
             }
 
-            // Top commands — horizontal bars.
+            // Top commands â€” horizontal bars.
             const hbars = top.length ? top.slice(0, 5).map((t) =>
                 `<div class="ovm-hbar"><div class="ovm-hbartop"><span>/${esc(t.name)}</span><span>${(t.count || 0).toLocaleString()}</span></div><div class="ovm-track"><div class="ovm-fill" style="width:${Math.max(3, Math.round(((t.count || 0) / Math.max(top[0].count || 1, 1)) * 100))}%"></div></div></div>`).join('')
                 : '<p class="muted small">No commands run yet.</p>';
 
-            // Peak hours — diurnal profile scaled by overall activity.
+            // Peak hours â€” diurnal profile scaled by overall activity.
             const avg = series.length ? series.reduce((a, d) => a + (d.count || 0), 0) / series.length : 0;
             const hscale = Math.min(1, avg / 80);
             const HOURS = [10, 6, 4, 3, 3, 5, 12, 22, 35, 42, 50, 58, 62, 60, 55, 60, 70, 82, 95, 100, 88, 70, 45, 25];
             const cells = HOURS.map((v, i) => `<div class="ovm-cell" style="opacity:${(0.12 + ((v * hscale) / 100) * 0.88).toFixed(2)}" title="${String(i).padStart(2, '0')}:00"></div>`).join('');
 
-            // Weekly goal — this week's commands vs the next round milestone.
+            // Weekly goal â€” this week's commands vs the next round milestone.
             const week = stats.usage?.week || 0;
             const mag = 10 ** Math.max(2, String(Math.floor(week)).length - 1);
             const goal = Math.max(100, Math.ceil(week / mag) * mag);
             const gpct = Math.min(100, Math.round((week / goal) * 100));
 
-            // Bot status boxes — uptime + live presence.
+            // Bot status boxes â€” uptime + live presence.
             const bot = stats.bot || {};
             const ATYPE = { 0: 'Playing', 1: 'Streaming', 2: 'Listening to', 3: 'Watching', 4: '', 5: 'Competing in' };
             const actTxt = bot.activity ? `${ATYPE[bot.atype] ?? ''} ${bot.activity}`.trim() : null;
             const PRES = { online: ['#22c55e', 'Online'], idle: ['#f59e0b', 'Idle'], dnd: ['#ef4444', 'Do Not Disturb'], offline: ['#94a3b8', 'Offline'], invisible: ['#94a3b8', 'Offline'] };
             const [pc, plabel] = PRES[bot.status] || PRES.online;
             const upMs = bot.uptime ?? -1;
-            const upStr = upMs < 0 ? '—' : upMs >= 864e5 ? `${Math.floor(upMs / 864e5)}d ${Math.floor((upMs % 864e5) / 36e5)}h`
+            const upStr = upMs < 0 ? 'â€”' : upMs >= 864e5 ? `${Math.floor(upMs / 864e5)}d ${Math.floor((upMs % 864e5) / 36e5)}h`
                 : upMs >= 36e5 ? `${Math.floor(upMs / 36e5)}h ${Math.floor((upMs % 36e5) / 6e4)}m` : `${Math.floor(upMs / 6e4)}m`;
             const upSince = upMs > 0 ? new Date(Date.now() - upMs).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : null;
 
@@ -2447,7 +2446,7 @@
                         <div class="ov-box-body">
                             <div class="ov-box-title">Bot Ping (Latency)</div>
                             <div class="ov-box-num">${pingVal}<span class="ov-box-unit">ms</span></div>
-                            <div class="ov-box-sub"><b>Gateway:</b> Connected · 0% Loss · 96MB Heap</div>
+                            <div class="ov-box-sub"><b>Gateway:</b> Connected Â· 0% Loss Â· 96MB Heap</div>
                         </div>
                     </div>
 
@@ -2515,7 +2514,7 @@
                         <div class="ov-box-body">
                             <div class="ov-box-title">Security & Moderation</div>
                             <div class="ov-box-num">${(stats.mod?.warnsTotal || 24) + (stats.mod?.tempbansTotal || 3)}<span class="ov-box-unit">actions</span></div>
-                            <div class="ov-box-sub"><b>Audit:</b> ${stats.mod?.warnsTotal || 24} warns · ${stats.mod?.tempbansTotal || 3} tempbans</div>
+                            <div class="ov-box-sub"><b>Audit:</b> ${stats.mod?.warnsTotal || 24} warns Â· ${stats.mod?.tempbansTotal || 3} tempbans</div>
                         </div>
                     </div>
 
@@ -2528,7 +2527,7 @@
                         <div class="ov-box-body">
                             <div class="ov-box-title">Bot Uptime</div>
                             <div class="ov-box-num">${upStr}</div>
-                            <div class="ov-box-sub"><b>Since:</b> ${upSince ? `restarted ${upSince}` : '—'} · ${bot.guilds || 1} servers</div>
+                            <div class="ov-box-sub"><b>Since:</b> ${upSince ? `restarted ${upSince}` : 'â€”'} Â· ${bot.guilds || 1} servers</div>
                         </div>
                     </div>
 
@@ -2541,7 +2540,7 @@
                         <div class="ov-box-body">
                             <div class="ov-box-title">Presence</div>
                             <div class="ov-box-num" style="font-size:22px">${esc(actTxt || plabel)}</div>
-                            <div class="ov-box-sub"><b>Status:</b> ${plabel} · serving ${bot.guilds || 1} server${(bot.guilds || 1) === 1 ? '' : 's'}</div>
+                            <div class="ov-box-sub"><b>Status:</b> ${plabel} Â· serving ${bot.guilds || 1} server${(bot.guilds || 1) === 1 ? '' : 's'}</div>
                         </div>
                     </div>
                 </div>
@@ -2562,7 +2561,7 @@
                     <div class="card"><h3 class="ovm-h">${svg('<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M7 10l3 2-3 2M12 15h5"/>')}Top commands</h3>${hbars}</div>
                     <div class="card"><h3 class="ovm-h">${svg('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>')}Peak hours</h3>
                         <div class="ovm-heat">${cells}</div>
-                        <div class="ovm-cap">00:00 to 23:00 — darker means busier</div></div>
+                        <div class="ovm-cap">00:00 to 23:00 â€” darker means busier</div></div>
                     <div class="card"><h3 class="ovm-h">${svg('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/>')}Weekly goal</h3>
                         <div class="ovm-donutwrap">
                             <div class="ovm-donut">
@@ -2589,7 +2588,7 @@
             const els = [
                 { id: `e${++uid}`, type: 'media', shape: 'circle', x: 0.5, y: 0.35, size: 0.35, ring: 'e8622e', ringWidth: 4, glow: 'e8622e' },
                 { id: `e${++uid}`, type: 'text', text: 'Welcome to {server}!', x: 0.5, y: 0.68, size: 0.09, color: 'ffffff', bold: true, align: 'center' },
-                { id: `e${++uid}`, type: 'text', text: 'Member #{members} · Enjoy your stay!', x: 0.5, y: 0.84, size: 0.05, color: 'fba57a', bold: false, align: 'center' },
+                { id: `e${++uid}`, type: 'text', text: 'Member #{members} Â· Enjoy your stay!', x: 0.5, y: 0.84, size: 0.05, color: 'fba57a', bold: false, align: 'center' },
             ];
             let sel = els[0];
             let zoom = 1;
@@ -2603,11 +2602,11 @@
                 <div class="studio-topbar">
                     <div class="studio-dim-selects">
                         <span style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;">Preset:</span>
-                        <button type="button" class="studio-dim-btn active" data-w="800" data-h="300">Welcome (800×300)</button>
-                        <button type="button" class="studio-dim-btn" data-w="960" data-h="540">Banner (960×540)</button>
-                        <button type="button" class="studio-dim-btn" data-w="900" data-h="250">Rank Card (900×250)</button>
-                        <button type="button" class="studio-dim-btn" data-w="1200" data-h="630">Event / Promo (1200×630)</button>
-                        <button type="button" class="studio-dim-btn" data-w="500" data-h="500">Square (500×500)</button>
+                        <button type="button" class="studio-dim-btn active" data-w="800" data-h="300">Welcome (800Ã—300)</button>
+                        <button type="button" class="studio-dim-btn" data-w="960" data-h="540">Banner (960Ã—540)</button>
+                        <button type="button" class="studio-dim-btn" data-w="900" data-h="250">Rank Card (900Ã—250)</button>
+                        <button type="button" class="studio-dim-btn" data-w="1200" data-h="630">Event / Promo (1200Ã—630)</button>
+                        <button type="button" class="studio-dim-btn" data-w="500" data-h="500">Square (500Ã—500)</button>
                     </div>
                     <div class="studio-actions-right">
                         <button type="button" class="btn-rust" id="im-btn-rust" title="Render image natively">
@@ -2645,7 +2644,7 @@
                     <!-- Center: Interactive Stage -->
                     <div class="studio-canvas-stage">
                         <div style="position:absolute;top:16px;left:20px;display:flex;align-items:center;gap:8px;z-index:10;">
-                            <span class="chip" id="im-status-pill" style="font-size:11px;">Zoom: 100% · Drag elements</span>
+                            <span class="chip" id="im-status-pill" style="font-size:11px;">Zoom: 100% Â· Drag elements</span>
                         </div>
                         <div style="position:absolute;top:16px;right:20px;display:flex;align-items:center;gap:6px;z-index:10;">
                             <button type="button" class="btn sm outline" id="im-align-cx" title="Center Horizontally">Align Center X</button>
@@ -2669,16 +2668,16 @@
                                     <option value="avatar">My Avatar</option>
                                     <option value="icon">Server Icon</option>
                                     <option value="banner">Server Banner</option>
-                                    <option value="member">Member…</option>
+                                    <option value="member">Memberâ€¦</option>
                                     <option value="url">Image URL</option>
                                 </select></div>
                                 <div class="fld"><label>Color</label><div style="display:flex;gap:6px;align-items:center;"><input type="color" id="im-bg-col" value="#0b0c10" style="flex:1;"><button type="button" class="btn sm" id="im-bg-dom" title="Sample dominant color from the background image" style="display:grid;place-items:center;padding:6px 9px;">${ICONS.pipette}</button></div></div>
                             </div>
-                            <div class="fld" id="im-bg-urlwrap" style="display:none"><label>Image URL</label><input type="text" id="im-bg-img" placeholder="https://… or {avatar} {icon} {banner}"></div>
+                            <div class="fld" id="im-bg-urlwrap" style="display:none"><label>Image URL</label><input type="text" id="im-bg-img" placeholder="https://â€¦ or {avatar} {icon} {banner}"></div>
                             <div class="fld" id="im-bg-memwrap" style="display:none"><label>Member</label><select id="im-bg-member"></select></div>
                             <div class="grid2">
-                                <div class="fld"><label>Blur — <span id="im-bgl-lbl">0</span>px</label><input type="range" id="im-bg-blur" min="0" max="20" step="1" value="0"></div>
-                                <div class="fld"><label>Dim — <span id="im-bgd-lbl">0</span>%</label><input type="range" id="im-bg-dim" min="0" max="80" step="5" value="0"></div>
+                                <div class="fld"><label>Blur â€” <span id="im-bgl-lbl">0</span>px</label><input type="range" id="im-bg-blur" min="0" max="20" step="1" value="0"></div>
+                                <div class="fld"><label>Dim â€” <span id="im-bgd-lbl">0</span>%</label><input type="range" id="im-bg-dim" min="0" max="80" step="5" value="0"></div>
                             </div>
                         </div>
 
@@ -2722,9 +2721,9 @@
                 $('#im-bg-memwrap', page).style.display = bgSrc === 'member' ? '' : 'none';
             };
             const fillMembers = async (sel, curId) => {
-                sel.innerHTML = '<option value="">Loading…</option>';
+                sel.innerHTML = '<option value="">Loadingâ€¦</option>';
                 const mm = await assets.loadMembers();
-                sel.innerHTML = '<option value="">Pick member…</option>' + Object.entries(mm)
+                sel.innerHTML = '<option value="">Pick memberâ€¦</option>' + Object.entries(mm)
                     .map(([id, m]) => `<option value="${esc(id)}" ${id === curId ? 'selected' : ''}>${esc(m.name)}${m.user ? ` (@${esc(m.user)})` : ''}</option>`).join('');
             };
             bgSrcIn.onchange = () => {
@@ -2859,7 +2858,7 @@
                         ctx.fillText(text, cx, cy);
                     }
 
-                    // Selection outline — follows the element's real bounds.
+                    // Selection outline â€” follows the element's real bounds.
                     if (el === sel) {
                         ctx.strokeStyle = '#38bdf8';
                         ctx.lineWidth = 2;
@@ -2961,11 +2960,11 @@
                             <option value="avatar" ${msrc==='avatar'?'selected':''}>My Avatar</option>
                             <option value="icon" ${msrc==='icon'?'selected':''}>Server Icon</option>
                             <option value="banner" ${msrc==='banner'?'selected':''}>Server Banner</option>
-                            <option value="member" ${msrc==='member'?'selected':''}>Member…</option>
+                            <option value="member" ${msrc==='member'?'selected':''}>Memberâ€¦</option>
                             <option value="url" ${msrc==='url'?'selected':''}>Image URL</option>
                         </select></div>
                         <div class="fld" id="pr-memwrap" style="display:${msrc==='member'?'':'none'}"><label>Member</label><select id="pr-member"></select></div>
-                        <div class="fld" id="pr-urlwrap" style="display:${msrc==='url'?'':'none'}"><label>Image URL</label><input type="text" id="pr-url" value="${msrc==='url' ? esc(sel.url || '') : ''}" placeholder="https://… or {avatar} {icon}"></div>
+                        <div class="fld" id="pr-urlwrap" style="display:${msrc==='url'?'':'none'}"><label>Image URL</label><input type="text" id="pr-url" value="${msrc==='url' ? esc(sel.url || '') : ''}" placeholder="https://â€¦ or {avatar} {icon}"></div>
                         <div class="grid2">
                             <div class="fld"><label>Shape</label><select id="pr-shape"><option value="circle" ${sel.shape==='circle'?'selected':''}>Circle</option><option value="rounded" ${sel.shape==='rounded'?'selected':''}>Rounded</option><option value="square" ${sel.shape==='square'?'selected':''}>Square</option></select></div>
                             <div class="fld"><label>Size</label><input type="range" id="pr-size" min="0.1" max="0.6" step="0.01" value="${sel.size || 0.35}"></div>
@@ -3046,10 +3045,10 @@
                 if (Math.abs(ny - 0.5) < 0.03) ny = 0.5;
                 sel.x = Math.max(0.05, Math.min(0.95, nx));
                 sel.y = Math.max(0.05, Math.min(0.95, ny));
-                statusPill.textContent = `X: ${Math.round(sel.x * 100)}% · Y: ${Math.round(sel.y * 100)}%`;
+                statusPill.textContent = `X: ${Math.round(sel.x * 100)}% Â· Y: ${Math.round(sel.y * 100)}%`;
                 draw();
             };
-            const stopDrag = () => { drag = null; statusPill.textContent = 'Zoom: 100% · Drag elements'; };
+            const stopDrag = () => { drag = null; statusPill.textContent = 'Zoom: 100% Â· Drag elements'; };
             cv.onpointerup = stopDrag;
             cv.onpointercancel = stopDrag;
 
@@ -3107,7 +3106,7 @@
             $('#tmpl-sunset', page).onclick = () => applyTmpl([
                 { type: 'media', url: '{avatar}', shape: 'circle', x: 0.5, y: 0.35, size: 0.35, ring: 'e8622e', ringWidth: 4 },
                 { type: 'text', text: 'Welcome to {server}!', x: 0.5, y: 0.68, size: 0.09, color: 'ffffff', bold: true, align: 'center' },
-                { type: 'text', text: 'Member #{members} · Have a wonderful time!', x: 0.5, y: 0.84, size: 0.05, color: 'fba57a', bold: false, align: 'center' },
+                { type: 'text', text: 'Member #{members} Â· Have a wonderful time!', x: 0.5, y: 0.84, size: 0.05, color: 'fba57a', bold: false, align: 'center' },
             ], '#1c0f0a');
 
             $('#tmpl-cyber', page).onclick = () => applyTmpl([
@@ -3127,7 +3126,7 @@
             $('#tmpl-event', page).onclick = () => applyTmpl([
                 { type: 'badge', text: 'COMMUNITY ANNOUNCEMENT', x: 0.5, y: 0.22, size: 0.045, bgColor: '#ef4444' },
                 { type: 'text', text: 'BIG WEEKEND TOURNAMENT!', x: 0.5, y: 0.5, size: 0.09, color: 'ffffff', bold: true, align: 'center' },
-                { type: 'text', text: 'Join Voice & General · Huge Coin & Role Prizes', x: 0.5, y: 0.76, size: 0.05, color: 'fca5a5', bold: false, align: 'center' },
+                { type: 'text', text: 'Join Voice & General Â· Huge Coin & Role Prizes', x: 0.5, y: 0.76, size: 0.05, color: 'fca5a5', bold: false, align: 'center' },
             ], '#180a0a');
 
             $('#tmpl-minimal', page).onclick = () => applyTmpl([
@@ -3137,7 +3136,7 @@
             ], '#090a0f');
 
             $('#im-btn-rust', page).onclick = async () => {
-                toast('Rendering…');
+                toast('Renderingâ€¦');
                 const cfg = { width: curWidth, height: curHeight, bgColor, background: bgTpl(), bgBlur, bgDim, elements: els };
                 const r = await api(`/api/guilds/${guildId}/studio/render`, { body: { type: 'image', config: cfg } });
                 if (r?.ok) {
@@ -3161,7 +3160,7 @@
             $('#im-btn-save-var', page).onclick = async () => {
                 const name = ($('#im-var-name', page).value || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
                 if (!name) return toast('Enter a variable name first', 'err');
-                toast(`Saving variable {img:${name}}…`);
+                toast(`Saving variable {img:${name}}â€¦`);
                 const cfg = { width: curWidth, height: curHeight, bgColor, background: bgUrl, elements: els };
                 const r = await api(`/api/guilds/${guildId}/studio/variables`, {
                     body: { name, type: 'image', config: cfg, dataUrl: cv.toDataURL('image/png') },
@@ -3189,7 +3188,7 @@
         async 'gif-studio'(page) {
             let width = 400, height = 200;
             let fps = 15;
-            let durationMs = 3000;   // total GIF length — clamped 500..5000
+            let durationMs = 3000;   // total GIF length â€” clamped 500..5000
             let easing = 'easeInOut';
             let playing = true;
             let playT = 0;           // playhead position (ms)
@@ -3234,8 +3233,8 @@
                 return r;
             };
 
-            // Sample the timeline at normalized time tn (0..1) — interpolates
-            // between the bracketing keyframes; wraps last→first for a
+            // Sample the timeline at normalized time tn (0..1) â€” interpolates
+            // between the bracketing keyframes; wraps lastâ†’first for a
             // seamless loop. Elements pair up by stable `id` across keyframes
             // (fall back to index for id-less elements).
             function sampleFrame(tn) {
@@ -3371,13 +3370,13 @@
                             <div class="gif-timeline-ctrls">
                                 <span class="studio-sec-title" style="margin:0;">Keyframes (<span id="gif-frame-count">${kfs.length}</span>)</span>
                                 <div style="display:flex;gap:6px;">
-                                    <button type="button" class="btn sm outline" id="gif-btn-copy-fr" title="Clone the selected keyframe right after itself — reuse the same state later for seamless loops">${ICONS.duplicate} Duplicate</button>
+                                    <button type="button" class="btn sm outline" id="gif-btn-copy-fr" title="Clone the selected keyframe right after itself â€” reuse the same state later for seamless loops">${ICONS.duplicate} Duplicate</button>
                                     <button type="button" class="btn sm outline" id="gif-btn-dup-fr">+ At Playhead</button>
                                     <button type="button" class="btn sm danger" id="gif-btn-del-fr">Delete</button>
                                 </div>
                             </div>
                             <div class="gif-kf-track" id="gif-strip"></div>
-                            <div class="gif-kf-hint">Click the track to scrub · click a dot to edit that keyframe</div>
+                            <div class="gif-kf-hint">Click the track to scrub Â· click a dot to edit that keyframe</div>
                         </div>
                     </div>
 
@@ -3385,7 +3384,7 @@
                     <div class="studio-sidebar-card">
                         <div class="studio-sec-title"><span>Active Keyframe</span></div>
                         <div style="display:flex;flex-direction:column;gap:10px;">
-                            <div class="fld"><label>Time on timeline — <span id="gif-kf-tlbl">0%</span></label><input type="range" id="gif-kf-t" min="0" max="100" value="0" step="1"></div>
+                            <div class="fld"><label>Time on timeline â€” <span id="gif-kf-tlbl">0%</span></label><input type="range" id="gif-kf-t" min="0" max="100" value="0" step="1"></div>
                             <div class="fld"><label>Background</label><div style="display:flex;gap:6px;align-items:center;"><input type="color" id="gif-fr-bg" value="#0b0c10" style="flex:1;"><button type="button" class="btn sm" id="gif-kf-dom" title="Sample dominant color from the background image into this keyframe" style="display:grid;place-items:center;padding:6px 9px;">${ICONS.pipette}</button></div></div>
                         </div>
 
@@ -3399,14 +3398,14 @@
                                 <option value="avatar">My Avatar</option>
                                 <option value="icon">Server Icon</option>
                                 <option value="banner">Server Banner</option>
-                                <option value="member">Member…</option>
+                                <option value="member">Memberâ€¦</option>
                                 <option value="url">Image URL</option>
                             </select></div>
-                            <div class="fld" id="gif-bg-urlwrap" style="display:none"><label>Image URL</label><input type="text" id="gif-bg-img" placeholder="https://… or {avatar} {icon} {banner}"></div>
+                            <div class="fld" id="gif-bg-urlwrap" style="display:none"><label>Image URL</label><input type="text" id="gif-bg-img" placeholder="https://â€¦ or {avatar} {icon} {banner}"></div>
                             <div class="fld" id="gif-bg-memwrap" style="display:none"><label>Member</label><select id="gif-bg-member"></select></div>
                             <div class="grid2">
-                                <div class="fld"><label>Blur — <span id="gif-bgl-lbl">0</span>px</label><input type="range" id="gif-bg-blur" min="0" max="20" step="1" value="0"></div>
-                                <div class="fld"><label>Dim — <span id="gif-bgd-lbl">0</span>%</label><input type="range" id="gif-bg-dim" min="0" max="80" step="5" value="0"></div>
+                                <div class="fld"><label>Blur â€” <span id="gif-bgl-lbl">0</span>px</label><input type="range" id="gif-bg-blur" min="0" max="20" step="1" value="0"></div>
+                                <div class="fld"><label>Dim â€” <span id="gif-bgd-lbl">0</span>%</label><input type="range" id="gif-bg-dim" min="0" max="80" step="5" value="0"></div>
                             </div>
                         </div>
 
@@ -3441,9 +3440,9 @@
                 : gBgSrc === 'member' ? (gBgMemberId ? `{mavatar:${gBgMemberId}}` : '')
                 : gBgSrc === 'url' ? gBgUrl : '');
             const gFillMembers = async (sel, curId) => {
-                sel.innerHTML = '<option value="">Loading…</option>';
+                sel.innerHTML = '<option value="">Loadingâ€¦</option>';
                 const mm = await gAssets.loadMembers();
-                sel.innerHTML = '<option value="">Pick member…</option>' + Object.entries(mm)
+                sel.innerHTML = '<option value="">Pick memberâ€¦</option>' + Object.entries(mm)
                     .map(([id, m]) => `<option value="${esc(id)}" ${id === curId ? 'selected' : ''}>${esc(m.name)}${m.user ? ` (@${esc(m.user)})` : ''}</option>`).join('');
             };
 
@@ -3549,7 +3548,7 @@
                         ctx.textBaseline = 'middle';
                         ctx.fillText(text, cx, cy);
                     }
-                    // Selection outline — match by element id (sampled clone),
+                    // Selection outline â€” match by element id (sampled clone),
                     // outlined at the element's real bounds rather than a box.
                     if (selEl && el.id && el.id === selEl.id && !playing) {
                         ctx.strokeStyle = '#38bdf8';
@@ -3600,7 +3599,7 @@
                 playBtn.innerHTML = playing ? ICONS.pause : ICONS.play;
             }
 
-            // Real-time playback — smooth interpolation across the duration.
+            // Real-time playback â€” smooth interpolation across the duration.
             let lastNow = performance.now();
             function loop(now) {
                 if (playing && durationMs > 0) {
@@ -3615,7 +3614,7 @@
             // Keyframe markers on the timeline track (+ playhead line).
             function renderTrack() {
                 trackEl.innerHTML = `<div class="gif-kf-cur" id="gif-kf-cur" style="left:${(playT / durationMs) * 100}%"></div>` +
-                    kfs.map((k, i) => `<button type="button" class="gif-kf-dot${i === selKf ? ' active' : ''}" style="left:${k.t * 100}%" data-i="${i}" title="Keyframe ${i + 1} — ${(k.t * 100).toFixed(0)}%"></button>`).join('');
+                    kfs.map((k, i) => `<button type="button" class="gif-kf-dot${i === selKf ? ' active' : ''}" style="left:${k.t * 100}%" data-i="${i}" title="Keyframe ${i + 1} â€” ${(k.t * 100).toFixed(0)}%"></button>`).join('');
                 $('#gif-frame-count', page).textContent = kfs.length;
                 $$('.gif-kf-dot', trackEl).forEach((d) => {
                     // Click selects; dragging scrubs the keyframe's time live.
@@ -3688,7 +3687,7 @@
                         <span class="studio-layer-name">${esc(e.type.toUpperCase())}: ${esc(e.text || e.shape || e.id || '')}</span>
                         <button type="button" class="studio-layer-btn" data-gdup="${idx}" title="Duplicate">${ICONS.duplicate}</button>
                         <button type="button" class="studio-layer-btn" data-gdel="${idx}" title="Remove from all keyframes">${ICONS.trash}</button>
-                    </div>`).join('') || '<p class="muted small" style="margin:0;">No elements on this keyframe — add some on the left.</p>';
+                    </div>`).join('') || '<p class="muted small" style="margin:0;">No elements on this keyframe â€” add some on the left.</p>';
 
                 $$('.studio-layer-item', layersEl).forEach((item) => {
                     item.onclick = (e) => {
@@ -3771,11 +3770,11 @@
                             <option value="avatar" ${msrc==='avatar'?'selected':''}>My Avatar</option>
                             <option value="icon" ${msrc==='icon'?'selected':''}>Server Icon</option>
                             <option value="banner" ${msrc==='banner'?'selected':''}>Server Banner</option>
-                            <option value="member" ${msrc==='member'?'selected':''}>Member…</option>
+                            <option value="member" ${msrc==='member'?'selected':''}>Memberâ€¦</option>
                             <option value="url" ${msrc==='url'?'selected':''}>Image URL</option>
                         </select></div>
                         <div class="fld" id="gp-memwrap" style="display:${msrc==='member'?'':'none'}"><label>Member</label><select id="gp-member"></select></div>
-                        <div class="fld" id="gp-urlwrap" style="display:${msrc==='url'?'':'none'}"><label>Image URL</label><input type="text" id="gp-url" value="${msrc==='url' ? esc(selEl.url || '') : ''}" placeholder="https://… or {avatar} {icon}"></div>
+                        <div class="fld" id="gp-urlwrap" style="display:${msrc==='url'?'':'none'}"><label>Image URL</label><input type="text" id="gp-url" value="${msrc==='url' ? esc(selEl.url || '') : ''}" placeholder="https://â€¦ or {avatar} {icon}"></div>
                         ${fldPos()}
                         <div class="grid2">
                             <div class="fld"><label>Shape</label><select id="gp-shape"><option value="circle" ${(selEl.shape || 'circle') === 'circle' ? 'selected' : ''}>Circle</option><option value="rounded" ${selEl.shape === 'rounded' ? 'selected' : ''}>Rounded</option><option value="square" ${selEl.shape === 'square' ? 'selected' : ''}>Square</option></select></div>
@@ -3810,7 +3809,7 @@
                 } else if (selEl.type === 'bar') {
                     propsEl.innerHTML = `
                         ${fldPos()}
-                        <div class="fld"><label>Progress — ${Math.round((selEl.progress ?? 0.5) * 100)}%</label><input type="range" id="gp-prog" min="0" max="1" step="0.02" value="${selEl.progress ?? 0.5}"></div>
+                        <div class="fld"><label>Progress â€” ${Math.round((selEl.progress ?? 0.5) * 100)}%</label><input type="range" id="gp-prog" min="0" max="1" step="0.02" value="${selEl.progress ?? 0.5}"></div>
                         <div class="grid2">
                             <div class="fld"><label>Width</label><input type="range" id="gp-w" min="0.1" max="1" step="0.02" value="${selEl.w ?? 0.6}"></div>
                             <div class="fld"><label>Height</label><input type="range" id="gp-h" min="0.02" max="0.3" step="0.01" value="${selEl.h ?? 0.1}"></div>
@@ -3841,7 +3840,7 @@
                 bindPos();
             }
 
-            // Add-element buttons — apply to all keyframes by default so the
+            // Add-element buttons â€” apply to all keyframes by default so the
             // element exists for the whole animation; unchecked = current only.
             const EL_DEFS = {
                 text: () => ({ id: nid(), type: 'text', text: 'New Text', x: 0.5, y: 0.5, size: 0.1, color: 'ffffff', bold: true }),
@@ -3945,7 +3944,7 @@
                 } else toast(r?.error || 'Could not read that image', 'err');
             };
 
-            // Shared background (image source / blur / dim — same every frame).
+            // Shared background (image source / blur / dim â€” same every frame).
             const gBgSrcIn = $('#gif-bg-src', page);
             const gBgImgIn = $('#gif-bg-img', page);
             const gBgMemIn = $('#gif-bg-member', page);
@@ -3977,7 +3976,7 @@
                 drawAtPlayhead();
             };
 
-            // Duplicate — clone the selected keyframe right after itself so
+            // Duplicate â€” clone the selected keyframe right after itself so
             // the same state can hold a segment or close a loop. Drag the
             // new dot to wherever it should sit.
             $('#gif-btn-copy-fr', page).onclick = () => {
@@ -3993,7 +3992,7 @@
                 renderTrack();
                 syncKfProps();
                 drawAtPlayhead();
-                toast('Keyframe duplicated — drag it to position');
+                toast('Keyframe duplicated â€” drag it to position');
             };
 
             // Insert a copy of the selected keyframe at the playhead.
@@ -4026,7 +4025,7 @@
             }
             const applyGen = (label) => { selKf = 0; playT = 0; selEl = null; relinkEls(); renderTrack(); syncKfProps(); drawAtPlayhead(); toast(label); };
 
-            // Auto generators — keyframe sequences on the shared timeline.
+            // Auto generators â€” keyframe sequences on the shared timeline.
             $('#gen-pulse', page).onclick = () => {
                 easing = 'easeInOut'; easeSel.value = 'easeInOut';
                 kfs.length = 0;
@@ -4130,7 +4129,7 @@
 
             // Native render
             $('#gif-btn-rust', page).onclick = async () => {
-                toast('Rendering GIF…');
+                toast('Rendering GIFâ€¦');
                 const r = await api(`/api/guilds/${guildId}/studio/render`, { body: { type: 'gif', config: gifCfg() } });
                 if (r?.ok) {
                     toast(`GIF encoded in ${r.durationMs}ms!`);
@@ -4141,7 +4140,7 @@
 
             // Download GIF
             $('#gif-btn-dl', page).onclick = async () => {
-                toast('Rendering & downloading animated GIF…');
+                toast('Rendering & downloading animated GIFâ€¦');
                 const r = await api(`/api/guilds/${guildId}/studio/render`, { body: { type: 'gif', config: gifCfg() } });
                 if (r?.dataUrl) {
                     const a = document.createElement('a');
@@ -4156,7 +4155,7 @@
             $('#gif-btn-save-var', page).onclick = async () => {
                 const name = ($('#gif-var-name', page).value || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
                 if (!name) return toast('Enter a variable name first', 'err');
-                toast(`Rendering & saving variable {gif:${name}}…`);
+                toast(`Rendering & saving variable {gif:${name}}â€¦`);
                 const cfg = gifCfg();
                 const rendered = await api(`/api/guilds/${guildId}/studio/render`, { body: { type: 'gif', config: cfg } });
                 const r = await api(`/api/guilds/${guildId}/studio/variables`, {
@@ -4215,7 +4214,7 @@
                             </div>
                             <div class="var-meta-row">
                                 <span class="chip ${v.type === 'gif' ? 'warn' : 'ok'}">${esc(v.type.toUpperCase())}</span>
-                                <span class="muted small">${v.config?.width || 800}×${v.config?.height || 300}</span>
+                                <span class="muted small">${v.config?.width || 800}Ã—${v.config?.height || 300}</span>
                             </div>
                             <div class="var-meta-row">
                                 <button type="button" class="var-tag-pill" data-copy="{${v.type === 'gif' ? 'gif' : 'img'}:${esc(v.name)}}" title="Click to copy">
@@ -4248,7 +4247,7 @@
                     const name = b.dataset.del;
                     const ok = await confirmModal('Delete variable', `Remove variable {${name}}? Any embed referencing it will stop displaying it.`);
                     if (!ok) return;
-                    toast(`Deleting ${name}…`);
+                    toast(`Deleting ${name}â€¦`);
                     const res = await api(`/api/guilds/${guildId}/studio/variables/${name}`, { method: 'DELETE' });
                     if (res?.ok) {
                         toast(`Deleted variable {${name}}`);
@@ -4260,7 +4259,7 @@
             });
         },
 
-        // Activity leaderboards — messages, voice, channels and members.
+        // Activity leaderboards â€” messages, voice, channels and members.
         // One fetch covers the range; filters re-render client-side.
         async activity(page) {
             const d = await api(`/api/guilds/${guildId}/activity?days=${actDays}`);
@@ -4269,7 +4268,7 @@
             const users = d.users || {};
             const chans = d.channels || {};
 
-            // Voice totals are stored as minutes — render "Xh Ym".
+            // Voice totals are stored as minutes â€” render "Xh Ym".
             const fmtV = (mins) => (mins >= 60 ? `${Math.floor(mins / 60)}h${mins % 60 ? ` ${mins % 60}m` : ''}` : `${mins}m`);
             const boards = {
                 messages: Object.entries(users).map(([id, u]) => ({ id, v: u.msg || 0 })).filter((e) => e.v > 0).sort((a, b) => b.v - a.v),
@@ -4313,14 +4312,14 @@
                 { key: 'messages', title: 'Messages', rows: () => boards.messages.filter((e) => memberOk(e.id)), row: (e, i) => urow(e, i, e.v.toLocaleString()) },
                 { key: 'voice', title: 'Voice', rows: () => boards.voice.filter((e) => memberOk(e.id)), row: (e, i) => urow(e, i, fmtV(e.v)) },
                 { key: 'channels', title: 'Channels', rows: () => boards.channels.filter((e) => chanOk(e.id)), row: crow },
-                { key: 'members', title: 'Members', rows: () => boards.members.filter((e) => memberOk(e.id)), row: (e, i) => urow(e, i, `${e.msg.toLocaleString()} msgs · ${fmtV(e.voice)}`) },
+                { key: 'members', title: 'Members', rows: () => boards.members.filter((e) => memberOk(e.id)), row: (e, i) => urow(e, i, `${e.msg.toLocaleString()} msgs Â· ${fmtV(e.voice)}`) },
             ];
 
             page.innerHTML = `
                 <div><div class="page-title">Activity</div>
-                    <p class="page-desc">Who's active and where — every message, voice minute, join and leave is counted live.</p></div>
+                    <p class="page-desc">Who's active and where â€” every message, voice minute, join and leave is counted live.</p></div>
                 <div class="card actbar">
-                    <input type="text" id="actq" placeholder="Filter by name or ID…" value="${esc(actFilter.q)}">
+                    <input type="text" id="actq" placeholder="Filter by name or IDâ€¦" value="${esc(actFilter.q)}">
                     ${selSlot('actroles')}
                     <div class="rpills">${[7, 14, 30, 90].map((dd) => `<button class="rpill${dd === actDays ? ' on' : ''}" data-d="${dd}">${dd}d</button>`).join('')}</div>
                 </div>
@@ -4350,7 +4349,7 @@
                 const ov = document.createElement('div');
                 ov.className = 'overlay';
                 ov.innerHTML = `<div class="modal actmodal">
-                    <div class="ph"><h3>${b.title} · last ${actDays} days</h3><span class="chip">${rows.length}</span></div>
+                    <div class="ph"><h3>${b.title} Â· last ${actDays} days</h3><span class="chip">${rows.length}</span></div>
                     <div class="lrows modal-lrows">${rows.length ? rows.map(b.row).join('') : '<div class="empty-state">No activity in this range yet</div>'}</div>
                     <div class="actions"><button class="btn" data-x>Close</button></div></div>`;
                 ov.addEventListener('click', (e) => { if (e.target === ov || e.target.hasAttribute('data-x')) ov.remove(); });
@@ -4412,7 +4411,7 @@
                         <button class="btn sm danger right" data-del="${i}" title="Remove" style="display:grid;place-items:center;">${ICONS.trash}</button>
                     </div>`).join('') || '<p class="muted small">No scoped rules.</p>';
                 rules.forEach((r, i) => {
-                    mountSelect(page, `rc_${i}`, { options: cmdOpts, value: r.command, placeholder: 'Command…' });
+                    mountSelect(page, `rc_${i}`, { options: cmdOpts, value: r.command, placeholder: 'Commandâ€¦' });
                     mountSelect(page, `rch_${i}`, { options: [{ value: '', label: 'Any channel' }, ...chOpts(DATA.channels)], value: r.channelId || '', placeholder: 'Any channel' });
                 });
                 $$('#rules [data-del]', page).forEach((b) => (b.onclick = () => {
@@ -4440,16 +4439,16 @@
         async triggers(page) {
             const known = new Set(CTX.commands.map((c) => c.name));
             page.innerHTML = `
-                <div><div class="page-title">Triggers</div><p class="page-desc">Bare words that run a command — no prefix needed. Typing <code class="mono">balance</code> can run <code class="mono">.balance</code>.</p></div>
+                <div><div class="page-title">Triggers</div><p class="page-desc">Bare words that run a command â€” no prefix needed. Typing <code class="mono">balance</code> can run <code class="mono">.balance</code>.</p></div>
                 <div class="card"><h3>New trigger</h3>
                     <div class="grid2">
-                        ${fldHtml('Trigger word', txtIn('tname', '', 'e.g. balance'), 'any characters except spaces and slashes — can\'t start with the prefix, max 32')}
+                        ${fldHtml('Trigger word', txtIn('tname', '', 'e.g. balance'), 'any characters except spaces and slashes â€” can\'t start with the prefix, max 32')}
                         ${fldHtml('Command', selSlot('tcmd'), 'the command it runs')}
                     </div>
-                    ${fldHtml('Arguments', txtIn('targs', '', 'optional — e.g. @user 100'), 'fixed args passed before whatever the sender types next')}
+                    ${fldHtml('Arguments', txtIn('targs', '', 'optional â€” e.g. @user 100'), 'fixed args passed before whatever the sender types next')}
                     <div class="mt"><button class="btn primary sm" id="add-tag">Create trigger</button></div></div>
                 <div class="card"><h3>Triggers</h3><div id="taglist"><div class="skeleton" style="height:60px"></div></div></div>`;
-            mountSelect(page, 'tcmd', { options: CTX.commands.map((c) => ({ value: c.name, label: `${c.name} — ${(c.description || '').slice(0, 40)}` })), placeholder: 'Pick a command' });
+            mountSelect(page, 'tcmd', { options: CTX.commands.map((c) => ({ value: c.name, label: `${c.name} â€” ${(c.description || '').slice(0, 40)}` })), placeholder: 'Pick a command' });
             const load = async () => {
                 const d = await api(`/api/guilds/${guildId}/tags`);
                 const tags = Object.entries(d.tags || {});
@@ -4487,7 +4486,7 @@
                 <div><div class="page-title">Automod</div><p class="page-desc">Automatic filtering and rate protection.</p></div>
                 <div class="card"><h3>Filters</h3>
                     <div class="mb">${tgl('antiInvite', 'Delete Discord invite links', a.antiInvite)}</div>
-                    ${fldHtml('Word blacklist', txtArea('blacklist', (a.blacklist || []).join('\n')), 'one per line — messages containing any are deleted')}
+                    ${fldHtml('Word blacklist', txtArea('blacklist', (a.blacklist || []).join('\n')), 'one per line â€” messages containing any are deleted')}
                 </div>
                 <div class="card"><h3>Anti-spam</h3><div class="grid2">
                     ${fldHtml('Max messages', numIn('spamMax', a.spamMax, 0, 50), 'per window; 0 = off')}
@@ -4498,7 +4497,7 @@
                     ${fldHtml('Window (seconds)', numIn('raidWindow', a.raidWindow, 2, 120))}
                 </div>${fldHtml('Action', `<select name="raidAction"><option value="alert" ${a.raidAction === 'alert' ? 'selected' : ''}>Alert mod-log</option><option value="kick" ${a.raidAction === 'kick' ? 'selected' : ''}>Kick joiner</option></select>`)}
                 </div>
-                <div class="card"><h3>Whitelist</h3><p class="sub mb">Automod never scans these channels, and never flags members holding these roles — applies to every check above.</p>
+                <div class="card"><h3>Whitelist</h3><p class="sub mb">Automod never scans these channels, and never flags members holding these roles â€” applies to every check above.</p>
                     <div class="grid2">
                         ${fldHtml('Exempt channels', selSlot('amch'), 'empty = all channels scanned')}
                         ${fldHtml('Exempt roles', selSlot('amroles'), 'empty = everyone checked')}
@@ -4520,7 +4519,7 @@
         async logging(page) {
             const s = CTX.settings;
             const l = s.logging;
-            // Every loggable event, grouped — each row has a toggle and a
+            // Every loggable event, grouped â€” each row has a toggle and a
             // per-event channel override (empty = default channel).
             const LOG_GROUPS = [
                 ['Messages', [
@@ -4551,7 +4550,7 @@
             page.innerHTML = `
                 <div><div class="page-title">Logging</div><p class="page-desc">Every event can be toggled and routed to its own channel.</p></div>
                 <div class="card"><h3>Channels</h3><div class="grid2">
-                    ${fldHtml('Default log channel', selSlot('logch'), 'events without an override post here — empty = off')}
+                    ${fldHtml('Default log channel', selSlot('logch'), 'events without an override post here â€” empty = off')}
                     ${fldHtml('Mod-log channel', selSlot('modlog'), 'warns, bans and automod alerts post here')}
                 </div></div>
                 ${LOG_GROUPS.map(([group, events]) => `
@@ -4612,18 +4611,18 @@
             const cardW = setupCardEditor(page, 'w', w.embed);
             const cardG = setupCardEditor(page, 'g', w.goodbyeEmbed);
             const imgedW = setupImageEditor(page, 'w', w.image);
-            mountSelect(page, 'wimg_tch', { options: [{ value: '', label: 'Pick a channel…' }, ...chOpts(DATA.channels)], value: '', placeholder: 'Pick a channel…' });
+            mountSelect(page, 'wimg_tch', { options: [{ value: '', label: 'Pick a channelâ€¦' }, ...chOpts(DATA.channels)], value: '', placeholder: 'Pick a channelâ€¦' });
             $('#wimg_test', page).onclick = async (e) => {
                 const status = $('#wimg_tstat', page);
                 const channel = mounts.wimg_tch.get();
-                if (!channel) { status.textContent = '— pick a channel first'; return; }
+                if (!channel) { status.textContent = 'â€” pick a channel first'; return; }
                 e.target.disabled = true;
                 const f = formVals(page);
                 const r = await api(`/api/guilds/${guildId}/welcome/test`, {
                     body: { channel, message: f.wmsg, embed: cardW.collect(f), image: imgedW.collect(f) },
                 }).catch(() => null);
                 e.target.disabled = false;
-                status.textContent = r?.ok ? '— sent!' : `— ${r?.error || 'failed'}`;
+                status.textContent = r?.ok ? 'â€” sent!' : `â€” ${r?.error || 'failed'}`;
             };
             bindSave(page, 'welcome', (el) => {
                 const f = formVals(el);
@@ -4641,19 +4640,19 @@
         async afk(page) {
             const a = CTX.settings.afk || {};
             page.innerHTML = `
-                <div><div class="page-title">AFK</div><p class="page-desc">Members go away with <code class="mono">.afk</code> or <code class="mono">/afk</code> — pinging them announces it, and <code class="mono">.afk pings</code> shows who tried. Placeholders: <code class="mono">{user}</code> <code class="mono">{username}</code> <code class="mono">{message}</code> <code class="mono">{ago}</code> <code class="mono">{channel}</code></p></div>
+                <div><div class="page-title">AFK</div><p class="page-desc">Members go away with <code class="mono">.afk</code> or <code class="mono">/afk</code> â€” pinging them announces it, and <code class="mono">.afk pings</code> shows who tried. Placeholders: <code class="mono">{user}</code> <code class="mono">{username}</code> <code class="mono">{message}</code> <code class="mono">{ago}</code> <code class="mono">{channel}</code></p></div>
                 <div class="card"><h3>Behavior</h3>
                     ${tgl('a_on', 'AFK enabled', a.enabled !== false)}
                     ${fldHtml('Default message', txtIn('a_def', a.defaultMessage || 'AFK'), 'used by a bare .afk with no text')}
-                    ${fldHtml('Announcement', txtIn('a_ann', a.announce || ''), 'reply when an AFK member gets pinged — {user} {message} {ago} {channel}')}
+                    ${fldHtml('Announcement', txtIn('a_ann', a.announce || ''), 'reply when an AFK member gets pinged â€” {user} {message} {ago} {channel}')}
                     ${tgl('a_clear', 'Welcome-back notice', a.selfClear !== false)}
                 </div>
                 <div class="card"><h3>Permissions</h3>
-                    ${fldHtml('Allowed roles', selSlot('a_roles'), 'members need one of these — empty = everyone')}
+                    ${fldHtml('Allowed roles', selSlot('a_roles'), 'members need one of these â€” empty = everyone')}
                     ${fldHtml('Silent channels', selSlot('a_ch'), 'mentions here never announce AFK status')}
                 </div>
                 <div class="card"><h3>Announcement card</h3>
-                    <p class="sub mb">Rich card replacing the plain announcement line — the same editor as Welcome.</p>
+                    <p class="sub mb">Rich card replacing the plain announcement line â€” the same editor as Welcome.</p>
                     ${cardEditorHtml('afk', a.card || {})}
                 </div>`;
 
@@ -4692,13 +4691,13 @@
                         <button class="btn sm danger right" data-del="${i}" title="Remove" style="display:grid;place-items:center;">${ICONS.trash}</button>
                     </div>`).join('') || '<p class="muted small">No reaction roles.</p>';
                 rrs.forEach((x, i) => {
-                    const ch = mountSelect(page, `rrc_${i}`, { options: chOpts(DATA.channels), value: x.channelId, placeholder: 'Channel…' });
-                    const ms = mountSelect(page, `rrm_${i}`, { options: [{ value: x.messageId || '', label: x.messageId ? `…${String(x.messageId).slice(-6)}` : 'Pick channel first' }], value: x.messageId, placeholder: 'Message…' });
-                    mountSelect(page, `rrr_${i}`, { options: roOpts(DATA.roles), value: x.roleId, placeholder: 'Role…' });
+                    const ch = mountSelect(page, `rrc_${i}`, { options: chOpts(DATA.channels), value: x.channelId, placeholder: 'Channelâ€¦' });
+                    const ms = mountSelect(page, `rrm_${i}`, { options: [{ value: x.messageId || '', label: x.messageId ? `â€¦${String(x.messageId).slice(-6)}` : 'Pick channel first' }], value: x.messageId, placeholder: 'Messageâ€¦' });
+                    mountSelect(page, `rrr_${i}`, { options: roOpts(DATA.roles), value: x.roleId, placeholder: 'Roleâ€¦' });
                     ch.addEventListener('change', async () => {
                         const cid = ch.get();
                         if (!cid) return;
-                        ms.setOptions([{ value: '', label: 'Loading…' }]);
+                        ms.setOptions([{ value: '', label: 'Loadingâ€¦' }]);
                         const d = await api(`/api/guilds/${guildId}/messages?channel=${cid}`);
                         ms.setOptions(d.messages?.length
                             ? d.messages.map((mm) => ({ value: mm.id, label: `${mm.author}: ${mm.preview}` }))
@@ -4747,7 +4746,7 @@
                     <input type="number" name="rl_${i}" value="${x.level || ''}" min="1" style="flex:0 0 80px">
                     <div class="grow">${selSlot(`rlr_${i}`)}</div>
                     <button class="btn sm danger" data-del="${i}" title="Remove" style="display:grid;place-items:center;">${ICONS.trash}</button></div>`).join('') || '<p class="muted small">No rewards.</p>';
-                rewards.forEach((x, i) => mountSelect(page, `rlr_${i}`, { options: roOpts(DATA.roles), value: x.roleId, placeholder: 'Role…' }));
+                rewards.forEach((x, i) => mountSelect(page, `rlr_${i}`, { options: roOpts(DATA.roles), value: x.roleId, placeholder: 'Roleâ€¦' }));
                 $$('#rewards [data-del]', page).forEach((b) => (b.onclick = () => { rewards.splice(+b.dataset.del, 1); renderRw(); }));
             };
             renderRw();
@@ -4771,14 +4770,14 @@
                 <div class="card"><h3>Currency</h3><div class="grid2">
                     ${fldHtml('Currency name', txtIn('currency', s.economy.currency || ''), 'empty = default "coins"')}
                     ${fldHtml('Starting balance', numIn('startBalance', s.economy.startBalance, 0, 10000000), 'wallet for new members')}
-                    ${fldHtml('Pay cap', numIn('payMax', s.economy.payMax, 1, 300000), 'max per payment — empty = 100,000, up to 300,000')}
+                    ${fldHtml('Pay cap', numIn('payMax', s.economy.payMax, 1, 300000), 'max per payment â€” empty = 100,000, up to 300,000')}
                 </div></div>
                 <div class="card"><h3>Daily reward</h3><div class="grid2">
                     ${fldHtml('Base reward', numIn('dailyBase', s.economy.dailyBase, 0, 1000000), 'empty = 500')}
                     ${fldHtml('Streak bonus / day', numIn('dailyStreak', s.economy.dailyStreak, 0, 1000000), 'empty = 100')}
                     ${fldHtml('Max streak bonus', numIn('dailyMaxStreak', s.economy.dailyMaxStreak, 0, 10000000), 'empty = 1000')}
                 </div></div>
-                <div class="card"><h3>Shop items</h3><p class="sub mb">Your server's catalog — empty uses the built-in shop (cookie, coffee, ticket, gem, VIP).</p>
+                <div class="card"><h3>Shop items</h3><p class="sub mb">Your server's catalog â€” empty uses the built-in shop (cookie, coffee, ticket, gem, VIP).</p>
                     <div id="shopitems"></div><button class="btn sm mt" id="add-item">${ICONS.plus} <span>Add item</span></button></div>`;
             const siEl = $('#shopitems', page);
             const renderItems = () => {
@@ -4787,7 +4786,7 @@
                         <input type="text" name="sn_${i}" value="${esc(x.name || '')}" placeholder="Item name" style="flex:0 0 160px">
                         <input type="number" name="sp_${i}" value="${x.price || ''}" placeholder="Price" min="1" style="flex:0 0 110px">
                         <input type="text" name="sd_${i}" value="${esc(x.description || '')}" placeholder="Description" class="grow">
-                        <button class="btn sm danger" data-del="${i}" title="Remove" style="display:grid;place-items:center;">${ICONS.trash}</button></div>`).join('') || '<p class="muted small">No custom items — the built-in shop is used.</p>';
+                        <button class="btn sm danger" data-del="${i}" title="Remove" style="display:grid;place-items:center;">${ICONS.trash}</button></div>`).join('') || '<p class="muted small">No custom items â€” the built-in shop is used.</p>';
                 $$('#shopitems [data-del]', page).forEach((b) => (b.onclick = () => { items.splice(+b.dataset.del, 1); renderItems(); }));
             };
             renderItems();
@@ -4804,15 +4803,15 @@
 
         async shop(page) {
             const s = CTX.settings.shop || {};
-            // Live editor model — DOM rows mirror this array; collect() reads
+            // Live editor model â€” DOM rows mirror this array; collect() reads
             // the DOM back into payload shape so re-renders never lose input.
             const state = { sections: (s.sections || []).map((c) => ({ name: c.name || '', items: (c.items || []).map((i) => ({ ...i })) })) };
 
             const TYPE_OPTS = [
-                { value: 'item', label: 'Item — collectible (lands in inventory)' },
-                { value: 'role', label: 'Role — granted on buy' },
-                { value: 'multiplier', label: 'Booster — timed coins/XP multiplier' },
-                { value: 'crate', label: 'Crate — random drop per buy' },
+                { value: 'item', label: 'Item â€” collectible (lands in inventory)' },
+                { value: 'role', label: 'Role â€” granted on buy' },
+                { value: 'multiplier', label: 'Booster â€” timed coins/XP multiplier' },
+                { value: 'crate', label: 'Crate â€” random drop per buy' },
             ];
 
             page.innerHTML = `
@@ -4821,13 +4820,13 @@
                     <div class="mb">${tgl('shop_on', 'Enable the shop', s.enabled !== false)}</div>
                     <div class="grid2">
                         ${fldHtml('Title', txtIn('shop_title', s.title, 'Shop'))}
-                        ${fldHtml('Accent color', `<div class="clrrow"><input type="color" name="shop_pick" value="${esc(s.color || '#5865f2')}"><input type="text" name="shop_color" value="${esc(s.color || '')}" placeholder="#5865f2 — empty = default"></div>`)}
+                        ${fldHtml('Accent color', `<div class="clrrow"><input type="color" name="shop_pick" value="${esc(s.color || '#5865f2')}"><input type="text" name="shop_color" value="${esc(s.color || '')}" placeholder="#5865f2 â€” empty = default"></div>`)}
                     </div>
                     ${fldHtml('Description', txtIn('shop_desc', s.description), 'shown under the title when /shop opens')}
                 </div>
                 <div id="shopsecs"></div>
                 <button class="btn sm" id="add-sec">+ Add section</button>
-                <p class="muted small" style="margin-top:10px">Item ids are the shop's keys — <b>Item</b> entries land in inventory under their id
+                <p class="muted small" style="margin-top:10px">Item ids are the shop's keys â€” <b>Item</b> entries land in inventory under their id
                     (e.g. <code class="mono">cookie</code>), <code class="mono">.shop buy &lt;id&gt;</code> purchases directly, and crates drop ids from their pool.</p>`;
 
             const pick = $('[name=shop_pick]', page), hex = $('[name=shop_color]', page);
@@ -4840,7 +4839,7 @@
                     ${selSlot(`${p}_t`)}
                     <input type="text" name="${p}_name" value="${esc(x.name || '')}" placeholder="Item name" style="flex:0 0 130px">
                     <input type="number" name="${p}_price" value="${x.price ?? ''}" placeholder="Price" min="0" style="flex:0 0 80px">
-                    <input type="text" name="${p}_id" value="${esc(x.id || '')}" placeholder="id (auto)" title="Unique key — inventory entry, .shop buy <id>, crate pool reference" style="flex:0 0 110px">
+                    <input type="text" name="${p}_id" value="${esc(x.id || '')}" placeholder="id (auto)" title="Unique key â€” inventory entry, .shop buy <id>, crate pool reference" style="flex:0 0 110px">
                     <input type="text" name="${p}_desc" value="${esc(x.desc || '')}" placeholder="Description" class="grow">
                     <span data-fx="role">${selSlot(`${p}_role`)}</span>
                     <span data-fx="multiplier" style="display:contents">
@@ -4848,7 +4847,7 @@
                         <input type="number" name="${p}_mult" value="${x.mult ?? ''}" placeholder="2x" min="1" step="0.1" style="width:70px" title="Multiplier">
                         <input type="number" name="${p}_mins" value="${x.mins ?? ''}" placeholder="mins" min="1" style="width:80px" title="Duration (minutes)">
                     </span>
-                    <span data-fx="crate" style="display:contents"><input type="text" name="${p}_pool" value="${esc(Array.isArray(x.pool) ? x.pool.join(', ') : x.pool || '')}" placeholder="cookie, gem, 50-200" style="min-width:180px" title="Comma-separated drops — item ids or coin amounts/ranges"></span>
+                    <span data-fx="crate" style="display:contents"><input type="text" name="${p}_pool" value="${esc(Array.isArray(x.pool) ? x.pool.join(', ') : x.pool || '')}" placeholder="cookie, gem, 50-200" style="min-width:180px" title="Comma-separated drops â€” item ids or coin amounts/ranges"></span>
                     <button class="btn sm" data-mv="-1" title="Move up" style="display:grid;place-items:center;">${ICONS.up}</button>
                     <button class="btn sm" data-mv="1" title="Move down" style="display:grid;place-items:center;">${ICONS.down}</button>
                     <button class="btn sm danger" data-del title="Remove" style="display:grid;place-items:center;">${ICONS.trash}</button>
@@ -4875,7 +4874,7 @@
             const secsEl = $('#shopsecs', page);
             const render = () => {
                 secsEl.innerHTML = state.sections.map(secCard).join('')
-                    || '<div class="card"><p class="muted small">No sections — add one below to start selling.</p></div>';
+                    || '<div class="card"><p class="muted small">No sections â€” add one below to start selling.</p></div>';
                 state.sections.forEach((c, si) => {
                     const card = secsEl.querySelector(`[data-sec="${si}"]`);
                     const rows = card.querySelectorAll('.shoprow');
@@ -4887,14 +4886,14 @@
                             row.dataset.type = mounts[`${p}_t`].get() || 'item';
                             syncFx(row);
                         });
-                        mountSelect(page, `${p}_role`, { options: roOpts(DATA.roles), value: x.roleId, placeholder: 'Role…' });
+                        mountSelect(page, `${p}_role`, { options: roOpts(DATA.roles), value: x.roleId, placeholder: 'Roleâ€¦' });
                         mountSelect(page, `${p}_kind`, { options: [{ value: 'coins', label: 'Coins' }, { value: 'xp', label: 'XP / Levels' }], value: x.kind || 'coins' });
                         syncFx(row);
                     });
                 });
             };
 
-            // Read the live DOM into payload shape — used both by bindSave and
+            // Read the live DOM into payload shape â€” used both by bindSave and
             // to checkpoint state before any structural re-render.
             const collect = () => {
                 const f = formVals(page);
@@ -4928,7 +4927,7 @@
             render();
             $('#add-sec', page).onclick = () => {
                 sync();
-                if (state.sections.length >= 10) return; // sane cap — menu fits 25 but pages get unwieldy
+                if (state.sections.length >= 10) return; // sane cap â€” menu fits 25 but pages get unwieldy
                 state.sections.push({ name: '', items: [] });
                 render();
             };
@@ -4981,21 +4980,21 @@
             ];
             const perIn = (game, key) => `<input type="number" name="gp_${game}_${key}" value="${per[game]?.[key] ?? ''}" min="0" placeholder="default">`;
             page.innerHTML = `
-                <div><div class="page-title">Games</div><p class="page-desc">Wagers and rewards — global defaults, plus a per-game override below.</p></div>
+                <div><div class="page-title">Games</div><p class="page-desc">Wagers and rewards â€” global defaults, plus a per-game override below.</p></div>
                 <div class="card"><h3>Defaults</h3><p class="sub mb">Applied to every game unless it has an override below.</p><div class="grid2">
                     ${fldHtml('Guess reward', numIn('guessReward', g.guessReward, 0, 10000000), 'number guess win')}
                     ${fldHtml('Scramble reward', numIn('scrambleReward', g.scrambleReward, 0, 10000000), 'first correct answer')}
-                    ${fldHtml('Win multiplier', numIn('winMultiplier', g.winMultiplier, 0, 100), 'scales wager wins — 1 = normal')}
-                    ${fldHtml('Max bet', numIn('maxBet', g.maxBet, 0, 100000000), 'wager cap — 0 = unlimited')}
+                    ${fldHtml('Win multiplier', numIn('winMultiplier', g.winMultiplier, 0, 100), 'scales wager wins â€” 1 = normal')}
+                    ${fldHtml('Max bet', numIn('maxBet', g.maxBet, 0, 100000000), 'wager cap â€” 0 = unlimited')}
                 </div></div>
                 ${WAGER.map(([k, label]) => `
                 <div class="card"><h3>${label}</h3><div class="grid2">
-                    ${fldHtml('Max bet', perIn(k, 'maxBet'), 'wager cap — empty = use default')}
-                    ${fldHtml('Win multiplier', perIn(k, 'winMultiplier'), 'payout scale — empty = use default')}
+                    ${fldHtml('Max bet', perIn(k, 'maxBet'), 'wager cap â€” empty = use default')}
+                    ${fldHtml('Win multiplier', perIn(k, 'winMultiplier'), 'payout scale â€” empty = use default')}
                 </div></div>`).join('')}
                 ${REWARD.map(([k, label]) => `
                 <div class="card"><h3>${label}</h3><div class="grid2">
-                    ${fldHtml('Reward', perIn(k, 'reward'), 'coins per win — empty = use default')}
+                    ${fldHtml('Reward', perIn(k, 'reward'), 'coins per win â€” empty = use default')}
                 </div></div>`).join('')}`;
             bindSave(page, 'games', (el) => {
                 const f = formVals(el);
@@ -5019,12 +5018,12 @@
             const t = CTX.settings.tickets || {};
             const topics = [...(t.topics || [])];
             page.innerHTML = `
-                <div><div class="page-title">Tickets</div><p class="page-desc">Members pick a topic on the panel — a private channel opens under your category.</p></div>
+                <div><div class="page-title">Tickets</div><p class="page-desc">Members pick a topic on the panel â€” a private channel opens under your category.</p></div>
                 <div class="card"><h3>Setup</h3>
                     <div class="mb">${tgl('tk_on', 'Enable tickets', t.enabled)}</div>
                     <div class="grid2">
                         ${fldHtml('Ticket category', selSlot('tkcat'), 'new ticket channels land here')}
-                        ${fldHtml('Log channel', selSlot('tklog'), 'open/close announcements — empty = silent')}
+                        ${fldHtml('Log channel', selSlot('tklog'), 'open/close announcements â€” empty = silent')}
                     </div>
                     <div class="grid2">
                         ${fldHtml('Support roles', selSlot('tkroles'), 'can see, claim and close tickets')}
@@ -5032,21 +5031,21 @@
                     </div>
                     ${fldHtml('Channel naming', txtIn('tkname', t.naming, 'ticket-{user}'), 'placeholders: {user} {count}')}
                 </div>
-                <div class="card"><h3>Topics</h3><p class="sub mb">The panel dropdown — up to 10. With none, the panel shows a single "Open a ticket" button.</p>
+                <div class="card"><h3>Topics</h3><p class="sub mb">The panel dropdown â€” up to 10. With none, the panel shows a single "Open a ticket" button.</p>
                     <div id="topics"></div><button class="btn sm mt" id="add-topic">${ICONS.plus} <span>Add topic</span></button></div>
-                <div class="card"><h3>Panel card</h3><p class="sub mb">The message people see — CV2 container, classic embed, or plain text when the card is off. The topic dropdown is attached automatically.</p>
+                <div class="card"><h3>Panel card</h3><p class="sub mb">The message people see â€” CV2 container, classic embed, or plain text when the card is off. The topic dropdown is attached automatically.</p>
                     ${cardEditorHtml('tp', t.panel || {})}</div>
                 <div class="card"><h3>Post panel</h3>
-                    ${fldHtml('Channel', selSlot('tkpost'), 'sends the panel immediately — uses saved settings')}
+                    ${fldHtml('Channel', selSlot('tkpost'), 'sends the panel immediately â€” uses saved settings')}
                     <div class="mt"><button class="btn" id="post-panel">Post panel</button> <span class="hint" id="post-status"></span></div></div>`;
 
             mountSelect(page, 'tkcat', { options: [{ value: '', label: 'No category' }, ...(DATA.categories || []).map((c) => ({ value: c.id, label: c.name, icon: ICONS.folder }))], value: t.categoryId || '', placeholder: 'No category' });
             mountSelect(page, 'tklog', { options: [{ value: '', label: 'Off' }, ...chOpts(DATA.channels)], value: t.logChannel || '', placeholder: 'Off' });
-            mountSelect(page, 'tkroles', { multi: true, options: roOpts(DATA.roles), value: t.supportRoles || [], placeholder: 'Support roles…' });
-            mountSelect(page, 'tkpost', { options: chOpts(DATA.channels), placeholder: 'Pick a channel…' });
+            mountSelect(page, 'tkroles', { multi: true, options: roOpts(DATA.roles), value: t.supportRoles || [], placeholder: 'Support rolesâ€¦' });
+            mountSelect(page, 'tkpost', { options: chOpts(DATA.channels), placeholder: 'Pick a channelâ€¦' });
             const card = setupCardEditor(page, 'tp', t.panel || {}, {
                 extras: t.topics?.length
-                    ? [{ type: 'select', label: 'Choose a topic…' }]
+                    ? [{ type: 'select', label: 'Choose a topicâ€¦' }]
                     : [{ type: 'buttons', labels: ['Open a ticket'], color: 'primary' }],
                 plain: 'Pick a topic below to open a ticket.',
             });
@@ -5061,10 +5060,10 @@
             const renderTopics = () => {
                 tpEl.innerHTML = topics.map((x, i) => `
                     <div class="modrow">
-                        <input type="text" name="tn_${i}" value="${esc(x.name || '')}" placeholder="Topic — e.g. General support" style="flex:0 0 200px">
+                        <input type="text" name="tn_${i}" value="${esc(x.name || '')}" placeholder="Topic â€” e.g. General support" style="flex:0 0 200px">
                         <input type="text" name="td_${i}" value="${esc(x.desc || '')}" placeholder="Dropdown description" class="grow">
                         <button class="btn sm danger" data-del="${i}" title="Remove" style="display:grid;place-items:center;">${ICONS.trash}</button></div>`).join('')
-                    || '<p class="muted small">No topics — the panel falls back to a single open button.</p>';
+                    || '<p class="muted small">No topics â€” the panel falls back to a single open button.</p>';
                 $$('#topics [data-del]', page).forEach((b) => (b.onclick = () => { syncTopics(); topics.splice(+b.dataset.del, 1); renderTopics(); }));
             };
             renderTopics();
@@ -5073,11 +5072,11 @@
             $('#post-panel', page).onclick = async (e) => {
                 const status = $('#post-status', page);
                 const channel = mounts.tkpost.get();
-                if (!channel) { status.textContent = '— pick a channel first'; return; }
+                if (!channel) { status.textContent = 'â€” pick a channel first'; return; }
                 e.target.disabled = true;
                 const r = await api(`/api/guilds/${guildId}/tickets/panel`, { body: { channel } }).catch(() => null);
                 e.target.disabled = false;
-                status.textContent = r?.ok ? '— posted!' : `— ${r?.error || 'failed (save your settings first)'}`;
+                status.textContent = r?.ok ? 'â€” posted!' : `â€” ${r?.error || 'failed (save your settings first)'}`;
             };
 
             bindSave(page, 'tickets', (el) => {
@@ -5098,24 +5097,24 @@
         async captcha(page) {
             const c = CTX.settings.captcha || {};
             page.innerHTML = `
-                <div><div class="page-title">CAPTCHA</div><p class="page-desc">Keep bots out — members click Verify on the panel, then pick the characters shown in a scrambled image to get the role.</p></div>
+                <div><div class="page-title">CAPTCHA</div><p class="page-desc">Keep bots out â€” members click Verify on the panel, then pick the characters shown in a scrambled image to get the role.</p></div>
                 <div class="card"><h3>Setup</h3>
                     <div class="mb">${tgl('cp_on', 'Enable CAPTCHA verification', c.enabled)}</div>
                     <div class="grid2">
-                        ${fldHtml('Verified role', selSlot('cprole'), 'granted when a member passes — required')}
-                        ${fldHtml('Log channel', selSlot('cplog'), 'pass/fail announcements — empty = silent')}
+                        ${fldHtml('Verified role', selSlot('cprole'), 'granted when a member passes â€” required')}
+                        ${fldHtml('Log channel', selSlot('cplog'), 'pass/fail announcements â€” empty = silent')}
                     </div>
-                    <p class="sub">Tip: hide your channels from @everyone and let only the verified role see them — that's what makes the gate work.</p>
+                    <p class="sub">Tip: hide your channels from @everyone and let only the verified role see them â€” that's what makes the gate work.</p>
                 </div>
-                <div class="card"><h3>Panel card</h3><p class="sub mb">The message people verify from — CV2 container, classic embed, or plain text when the card is off. The Verify button is attached automatically.</p>
+                <div class="card"><h3>Panel card</h3><p class="sub mb">The message people verify from â€” CV2 container, classic embed, or plain text when the card is off. The Verify button is attached automatically.</p>
                     ${cardEditorHtml('cp', c.panel || {})}</div>
                 <div class="card"><h3>Post panel</h3>
-                    ${fldHtml('Channel', selSlot('cppost'), 'sends the panel immediately — uses saved settings')}
+                    ${fldHtml('Channel', selSlot('cppost'), 'sends the panel immediately â€” uses saved settings')}
                     <div class="mt"><button class="btn" id="post-panel">Post panel</button> <span class="hint" id="post-status"></span></div></div>`;
 
-            mountSelect(page, 'cprole', { options: roOpts(DATA.roles), value: c.roleId || '', placeholder: 'Pick a role…' });
+            mountSelect(page, 'cprole', { options: roOpts(DATA.roles), value: c.roleId || '', placeholder: 'Pick a roleâ€¦' });
             mountSelect(page, 'cplog', { options: [{ value: '', label: 'Off' }, ...chOpts(DATA.channels)], value: c.logChannel || '', placeholder: 'Off' });
-            mountSelect(page, 'cppost', { options: chOpts(DATA.channels), placeholder: 'Pick a channel…' });
+            mountSelect(page, 'cppost', { options: chOpts(DATA.channels), placeholder: 'Pick a channelâ€¦' });
             const card = setupCardEditor(page, 'cp', c.panel || {}, {
                 extras: [{ type: 'buttons', labels: ['Verify'], color: 'success' }],
                 plain: 'Click **Verify** to prove you\'re human.',
@@ -5124,11 +5123,11 @@
             $('#post-panel', page).onclick = async (e) => {
                 const status = $('#post-status', page);
                 const channel = mounts.cppost.get();
-                if (!channel) { status.textContent = '— pick a channel first'; return; }
+                if (!channel) { status.textContent = 'â€” pick a channel first'; return; }
                 e.target.disabled = true;
                 const r = await api(`/api/guilds/${guildId}/captcha/panel`, { body: { channel } }).catch(() => null);
                 e.target.disabled = false;
-                status.textContent = r?.ok ? '— posted!' : `— ${r?.error || 'failed (save your settings first)'}`;
+                status.textContent = r?.ok ? 'â€” posted!' : `â€” ${r?.error || 'failed (save your settings first)'}`;
             };
 
             bindSave(page, 'captcha', (el) => {
@@ -5145,41 +5144,41 @@
         async voicemaster(page) {
             const v = CTX.settings.voicemaster || {};
             page.innerHTML = `
-                <div><div class="page-title">VoiceMaster</div><p class="page-desc">Join-to-create voice channels — members who join the trigger channel get their own voice room and control it from the posted panel or by typing <code>.vc</code> in the channel's chat.</p></div>
+                <div><div class="page-title">VoiceMaster</div><p class="page-desc">Join-to-create voice channels â€” members who join the trigger channel get their own voice room and control it from the posted panel or by typing <code>.vc</code> in the channel's chat.</p></div>
                 <div class="card"><h3>Setup</h3>
                     <div class="mb">${tgl('vm_on', 'Enable VoiceMaster', v.enabled)}</div>
                     <div class="grid2">
                         ${fldHtml('Trigger channel', selSlot('vmtrig'), 'joining this voice channel hands out a personal one')}
-                        ${fldHtml('Category', selSlot('vmcat'), 'new voice channels land here — empty = same as trigger')}
+                        ${fldHtml('Category', selSlot('vmcat'), 'new voice channels land here â€” empty = same as trigger')}
                     </div>
                     <div class="grid2">
-                        ${fldHtml('Channel naming', txtIn('vmname', v.naming, "{user}'s channel"), '{user} = username · {name} = display name')}
+                        ${fldHtml('Channel naming', txtIn('vmname', v.naming, "{user}'s channel"), '{user} = username Â· {name} = display name')}
                         ${fldHtml('Default user limit', numIn('vmlimit', v.userLimit, 0, 99), '0 = unlimited')}
                     </div>
-                    ${fldHtml('Default bitrate (kbps)', numIn('vmbit', v.bitrate, 0, 384), '0 = server default — capped by the server\'s boost level')}
+                    ${fldHtml('Default bitrate (kbps)', numIn('vmbit', v.bitrate, 0, 384), '0 = server default â€” capped by the server\'s boost level')}
                 </div>
-                <div class="card"><h3>Control panel</h3><p class="sub mb">The message members control their channel from — the button grid and bitrate picker attach automatically. Owners can also type <code>.vc</code> in their channel's built-in chat.</p>
+                <div class="card"><h3>Control panel</h3><p class="sub mb">The message members control their channel from â€” the button grid and bitrate picker attach automatically. Owners can also type <code>.vc</code> in their channel's built-in chat.</p>
                     ${cardEditorHtml('vmp', v.panel || {})}</div>
                 <div class="card"><h3>Post panel</h3>
-                    ${fldHtml('Channel', selSlot('vmpost'), 'sends the panel immediately — uses saved settings')}
+                    ${fldHtml('Channel', selSlot('vmpost'), 'sends the panel immediately â€” uses saved settings')}
                     <div class="mt"><button class="btn" id="post-panel">Post panel</button> <span class="hint" id="post-status"></span></div></div>`;
 
-            mountSelect(page, 'vmtrig', { options: [{ value: '', label: 'Off' }, ...(DATA.voice || []).map((c) => ({ value: c.id, label: c.name, icon: ICONS.speaker }))], value: v.triggerId || '', placeholder: 'Pick a voice channel…' });
+            mountSelect(page, 'vmtrig', { options: [{ value: '', label: 'Off' }, ...(DATA.voice || []).map((c) => ({ value: c.id, label: c.name, icon: ICONS.speaker }))], value: v.triggerId || '', placeholder: 'Pick a voice channelâ€¦' });
             mountSelect(page, 'vmcat', { options: [{ value: '', label: 'Same as trigger' }, ...(DATA.categories || []).map((c) => ({ value: c.id, label: c.name, icon: ICONS.folder }))], value: v.categoryId || '', placeholder: 'Same as trigger' });
-            mountSelect(page, 'vmpost', { options: chOpts(DATA.channels), placeholder: 'Pick a channel…' });
+            mountSelect(page, 'vmpost', { options: chOpts(DATA.channels), placeholder: 'Pick a channelâ€¦' });
             const card = setupCardEditor(page, 'vmp', v.panel || {}, {
                 extras: VM_EXTRAS,
-                plain: 'Join the trigger channel to get your own voice channel — manage it with the buttons below or by typing `.vc` in its chat.',
+                plain: 'Join the trigger channel to get your own voice channel â€” manage it with the buttons below or by typing `.vc` in its chat.',
             });
 
             $('#post-panel', page).onclick = async (e) => {
                 const status = $('#post-status', page);
                 const channel = mounts.vmpost.get();
-                if (!channel) { status.textContent = '— pick a channel first'; return; }
+                if (!channel) { status.textContent = 'â€” pick a channel first'; return; }
                 e.target.disabled = true;
                 const r = await api(`/api/guilds/${guildId}/voicemaster/panel`, { body: { channel } }).catch(() => null);
                 e.target.disabled = false;
-                status.textContent = r?.ok ? '— posted!' : `— ${r?.error || 'failed (save your settings first)'}`;
+                status.textContent = r?.ok ? 'â€” posted!' : `â€” ${r?.error || 'failed (save your settings first)'}`;
             };
 
             bindSave(page, 'voicemaster', (el) => {
@@ -5202,7 +5201,7 @@
                 <div><div class="page-title">Boosting</div><p class="page-desc">Perks for members who boost the server.</p></div>
                 <div class="card"><h3>Announcement</h3>
                     ${fldHtml('Channel', selSlot('bch'), 'empty = no announcement')}
-                    ${fldHtml('Message', txtArea('bmsg', b.message), '{user} {username} {server} {boosts} — sent as plain text when the card below is off')}
+                    ${fldHtml('Message', txtArea('bmsg', b.message), '{user} {username} {server} {boosts} â€” sent as plain text when the card below is off')}
                     ${cardEditorHtml('bc', b.card || {}, ['{boosts}'])}
                 </div>
                 <div class="card"><h3>Booster role</h3>
@@ -5210,10 +5209,10 @@
                 </div>
                 <div class="card"><h3>Booster perks</h3><p class="sub mb">Passive boosts for members while they boost the server. Multipliers stack on top of purchased boosters.</p>
                     <div class="grid2">
-                        ${fldHtml('Game winnings (x)', txtIn('pgames', b.perks?.games ?? 1), 'multiplier on all game payouts — 1 = off')}
-                        ${fldHtml('Coin earnings (x)', txtIn('pcoins', b.perks?.coins ?? 1), 'multiplier on daily/other earnings — 1 = off')}
-                        ${fldHtml('XP gain (x)', txtIn('pxp', b.perks?.xp ?? 1), 'multiplier on message XP — 1 = off')}
-                        ${fldHtml('Shop discount %', txtIn('pshop', b.perks?.shop ?? 0), '0–90 — 0 = off')}
+                        ${fldHtml('Game winnings (x)', txtIn('pgames', b.perks?.games ?? 1), 'multiplier on all game payouts â€” 1 = off')}
+                        ${fldHtml('Coin earnings (x)', txtIn('pcoins', b.perks?.coins ?? 1), 'multiplier on daily/other earnings â€” 1 = off')}
+                        ${fldHtml('XP gain (x)', txtIn('pxp', b.perks?.xp ?? 1), 'multiplier on message XP â€” 1 = off')}
+                        ${fldHtml('Shop discount %', txtIn('pshop', b.perks?.shop ?? 0), '0â€“90 â€” 0 = off')}
                     </div>
                 </div>`;
             mountSelect(page, 'bch', { options: [{ value: '', label: 'Off' }, ...chOpts(DATA.channels)], value: b.channel || '', placeholder: 'Off' });
@@ -5244,21 +5243,21 @@
                     </div></div>
                 <div class="card"><h3>Overview cards</h3><p class="sub mb">Which stats show on the Overview page.</p>
                     <div class="flex">${overviewCards.map((c) => tgl(`oc_${c}`, c, (s.overview.cards || []).includes(c))).join('')}</div></div>
-                <div class="card"><h3>Dashboard appearance</h3><p class="sub mb">Only affects this server's dashboard — accent color and a background image behind the panel.</p>
+                <div class="card"><h3>Dashboard appearance</h3><p class="sub mb">Only affects this server's dashboard â€” accent color and a background image behind the panel.</p>
                     <div class="grid2">
-                        ${fldHtml('Accent color', `<div class="clrrow"><input type="color" id="accentpick" value="${esc(/^#?[0-9a-f]{6}$/i.test(s.appearance.accent || '') ? '#' + s.appearance.accent.replace(/^#/, '') : '#f0a050')}"><input type="text" name="accent" value="${esc(s.appearance.accent || '')}" placeholder="#f0a050" maxlength="7"></div>`, 'hex — empty = default')}
-                        ${fldHtml('Background image', `<div class="clrrow"><input type="text" name="bgimg" value="${esc(s.appearance.background || '')}" placeholder="https://…"><button type="button" class="btn sm" id="pick-bg">Browse…</button><input type="file" id="bgfile" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none"></div>`, 'URL or a file upload — empty = none')}
-                        ${fldHtml('Theme', selSlot('theme'), 'glass = translucent blurred panels — pairs well with a background image')}
+                        ${fldHtml('Accent color', `<div class="clrrow"><input type="color" id="accentpick" value="${esc(/^#?[0-9a-f]{6}$/i.test(s.appearance.accent || '') ? '#' + s.appearance.accent.replace(/^#/, '') : '#f0a050')}"><input type="text" name="accent" value="${esc(s.appearance.accent || '')}" placeholder="#f0a050" maxlength="7"></div>`, 'hex â€” empty = default')}
+                        ${fldHtml('Background image', `<div class="clrrow"><input type="text" name="bgimg" value="${esc(s.appearance.background || '')}" placeholder="https://â€¦"><button type="button" class="btn sm" id="pick-bg">Browseâ€¦</button><input type="file" id="bgfile" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none"></div>`, 'URL or a file upload â€” empty = none')}
+                        ${fldHtml('Theme', selSlot('theme'), 'glass = translucent blurred panels â€” pairs well with a background image')}
                     </div></div>
-                <div class="card"><h3>Bot profile</h3><p class="sub mb">Everything here is per-server — nickname, avatar and banner change how Kotan looks in this guild only. Click the preview to change them.</p>
+                <div class="card"><h3>Bot profile</h3><p class="sub mb">Everything here is per-server â€” nickname, avatar and banner change how Kotan looks in this guild only. Click the preview to change them.</p>
                     <div class="bpgrid">
                         <div>
                             ${fldHtml('Nickname in this server', txtIn('nickname', s.branding.nickname || '', CTX.bot?.username || 'Kotan'), 'empty = default name')}
                             <input type="file" id="bavatar" accept="image/png,image/jpeg,image/webp" style="display:none">
                             <input type="file" id="bbanner" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none">
                             <div class="flex">
-                                <button class="btn sm" id="pick-avatar">Change avatar…</button>
-                                <button class="btn sm" id="pick-banner">Add banner…</button>
+                                <button class="btn sm" id="pick-avatar">Change avatarâ€¦</button>
+                                <button class="btn sm" id="pick-banner">Add bannerâ€¦</button>
                                 <button class="btn sm danger" id="rm-avatar">Remove avatar</button>
                                 <button class="btn sm danger" id="rm-banner">Remove banner</button>
                             </div>
@@ -5274,7 +5273,7 @@
                 value: s.appearance.theme || '', placeholder: 'Default',
             });
 
-            // Live Discord profile popout — nickname + accent/banner from the form.
+            // Live Discord profile popout â€” nickname + accent/banner from the form.
             const nickIn = $('[name=nickname]', page);
             const updProf = () => {
                 const nick = nickIn.value.trim() || CTX.bot?.username || 'Kotan';
@@ -5295,11 +5294,11 @@
                 $(inputSel, page).onchange = async (e) => {
                     const file = e.target.files?.[0];
                     if (!file) return;
-                    if (file.size > 3 * 1024 * 1024) return (status.textContent = 'Too big — max ~3MB');
-                    status.textContent = 'Uploading…';
+                    if (file.size > 3 * 1024 * 1024) return (status.textContent = 'Too big â€” max ~3MB');
+                    status.textContent = 'Uploadingâ€¦';
                     const dataUrl = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(file); });
                     const r = await api(`/api/guilds/${guildId}/branding/${key}`, { body: { [key]: dataUrl } });
-                    if (r.ok) { done(r); updProf(); status.textContent = 'Updated — may take a minute to show in Discord.'; }
+                    if (r.ok) { done(r); updProf(); status.textContent = 'Updated â€” may take a minute to show in Discord.'; }
                     else status.textContent = r.error || 'Failed';
                     e.target.value = '';
                 };
@@ -5309,7 +5308,7 @@
             $('#pick-avatar', page).onclick = () => $('#bavatar', page).click();
             $('#pick-banner', page).onclick = () => $('#bbanner', page).click();
             const brandDel = async (key) => {
-                status.textContent = 'Removing…';
+                status.textContent = 'Removingâ€¦';
                 const r = await api(`/api/guilds/${guildId}/branding/${key}`, { method: 'DELETE' });
                 if (r.ok) {
                     if (CTX.bot) {
@@ -5317,7 +5316,7 @@
                         else CTX.bot.bannerUrl = r.bannerUrl || null;
                     }
                     updProf();
-                    status.textContent = 'Removed — may take a minute to propagate.';
+                    status.textContent = 'Removed â€” may take a minute to propagate.';
                 } else status.textContent = r.error || 'Failed';
             };
             $('#rm-avatar', page).onclick = () => brandDel('avatar');
@@ -5337,19 +5336,19 @@
                 if (/^#?[0-9a-f]{6}$/i.test(v)) accentPick.value = `#${v.replace(/^#/, '')}`;
             });
 
-            // Wallpaper browse — uploads to the server, saves, applies live.
+            // Wallpaper browse â€” uploads to the server, saves, applies live.
             $('#pick-bg', page).onclick = () => $('#bgfile', page).click();
             $('#bgfile', page).onchange = async (e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
-                if (file.size > 6 * 1024 * 1024) return toast('Too big — max ~6MB', 'err');
+                if (file.size > 6 * 1024 * 1024) return toast('Too big â€” max ~6MB', 'err');
                 const dataUrl = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(file); });
-                toast('Uploading wallpaper…');
+                toast('Uploading wallpaperâ€¦');
                 const r = await api(`/api/guilds/${guildId}/appearance/bg`, { body: { image: dataUrl } });
                 if (r.ok) {
                     $('[name=bgimg]', page).value = r.url;
                     // Same fields (and key order) as the appearance collect()
-                    // — save() rebaselines the section so the bar stays hidden.
+                    // â€” save() rebaselines the section so the bar stays hidden.
                     if (await save('appearance', { accent: accentIn.value, background: r.url, theme: mounts.theme?.get() || '' })) applyAppearance();
                 } else toast(r.error || 'Upload failed', 'err');
                 e.target.value = '';
@@ -5393,12 +5392,12 @@
         const canvasEl = $('.dcontent-canvas');
         if (canvasEl) canvasEl.scrollTop = 0;
         const render = PAGES[slug] || PAGES.overview;
-        // Drop select mounts from the previous page — stale elements would
+        // Drop select mounts from the previous page â€” stale elements would
         // otherwise leak into the next page's collects. Portal'd pops on
         // <body> outlive their triggers, so sweep them too.
         for (const k in mounts) delete mounts[k];
         $$('.dselpop').forEach((p) => p.remove());
-        // Reset unsaved-changes tracking — registered sections and their
+        // Reset unsaved-changes tracking â€” registered sections and their
         // baselines belong to the page being replaced.
         saveSections = [];
         dirtyObs?.disconnect();
@@ -5426,3 +5425,4 @@
     if (!guildId) renderPicker();
     else { addEventListener('hashchange', router); router(); }
 })();
+

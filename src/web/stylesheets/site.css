@@ -250,6 +250,113 @@ a:hover { color: var(--accent-2); }
 }
 
 /* ==========================================================================
+   Interactive Hover Button — CSS port of InteractiveHoverButton component
+   Usage: add class "btn-anim" alongside existing .btn classes.
+   The pill background slides in from left; arrow icon fades in from right.
+   Variants: .btn-anim.primary  → accent gradient (Dashboard / Open)
+             .btn-anim.discord  → Discord Blurple (Add to Server)
+             .btn-anim.ghost    → subtle ghost (Docs / secondary)
+   ========================================================================== */
+.btn-anim {
+    position: relative;
+    overflow: hidden;
+    border-radius: var(--r-full) !important;
+    isolation: isolate;
+    min-width: 160px;
+}
+
+/* Sliding pill fill */
+.btn-anim::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    left: 20%;
+    top: 40%;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--btn-anim-fill, var(--accent));
+    transform: scale(1);
+    transition: left 0.32s ease, top 0.32s ease,
+                width 0.32s ease, height 0.32s ease,
+                border-radius 0.32s ease, transform 0.32s ease;
+    z-index: 0;
+    pointer-events: none;
+}
+.btn-anim:hover::before {
+    left: 0%;
+    top: 0%;
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+    transform: scale(1.8);
+}
+
+/* Label text slides out on hover */
+.btn-anim > .btn-anim-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    position: relative;
+    z-index: 1;
+    transform: translateX(0);
+    transition: transform 0.3s ease, opacity 0.3s ease;
+}
+.btn-anim:hover > .btn-anim-label {
+    transform: translateX(52px);
+    opacity: 0;
+}
+
+/* Arrow + text overlay slides in on hover */
+.btn-anim > .btn-anim-hover {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    z-index: 2;
+    transform: translateX(52px);
+    opacity: 0;
+    transition: transform 0.3s ease, opacity 0.3s ease;
+    color: #fff;
+    font-weight: 600;
+    pointer-events: none;
+}
+.btn-anim:hover > .btn-anim-hover {
+    transform: translateX(0);
+    opacity: 1;
+}
+
+/* Arrow SVG inside hover overlay */
+.btn-anim-arrow {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+}
+
+/* Color variants */
+.btn-anim.primary {
+    --btn-anim-fill: var(--accent-2);
+}
+.btn-anim.discord {
+    --btn-anim-fill: #4752c4;
+    background: #5865f2;
+    border-color: transparent;
+    color: #fff;
+}
+.btn-anim.discord:hover {
+    color: #fff;
+    border-color: transparent;
+}
+.btn-anim.ghost {
+    --btn-anim-fill: var(--panel-hover);
+}
+.btn-anim.ghost > .btn-anim-hover {
+    color: var(--text);
+}
+
+/* ==========================================================================
    Hero Section & Interactive Discord Widget
    ========================================================================== */
 .hero-section {
