@@ -1148,7 +1148,7 @@
 
                 <div class="grid2">
                     ${fldHtml('Background image URL', txtIn(`${p}img_bg`, img?.background || ''), 'empty = solid color below')}
-                    ${fldHtml('Background color', `<input type="color" name="${p}img_col" value="#${esc(img?.bgColor || '1e1f22')}" class="colfull">`)}
+                    ${fldHtml('Background color', `<div style="display:flex;gap:6px;align-items:center;"><input type="color" name="${p}img_col" value="#${esc(img?.bgColor || '1e1f22')}" class="colfull" style="flex:1;"><button type="button" class="btn sm" id="${p}img_dom" title="Sample dominant color from the background image" style="display:grid;place-items:center;padding:6px 9px;">${ICONS.pipette}</button></div>`)}
                 </div>
 
                 <div class="imged-tools">
@@ -1231,6 +1231,22 @@
         bgImg.onload = draw;
         bgIn.addEventListener('input', loadBg);
         colIn.addEventListener('input', draw);
+
+        // Sample the dominant color out of the background image (falls back
+        // to the member avatar / server icon when no image is set).
+        $(`#${p}img_dom`, page).onclick = async (ev) => {
+            const raw = (bgIn.value || '').trim();
+            const src = raw === '{avatar}' ? memberAv
+                : raw === '{icon}' ? guildIcon
+                : /^https?:\/\//.test(raw) ? raw
+                : (memberAv || guildIcon);
+            if (!src) return toast('No image to sample — set a background image first', 'err');
+            ev.target.disabled = true;
+            const r = await api(`/api/guilds/${guildId}/dominant-color?src=${encodeURIComponent(src)}`).catch(() => null);
+            ev.target.disabled = false;
+            if (r?.ok && r.color) { colIn.value = r.color; draw(); toast(`Sampled ${r.color}`); }
+            else toast(r?.error || 'Could not read that image', 'err');
+        };
 
         const fmtS = (s) => String(s ?? '')
             .replaceAll('{user}', `@${CTX.user.username}`)
@@ -2656,7 +2672,7 @@
                                     <option value="member">Member…</option>
                                     <option value="url">Image URL</option>
                                 </select></div>
-                                <div class="fld"><label>Color</label><input type="color" id="im-bg-col" value="#0b0c10"></div>
+                                <div class="fld"><label>Color</label><div style="display:flex;gap:6px;align-items:center;"><input type="color" id="im-bg-col" value="#0b0c10" style="flex:1;"><button type="button" class="btn sm" id="im-bg-dom" title="Sample dominant color from the background image" style="display:grid;place-items:center;padding:6px 9px;">${ICONS.pipette}</button></div></div>
                             </div>
                             <div class="fld" id="im-bg-urlwrap" style="display:none"><label>Image URL</label><input type="text" id="im-bg-img" placeholder="https://… or {avatar} {icon} {banner}"></div>
                             <div class="fld" id="im-bg-memwrap" style="display:none"><label>Member</label><select id="im-bg-member"></select></div>
@@ -2720,6 +2736,17 @@
             bgMemIn.onchange = () => { bgMemberId = bgMemIn.value; draw(); };
             bgColIn.oninput = () => { bgColor = bgColIn.value.slice(1); draw(); };
             bgImgIn.oninput = () => { bgUrl = bgImgIn.value.trim(); draw(); };
+            // Sample dominant color out of the current background image
+            // (falls back to your avatar / server icon when source is solid).
+            $('#im-bg-dom', page).onclick = async (ev) => {
+                const src = assets.tplResolve(bgTpl()) || assets.memberAv || assets.guildIconU;
+                if (!src) return toast('Pick an image source first', 'err');
+                ev.target.disabled = true;
+                const r = await api(`/api/guilds/${guildId}/dominant-color?src=${encodeURIComponent(src)}`).catch(() => null);
+                ev.target.disabled = false;
+                if (r?.ok && r.color) { bgColor = r.color.replace('#', ''); bgColIn.value = r.color; draw(); toast(`Sampled ${r.color}`); }
+                else toast(r?.error || 'Could not read that image', 'err');
+            };
             bgBlurIn.oninput = () => { bgBlur = +bgBlurIn.value; $('#im-bgl-lbl', page).textContent = bgBlur; draw(); };
             bgDimIn.oninput = () => { bgDim = (+bgDimIn.value) / 100; $('#im-bgd-lbl', page).textContent = bgDimIn.value; draw(); };
 
@@ -2769,7 +2796,12 @@
                         if (mi) {
                             ctx.save();
                             ctx.clip();
-                            ctx.drawImage(mi, cx - r, cy - r, r * 2, r * 2);
+                            // Cover-crop so the image fills the shape evenly.
+                            const ir = mi.width / mi.height;
+                            let sw, sh, sx, sy;
+                            if (ir > 1) { sh = mi.height; sw = sh; sx = (mi.width - sw) / 2; sy = 0; }
+                            else { sw = mi.width; sh = sw; sx = 0; sy = (mi.height - sh) / 2; }
+                            ctx.drawImage(mi, sx, sy, sw, sh, cx - r, cy - r, r * 2, r * 2);
                             ctx.restore();
                         } else {
                             ctx.fillStyle = el.fill || '#5865f2';
@@ -2827,12 +2859,36 @@
                         ctx.fillText(text, cx, cy);
                     }
 
-                    // Selection box outline
+                    // Selection outline — follows the element's real bounds.
                     if (el === sel) {
                         ctx.strokeStyle = '#38bdf8';
                         ctx.lineWidth = 2;
-                        ctx.setLineDash([4, 4]);
-                        ctx.strokeRect(cx - 30, cy - 30, 60, 60);
+                        ctx.setLineDash([5, 4]);
+                        if (el.type === 'media') {
+                            const r = Math.max(8, (el.size || 0.3) * curHeight * 0.5) + 4;
+                            ctx.beginPath();
+                            if (el.shape === 'square') ctx.rect(cx - r, cy - r, r * 2, r * 2);
+                            else if (el.shape === 'rounded') ctx.roundRect(cx - r, cy - r, r * 2, r * 2, r * 0.35);
+                            else ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                            ctx.stroke();
+                        } else {
+                            let bw = 48, bh = 24, bx = cx, by = cy;
+                            if (el.type === 'bar') {
+                                bw = (el.w || 0.4) * curWidth;
+                                bh = Math.max(6, (el.h || 0.06) * curHeight);
+                            } else {
+                                const px = Math.max(8, (el.size || 0.05) * curHeight);
+                                ctx.font = `${el.bold ? '800' : '600'} ${px}px Inter, sans-serif`;
+                                const raw = el.type === 'badge'
+                                    ? (el.text || 'BADGE')
+                                    : (el.text || '').replaceAll('{username}', CTX.user.username).replaceAll('{server}', CTX.guild.name).replaceAll('{members}', '1284');
+                                bw = ctx.measureText(raw).width + px * (el.type === 'badge' ? 2 : 0.4);
+                                bh = px * (el.type === 'badge' ? 1.8 : 1.4);
+                                const ax = { left: 0, right: -1 }[el.align] ?? -0.5;
+                                bx = cx + bw * ax;
+                            }
+                            ctx.strokeRect(bx - 5, cy - bh / 2 - 5, bw + 10, bh + 10);
+                        }
                         ctx.setLineDash([]);
                     }
                     ctx.restore();
@@ -2914,10 +2970,15 @@
                             <div class="fld"><label>Shape</label><select id="pr-shape"><option value="circle" ${sel.shape==='circle'?'selected':''}>Circle</option><option value="rounded" ${sel.shape==='rounded'?'selected':''}>Rounded</option><option value="square" ${sel.shape==='square'?'selected':''}>Square</option></select></div>
                             <div class="fld"><label>Size</label><input type="range" id="pr-size" min="0.1" max="0.6" step="0.01" value="${sel.size || 0.35}"></div>
                         </div>
-                        <div class="grid2">
+                        <div class="fld"><label class="chkline" style="font-size:12px;font-weight:600;"><input type="checkbox" id="pr-ringon" ${sel.ring ? 'checked' : ''}> Show ring outline</label></div>
+                        <div class="grid2" id="pr-ringwrap" style="display:${sel.ring ? '' : 'none'}">
                             <div class="fld"><label>Ring Color</label><input type="color" id="pr-ring" value="${sel.ring?.startsWith('#') ? sel.ring : '#' + (sel.ring || 'e8622e')}"></div>
                             <div class="fld"><label>Ring Width</label><input type="range" id="pr-ringw" min="0" max="12" step="1" value="${sel.ringWidth || 4}"></div>
                         </div>`;
+                    $('#pr-ringon', propsEl).onchange = (e) => {
+                        if (e.target.checked) sel.ring = 'e8622e'; else delete sel.ring;
+                        renderProps(); draw();
+                    };
                     $('#pr-src', propsEl).onchange = (e) => {
                         const v = e.target.value;
                         sel.url = v === 'url' ? (sel.url?.startsWith('{') ? '' : (sel.url || ''))
@@ -3324,7 +3385,7 @@
                         <div class="studio-sec-title"><span>Active Keyframe</span></div>
                         <div style="display:flex;flex-direction:column;gap:10px;">
                             <div class="fld"><label>Time on timeline — <span id="gif-kf-tlbl">0%</span></label><input type="range" id="gif-kf-t" min="0" max="100" value="0" step="1"></div>
-                            <div class="fld"><label>Background</label><input type="color" id="gif-fr-bg" value="#0b0c10"></div>
+                            <div class="fld"><label>Background</label><div style="display:flex;gap:6px;align-items:center;"><input type="color" id="gif-fr-bg" value="#0b0c10" style="flex:1;"><button type="button" class="btn sm" id="gif-kf-dom" title="Sample dominant color from the background image into this keyframe" style="display:grid;place-items:center;padding:6px 9px;">${ICONS.pipette}</button></div></div>
                         </div>
 
                         <div class="studio-sec-title mt"><span>Element Properties</span></div>
@@ -3441,7 +3502,11 @@
                         if (mi) {
                             ctx.save();
                             ctx.clip();
-                            ctx.drawImage(mi, cx - r, cy - r, r * 2, r * 2);
+                            const ir = mi.width / mi.height;
+                            let sw, sh, sx, sy;
+                            if (ir > 1) { sh = mi.height; sw = sh; sx = (mi.width - sw) / 2; sy = 0; }
+                            else { sw = mi.width; sh = sw; sx = 0; sy = (mi.height - sh) / 2; }
+                            ctx.drawImage(mi, sx, sy, sw, sh, cx - r, cy - r, r * 2, r * 2);
                             ctx.restore();
                         } else {
                             ctx.fillStyle = `#${String(el.fill || '5865f2').replace('#', '')}`;
@@ -3483,12 +3548,35 @@
                         ctx.textBaseline = 'middle';
                         ctx.fillText(text, cx, cy);
                     }
-                    // Selection outline — match by element id (sampled clone)
+                    // Selection outline — match by element id (sampled clone),
+                    // outlined at the element's real bounds rather than a box.
                     if (selEl && el.id && el.id === selEl.id && !playing) {
                         ctx.strokeStyle = '#38bdf8';
                         ctx.lineWidth = 2;
-                        ctx.setLineDash([4, 4]);
-                        ctx.strokeRect(cx - 24, cy - 24, 48, 48);
+                        ctx.setLineDash([5, 4]);
+                        if (el.type === 'media') {
+                            const r = Math.max(4, (el.size || 0.3) * height * 0.5) + 4;
+                            ctx.beginPath();
+                            if (el.shape === 'square') ctx.rect(cx - r, cy - r, r * 2, r * 2);
+                            else if (el.shape === 'rounded') ctx.roundRect(cx - r, cy - r, r * 2, r * 2, r * 0.35);
+                            else ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                            ctx.stroke();
+                        } else {
+                            let bw = 44, bh = 20, bx = cx;
+                            if (el.type === 'bar') {
+                                bw = (el.w ?? 0.6) * width;
+                                bh = Math.max(4, (el.h ?? 0.08) * height);
+                            } else {
+                                const px = Math.max(8, (el.size || 0.1) * height);
+                                ctx.font = `${el.bold ? '800' : '600'} ${px}px Inter, sans-serif`;
+                                const raw = (el.text || '').replaceAll('{username}', CTX.user.username).replaceAll('{server}', CTX.guild.name);
+                                bw = ctx.measureText(raw).width + px * (el.type === 'badge' ? 1.6 : 0.4);
+                                bh = px * (el.type === 'badge' ? 1.8 : 1.4);
+                                const ax = { left: 0, right: -1 }[el.align] ?? -0.5;
+                                bx = cx + bw * ax;
+                            }
+                            ctx.strokeRect(bx - 5, cy - bh / 2 - 5, bw + 10, bh + 10);
+                        }
                         ctx.setLineDash([]);
                     }
                     ctx.restore();
@@ -3694,9 +3782,13 @@
                         </div>
                         <div class="grid2">
                             <div class="fld"><label>Fill</label><input type="color" id="gp-fill" value="${selEl.fill?.startsWith('#') ? selEl.fill : '#' + (selEl.fill || '5865f2')}"></div>
-                            <div class="fld"><label>Ring</label><input type="color" id="gp-ring" value="${selEl.ring?.startsWith('#') ? selEl.ring : '#' + (selEl.ring || 'e8622e')}"></div>
+                            <div class="fld"><label class="chkline" style="font-size:11.5px;font-weight:600;"><input type="checkbox" id="gp-ringon" ${selEl.ring ? 'checked' : ''}> Ring</label><input type="color" id="gp-ring" ${selEl.ring ? '' : 'disabled'} value="${selEl.ring?.startsWith('#') ? selEl.ring : '#' + (selEl.ring || 'e8622e')}"></div>
                         </div>
                         <div class="fld"><label>Opacity</label><input type="range" id="gp-op" min="0" max="1" step="0.05" value="${selEl.opacity ?? 1}"></div>`;
+                    $('#gp-ringon', propsEl).onchange = (e) => {
+                        if (e.target.checked) selEl.ring = 'e8622e'; else delete selEl.ring;
+                        renderGifProps(); drawAtPlayhead();
+                    };
                     $('#gp-src', propsEl).onchange = (e) => {
                         const v = e.target.value;
                         selEl.url = v === 'url' ? (selEl.url?.startsWith('{') ? '' : (selEl.url || ''))
@@ -3837,6 +3929,19 @@
                 const k = kfs[selKf];
                 if (k) k.bgColor = e.target.value;
                 drawAtPlayhead();
+            };
+            // Sample dominant color from the shared bg image into this keyframe.
+            $('#gif-kf-dom', page).onclick = async (ev) => {
+                const src = gAssets.tplResolve(gBgTpl()) || gAssets.memberAv || gAssets.guildIconU;
+                if (!src) return toast('Pick a background image source first', 'err');
+                ev.target.disabled = true;
+                const r = await api(`/api/guilds/${guildId}/dominant-color?src=${encodeURIComponent(src)}`).catch(() => null);
+                ev.target.disabled = false;
+                if (r?.ok && r.color) {
+                    const k = kfs[selKf];
+                    if (k) { k.bgColor = r.color; syncKfProps(); drawAtPlayhead(); }
+                    toast(`Sampled ${r.color}`);
+                } else toast(r?.error || 'Could not read that image', 'err');
             };
 
             // Shared background (image source / blur / dim — same every frame).
