@@ -489,7 +489,11 @@ function sampleGifKeyframes(kfs, tn, easeFn) {
     const p = easeFn(raw);
     return {
         bgColor: gifLerpHex(a.bgColor || '0b0c10', b.bgColor || a.bgColor || '0b0c10', p),
-        elements: (a.elements || []).map((e, ei) => ((b.elements || [])[ei] ? lerpGifEl(e, b.elements[ei], p) : e)),
+        elements: (a.elements || []).map((e, ei) => {
+            const bs = b.elements || [];
+            const m = e.id ? bs.find((x) => x.id === e.id) : bs[ei];
+            return m ? lerpGifEl(e, m, p) : e;
+        }),
     };
 }
 
@@ -532,6 +536,22 @@ function drawGifElement(ctx, el, W, H, vars) {
             ctx.roundRect(cx - w / 2, cy - h / 2, fillW, h, h / 2);
             ctx.fill();
         }
+    } else if (el.type === 'badge') {
+        const px = Math.max(10, num01(el.size, 0.05) * H);
+        ctx.font = `bold ${px}px ${FONT}`;
+        const text = replaceVars(el.text || 'BADGE', vars);
+        const tw = ctx.measureText(text).width + px * 1.6;
+        const th = px * 1.8;
+        const cx = num01(el.x, 0.5) * W;
+        const cy = num01(el.y, 0.5) * H;
+        ctx.fillStyle = `#${String(el.bgColor || '6366f1').replace('#', '')}`;
+        ctx.beginPath();
+        ctx.roundRect(cx - tw / 2, cy - th / 2, tw, th, th / 2);
+        ctx.fill();
+        ctx.fillStyle = el.color ? (String(el.color).startsWith('#') ? el.color : `#${el.color}`) : '#ffffff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, cx, cy);
     }
     ctx.restore();
 }

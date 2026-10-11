@@ -3056,7 +3056,8 @@
 
             // Sample the timeline at normalized time tn (0..1) — interpolates
             // between the bracketing keyframes; wraps last→first for a
-            // seamless loop.
+            // seamless loop. Elements pair up by stable `id` across keyframes
+            // (fall back to index for id-less elements).
             function sampleFrame(tn) {
                 if (!kfs.length) return { bgColor: '0b0c10', elements: [] };
                 if (kfs.length === 1) return clone(kfs[0]);
@@ -3066,26 +3067,33 @@
                 const t1 = i === kfs.length - 1 ? 1 + b.t : b.t;
                 const raw = Math.min(1, Math.max(0, (tn - a.t) / Math.max(t1 - a.t, 1e-6)));
                 const p = (EASE[easing] || EASE.easeInOut)(raw);
+                const bs = b.elements || [];
                 return {
                     bgColor: lerpHex(a.bgColor || '0b0c10', b.bgColor || a.bgColor || '0b0c10', p),
-                    elements: (a.elements || []).map((e, ei) => ((b.elements || [])[ei] ? lerpEl(e, b.elements[ei], p) : e)),
+                    elements: (a.elements || []).map((e, ei) => {
+                        const m = e.id ? bs.find((x) => x.id === e.id) : bs[ei];
+                        return m ? lerpEl(e, m, p) : e;
+                    }),
                 };
             }
 
+            let eUid = 0;
+            const nid = () => `e${++eUid}`;
             const kfs = [
                 { t: 0, bgColor: '0b0c10', elements: [
-                    { type: 'text', text: '✨ WELCOME ✨', x: 0.5, y: 0.4, size: 0.12, color: '6366f1', bold: true },
-                    { type: 'text', text: '{username}', x: 0.5, y: 0.68, size: 0.14, color: 'ffffff', bold: true },
+                    { id: nid(), type: 'text', text: '✨ WELCOME ✨', x: 0.5, y: 0.4, size: 0.12, color: '6366f1', bold: true },
+                    { id: nid(), type: 'text', text: '{username}', x: 0.5, y: 0.68, size: 0.14, color: 'ffffff', bold: true },
                 ] },
                 { t: 0.5, bgColor: '16121e', elements: [
-                    { type: 'text', text: '✨ WELCOME ✨', x: 0.5, y: 0.4, size: 0.16, color: 'e8622e', bold: true },
-                    { type: 'text', text: '{username}', x: 0.5, y: 0.68, size: 0.17, color: 'ffd9a0', bold: true },
+                    { id: 'e1', type: 'text', text: '✨ WELCOME ✨', x: 0.5, y: 0.4, size: 0.16, color: 'e8622e', bold: true },
+                    { id: 'e2', type: 'text', text: '{username}', x: 0.5, y: 0.68, size: 0.17, color: 'ffd9a0', bold: true },
                 ] },
                 { t: 1, bgColor: '0b0c10', elements: [
-                    { type: 'text', text: '✨ WELCOME ✨', x: 0.5, y: 0.4, size: 0.12, color: '6366f1', bold: true },
-                    { type: 'text', text: '{username}', x: 0.5, y: 0.68, size: 0.14, color: 'ffffff', bold: true },
+                    { id: 'e1', type: 'text', text: '✨ WELCOME ✨', x: 0.5, y: 0.4, size: 0.12, color: '6366f1', bold: true },
+                    { id: 'e2', type: 'text', text: '{username}', x: 0.5, y: 0.68, size: 0.14, color: 'ffffff', bold: true },
                 ] },
             ];
+            let selEl = null;   // selected element (in the selected keyframe)
 
             page.innerHTML = `
                 <div>
@@ -3134,7 +3142,19 @@
                 <div class="studio-main-grid">
                     <!-- Left: Animation Presets -->
                     <div class="studio-sidebar-card">
-                        <div class="studio-sec-title"><span>Auto Generators</span></div>
+                        <div class="studio-sec-title"><span>Add Elements</span></div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+                            <button type="button" class="btn sm outline" id="gif-add-text">${ICONS.typeText} Text</button>
+                            <button type="button" class="btn sm outline" id="gif-add-media">${ICONS.userAvatar} Media</button>
+                            <button type="button" class="btn sm outline" id="gif-add-bar">${svg('<rect x="3" y="10" width="18" height="4" rx="2"/>')} Bar</button>
+                            <button type="button" class="btn sm outline" id="gif-add-badge">${svg('<rect x="4" y="6" width="16" height="12" rx="6"/>')} Badge</button>
+                        </div>
+                        <label class="chkline" style="font-size:11.5px;margin-top:8px;"><input type="checkbox" id="gif-add-all" checked> Add to all keyframes</label>
+
+                        <div class="studio-sec-title mt"><span>Elements (<span id="gif-el-count">0</span>)</span></div>
+                        <div class="studio-layer-list" id="gif-layers"></div>
+
+                        <div class="studio-sec-title mt"><span>Auto Generators</span></div>
                         <p class="muted small" style="margin:0;">Generate animated frame sequences instantly:</p>
                         <div style="display:flex;flex-direction:column;gap:6px;">
                             <button type="button" class="btn sm outline" id="gen-pulse">⚡ Pulsing Glow</button>
@@ -3185,11 +3205,11 @@
                         <div class="studio-sec-title"><span>Active Keyframe</span></div>
                         <div style="display:flex;flex-direction:column;gap:10px;">
                             <div class="fld"><label>Time on timeline — <span id="gif-kf-tlbl">0%</span></label><input type="range" id="gif-kf-t" min="0" max="100" value="0" step="1"></div>
-                            <div class="fld"><label>Line 1 Text</label><input type="text" id="gif-fr-text1" value="✨ WELCOME ✨"></div>
-                            <div class="fld"><label>Line 2 Text</label><input type="text" id="gif-fr-text2" value="{username}"></div>
-                            <div class="fld"><label>Line 1 Color</label><input type="color" id="gif-fr-col" value="#6366f1"></div>
                             <div class="fld"><label>Background</label><input type="color" id="gif-fr-bg" value="#0b0c10"></div>
                         </div>
+
+                        <div class="studio-sec-title mt"><span>Element Properties</span></div>
+                        <div id="gif-props" style="display:flex;flex-direction:column;gap:12px;"></div>
 
                         <div class="studio-sec-title mt"><span>Save as GIF Variable</span></div>
                         <p class="muted small" style="margin:0;">Save this animation as a variable to attach to welcome embeds or cards.</p>
@@ -3264,6 +3284,28 @@
                             ctx.roundRect(cx - w / 2, cy - h / 2, w * Math.min(1, Math.max(0, el.progress)), h, h / 2);
                             ctx.fill();
                         }
+                    } else if (el.type === 'badge') {
+                        const px = Math.max(10, (el.size || 0.05) * height);
+                        ctx.font = `bold ${px}px Inter, sans-serif`;
+                        const text = (el.text || 'BADGE').replaceAll('{username}', CTX.user.username);
+                        const tw = ctx.measureText(text).width + px * 1.6;
+                        const th = px * 1.8;
+                        ctx.fillStyle = `#${String(el.bgColor || '6366f1').replace('#', '')}`;
+                        ctx.beginPath();
+                        ctx.roundRect(cx - tw / 2, cy - th / 2, tw, th, th / 2);
+                        ctx.fill();
+                        ctx.fillStyle = el.color?.startsWith('#') ? el.color : `#${el.color || 'ffffff'}`;
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(text, cx, cy);
+                    }
+                    // Selection outline — match by element id (sampled clone)
+                    if (selEl && el.id && el.id === selEl.id && !playing) {
+                        ctx.strokeStyle = '#38bdf8';
+                        ctx.lineWidth = 2;
+                        ctx.setLineDash([4, 4]);
+                        ctx.strokeRect(cx - 24, cy - 24, 48, 48);
+                        ctx.setLineDash([]);
                     }
                     ctx.restore();
                 }
@@ -3306,8 +3348,11 @@
                     d.onclick = (ev) => {
                         ev.stopPropagation();
                         selKf = +d.dataset.i;
+                        playT = kfs[selKf].t * durationMs;
+                        setPlaying(false);
                         syncKfProps();
                         renderTrack();
+                        drawAtPlayhead();
                     };
                 });
             }
@@ -3318,19 +3363,231 @@
                 drawAtPlayhead();
             };
 
+            const elsOf = () => (kfs[selKf].elements ||= []);
+            const layersEl = $('#gif-layers', page);
+            const propsEl = $('#gif-props', page);
+
             function syncKfProps() {
                 const k = kfs[selKf];
                 if (!k) return;
                 const tpct = Math.round(k.t * 100);
                 $('#gif-kf-t', page).value = tpct;
                 $('#gif-kf-tlbl', page).textContent = `${tpct}%`;
-                $('#gif-fr-text1', page).value = k.elements?.[0]?.text || '';
-                $('#gif-fr-text2', page).value = k.elements?.[1]?.text || '';
-                const col = k.elements?.[0]?.color || '6366f1';
-                $('#gif-fr-col', page).value = col.startsWith('#') ? col : `#${col}`;
                 const bg = String(k.bgColor || '0b0c10');
                 $('#gif-fr-bg', page).value = bg.startsWith('#') ? bg : `#${bg}`;
+                // Keep selection if the element still exists on this keyframe.
+                selEl = (k.elements || []).find((e) => selEl && e.id === selEl.id) || null;
+                renderGifLayers();
+                renderGifProps();
             }
+
+            function renderGifLayers() {
+                const els = elsOf();
+                $('#gif-el-count', page).textContent = els.length;
+                layersEl.innerHTML = els.map((e, idx) => `
+                    <div class="studio-layer-item ${e === selEl ? 'selected' : ''}" data-idx="${idx}">
+                        <span class="studio-layer-name">${esc(e.type.toUpperCase())}: ${esc(e.text || e.shape || e.id || '')}</span>
+                        <button type="button" class="studio-layer-btn" data-gdup="${idx}" title="Duplicate">${ICONS.duplicate || '⎘'}</button>
+                        <button type="button" class="studio-layer-btn" data-gdel="${idx}" title="Remove from all keyframes">${ICONS.trash}</button>
+                    </div>`).join('') || '<p class="muted small" style="margin:0;">No elements on this keyframe — add some on the left.</p>';
+
+                $$('.studio-layer-item', layersEl).forEach((item) => {
+                    item.onclick = (e) => {
+                        if (e.target.closest('button')) return;
+                        selEl = els[+item.dataset.idx];
+                        // Jump playhead so the canvas shows this keyframe's exact state.
+                        playT = kfs[selKf].t * durationMs;
+                        setPlaying(false);
+                        renderGifLayers(); renderGifProps(); drawAtPlayhead();
+                    };
+                });
+                $$('[data-gdel]', layersEl).forEach((b) => {
+                    b.onclick = () => {
+                        const el = els[+b.dataset.gdel];
+                        // Delete everywhere so the element leaves the animation.
+                        for (const kf of kfs) {
+                            const i2 = (kf.elements || []).findIndex((x) => x === el || (el.id && x.id === el.id));
+                            if (i2 >= 0) kf.elements.splice(i2, 1);
+                        }
+                        if (selEl && selEl.id === el.id) selEl = null;
+                        renderGifLayers(); renderGifProps(); drawAtPlayhead();
+                    };
+                });
+                $$('[data-gdup]', layersEl).forEach((b) => {
+                    b.onclick = () => {
+                        const src = els[+b.dataset.gdup];
+                        const copy = clone(src);
+                        copy.id = nid();
+                        copy.x = Math.min(0.95, (copy.x ?? 0.5) + 0.05);
+                        copy.y = Math.min(0.95, (copy.y ?? 0.5) + 0.05);
+                        // Duplicates live on every keyframe that has the source.
+                        for (const kf of kfs) {
+                            if ((kf.elements || []).some((x) => src.id && x.id === src.id)) (kf.elements ||= []).push(clone(copy));
+                        }
+                        selEl = elsOf().find((e) => e.id === copy.id) || null;
+                        renderGifLayers(); renderGifProps(); drawAtPlayhead();
+                    };
+                });
+            }
+
+            const fldPos = () => `
+                <div class="grid2">
+                    <div class="fld"><label>X Position</label><input type="range" id="gp-x" min="0" max="1" step="0.01" value="${selEl.x ?? 0.5}"></div>
+                    <div class="fld"><label>Y Position</label><input type="range" id="gp-y" min="0" max="1" step="0.01" value="${selEl.y ?? 0.5}"></div>
+                </div>`;
+            const bindPos = () => {
+                $('#gp-x', propsEl).oninput = (e) => { selEl.x = +e.target.value; drawAtPlayhead(); };
+                $('#gp-y', propsEl).oninput = (e) => { selEl.y = +e.target.value; drawAtPlayhead(); };
+            };
+
+            function renderGifProps() {
+                if (!selEl) {
+                    propsEl.innerHTML = '<p class="muted small" style="margin:0;">Click an element on the canvas or in the list to edit it here.</p>';
+                    return;
+                }
+                if (selEl.type === 'text') {
+                    propsEl.innerHTML = `
+                        <div class="fld"><label>Text</label><input type="text" id="gp-text" value="${esc(selEl.text || '')}" placeholder="{username} {server}"></div>
+                        ${fldPos()}
+                        <div class="grid2">
+                            <div class="fld"><label>Size</label><input type="range" id="gp-size" min="0.03" max="0.4" step="0.005" value="${selEl.size || 0.1}"></div>
+                            <div class="fld"><label>Color</label><input type="color" id="gp-col" value="${selEl.color?.startsWith('#') ? selEl.color : '#' + (selEl.color || 'ffffff')}"></div>
+                        </div>
+                        <div class="grid2">
+                            <div class="fld"><label>Align</label><select id="gp-align"><option value="left" ${selEl.align === 'left' ? 'selected' : ''}>Left</option><option value="center" ${(selEl.align || 'center') === 'center' ? 'selected' : ''}>Center</option><option value="right" ${selEl.align === 'right' ? 'selected' : ''}>Right</option></select></div>
+                            <div class="fld"><label>&nbsp;</label><label class="chkline"><input type="checkbox" id="gp-bold" ${selEl.bold ? 'checked' : ''}> Bold</label></div>
+                        </div>
+                        <div class="fld"><label>Opacity</label><input type="range" id="gp-op" min="0" max="1" step="0.05" value="${selEl.opacity ?? 1}"></div>`;
+                    $('#gp-text', propsEl).oninput = (e) => { selEl.text = e.target.value; renderGifLayers(); drawAtPlayhead(); };
+                    $('#gp-size', propsEl).oninput = (e) => { selEl.size = +e.target.value; drawAtPlayhead(); };
+                    $('#gp-col', propsEl).oninput = (e) => { selEl.color = e.target.value; drawAtPlayhead(); };
+                    $('#gp-align', propsEl).onchange = (e) => { selEl.align = e.target.value; drawAtPlayhead(); };
+                    $('#gp-bold', propsEl).onchange = (e) => { selEl.bold = e.target.checked; drawAtPlayhead(); };
+                    $('#gp-op', propsEl).oninput = (e) => { selEl.opacity = +e.target.value; drawAtPlayhead(); };
+                } else if (selEl.type === 'media') {
+                    propsEl.innerHTML = `
+                        ${fldPos()}
+                        <div class="grid2">
+                            <div class="fld"><label>Shape</label><select id="gp-shape"><option value="circle" ${(selEl.shape || 'circle') === 'circle' ? 'selected' : ''}>Circle</option><option value="rounded" ${selEl.shape === 'rounded' ? 'selected' : ''}>Rounded</option><option value="square" ${selEl.shape === 'square' ? 'selected' : ''}>Square</option></select></div>
+                            <div class="fld"><label>Size</label><input type="range" id="gp-size" min="0.05" max="0.8" step="0.01" value="${selEl.size || 0.3}"></div>
+                        </div>
+                        <div class="grid2">
+                            <div class="fld"><label>Fill</label><input type="color" id="gp-fill" value="${selEl.fill?.startsWith('#') ? selEl.fill : '#' + (selEl.fill || '5865f2')}"></div>
+                            <div class="fld"><label>Ring</label><input type="color" id="gp-ring" value="${selEl.ring?.startsWith('#') ? selEl.ring : '#' + (selEl.ring || 'e8622e')}"></div>
+                        </div>
+                        <div class="fld"><label>Opacity</label><input type="range" id="gp-op" min="0" max="1" step="0.05" value="${selEl.opacity ?? 1}"></div>`;
+                    $('#gp-shape', propsEl).onchange = (e) => { selEl.shape = e.target.value; renderGifLayers(); drawAtPlayhead(); };
+                    $('#gp-size', propsEl).oninput = (e) => { selEl.size = +e.target.value; drawAtPlayhead(); };
+                    $('#gp-fill', propsEl).oninput = (e) => { selEl.fill = e.target.value; drawAtPlayhead(); };
+                    $('#gp-ring', propsEl).oninput = (e) => { selEl.ring = e.target.value; drawAtPlayhead(); };
+                    $('#gp-op', propsEl).oninput = (e) => { selEl.opacity = +e.target.value; drawAtPlayhead(); };
+                } else if (selEl.type === 'bar') {
+                    propsEl.innerHTML = `
+                        ${fldPos()}
+                        <div class="fld"><label>Progress — ${Math.round((selEl.progress ?? 0.5) * 100)}%</label><input type="range" id="gp-prog" min="0" max="1" step="0.02" value="${selEl.progress ?? 0.5}"></div>
+                        <div class="grid2">
+                            <div class="fld"><label>Width</label><input type="range" id="gp-w" min="0.1" max="1" step="0.02" value="${selEl.w ?? 0.6}"></div>
+                            <div class="fld"><label>Height</label><input type="range" id="gp-h" min="0.02" max="0.3" step="0.01" value="${selEl.h ?? 0.1}"></div>
+                        </div>
+                        <div class="grid2">
+                            <div class="fld"><label>Fill</label><input type="color" id="gp-fill" value="${selEl.fill?.startsWith('#') ? selEl.fill : '#' + (selEl.fill || '10b981')}"></div>
+                            <div class="fld"><label>Track</label><input type="color" id="gp-track" value="${selEl.bgColor?.startsWith('#') ? selEl.bgColor : '#' + (selEl.bgColor || '2b2d31')}"></div>
+                        </div>`;
+                    $('#gp-prog', propsEl).oninput = (e) => { selEl.progress = +e.target.value; drawAtPlayhead(); };
+                    $('#gp-w', propsEl).oninput = (e) => { selEl.w = +e.target.value; drawAtPlayhead(); };
+                    $('#gp-h', propsEl).oninput = (e) => { selEl.h = +e.target.value; drawAtPlayhead(); };
+                    $('#gp-fill', propsEl).oninput = (e) => { selEl.fill = e.target.value; drawAtPlayhead(); };
+                    $('#gp-track', propsEl).oninput = (e) => { selEl.bgColor = e.target.value; drawAtPlayhead(); };
+                } else if (selEl.type === 'badge') {
+                    propsEl.innerHTML = `
+                        <div class="fld"><label>Badge Text</label><input type="text" id="gp-btext" value="${esc(selEl.text || 'BADGE')}"></div>
+                        ${fldPos()}
+                        <div class="grid2">
+                            <div class="fld"><label>Badge Color</label><input type="color" id="gp-bcol" value="${selEl.bgColor?.startsWith('#') ? selEl.bgColor : '#' + (selEl.bgColor || '6366f1')}"></div>
+                            <div class="fld"><label>Size</label><input type="range" id="gp-bsize" min="0.02" max="0.15" step="0.005" value="${selEl.size || 0.05}"></div>
+                        </div>
+                        <div class="fld"><label>Opacity</label><input type="range" id="gp-op" min="0" max="1" step="0.05" value="${selEl.opacity ?? 1}"></div>`;
+                    $('#gp-btext', propsEl).oninput = (e) => { selEl.text = e.target.value; renderGifLayers(); drawAtPlayhead(); };
+                    $('#gp-bcol', propsEl).oninput = (e) => { selEl.bgColor = e.target.value; drawAtPlayhead(); };
+                    $('#gp-bsize', propsEl).oninput = (e) => { selEl.size = +e.target.value; drawAtPlayhead(); };
+                    $('#gp-op', propsEl).oninput = (e) => { selEl.opacity = +e.target.value; drawAtPlayhead(); };
+                }
+                bindPos();
+            }
+
+            // Add-element buttons — apply to all keyframes by default so the
+            // element exists for the whole animation; unchecked = current only.
+            const EL_DEFS = {
+                text: () => ({ id: nid(), type: 'text', text: 'New Text', x: 0.5, y: 0.5, size: 0.1, color: 'ffffff', bold: true }),
+                media: () => ({ id: nid(), type: 'media', x: 0.5, y: 0.4, size: 0.3, shape: 'circle', fill: '5865f2', ring: 'e8622e' }),
+                bar: () => ({ id: nid(), type: 'bar', x: 0.5, y: 0.75, w: 0.6, h: 0.1, progress: 0.6, bgColor: '2b2d31', fill: '10b981' }),
+                badge: () => ({ id: nid(), type: 'badge', text: 'NEW', x: 0.5, y: 0.25, size: 0.05, bgColor: '6366f1', color: 'ffffff' }),
+            };
+            const addEl = (type) => {
+                const el = EL_DEFS[type]();
+                if ($('#gif-add-all', page).checked) {
+                    for (const kf of kfs) (kf.elements ||= []).push(clone(el));
+                } else {
+                    elsOf().push(el);
+                }
+                selEl = elsOf().find((e) => e.id === el.id) || el;
+                renderGifLayers(); renderGifProps(); drawAtPlayhead();
+            };
+            $('#gif-add-text', page).onclick = () => addEl('text');
+            $('#gif-add-media', page).onclick = () => addEl('media');
+            $('#gif-add-bar', page).onclick = () => addEl('bar');
+            $('#gif-add-badge', page).onclick = () => addEl('badge');
+
+            // Canvas hit-test + drag to reposition (edits the selected keyframe).
+            function hitEl(nx, ny) {
+                const els = elsOf();
+                for (let i = els.length - 1; i >= 0; i--) {
+                    const el = els[i];
+                    if (el.hidden) continue;
+                    const dx = Math.abs(nx - (el.x ?? 0.5)) * width;
+                    const dy = Math.abs(ny - (el.y ?? 0.5)) * height;
+                    if (el.type === 'media') {
+                        const r = Math.max(4, (el.size || 0.3) * height * 0.5) + 8;
+                        if (dx < r && dy < r) return el;
+                    } else if (el.type === 'bar') {
+                        const w = (el.w ?? 0.6) * width, h = Math.max(10, (el.h ?? 0.08) * height);
+                        if (dx < w / 2 + 6 && dy < h / 2 + 6) return el;
+                    } else {
+                        const px = Math.max(8, (el.size || 0.1) * height);
+                        const est = Math.min(width * 0.95, px * String(el.text || ' ').length * 0.62 + px);
+                        if (dx < est / 2 + 8 && dy < px + 8) return el;
+                    }
+                }
+                return null;
+            }
+            let gDrag = null;
+            cv.onpointerdown = (e) => {
+                const r = cv.getBoundingClientRect();
+                const nx = (e.clientX - r.left) / r.width;
+                const ny = (e.clientY - r.top) / r.height;
+                const el = hitEl(nx, ny);
+                if (!el) return;
+                selEl = el;
+                playT = kfs[selKf].t * durationMs;
+                setPlaying(false);
+                gDrag = { ox: nx - (el.x ?? 0.5), oy: ny - (el.y ?? 0.5) };
+                cv.setPointerCapture(e.pointerId);
+                renderGifLayers(); renderGifProps(); drawAtPlayhead();
+            };
+            cv.onpointermove = (e) => {
+                if (!gDrag || !selEl) return;
+                const r = cv.getBoundingClientRect();
+                let nx = (e.clientX - r.left) / r.width - gDrag.ox;
+                let ny = (e.clientY - r.top) / r.height - gDrag.oy;
+                if (Math.abs(nx - 0.5) < 0.03) nx = 0.5;
+                if (Math.abs(ny - 0.5) < 0.03) ny = 0.5;
+                selEl.x = Math.max(0.02, Math.min(0.98, nx));
+                selEl.y = Math.max(0.02, Math.min(0.98, ny));
+                drawAtPlayhead();
+            };
+            const gStop = () => { gDrag = null; };
+            cv.onpointerup = gStop;
+            cv.onpointercancel = gStop;
 
             // Move the selected keyframe along the timeline.
             $('#gif-kf-t', page).oninput = (e) => {
@@ -3341,27 +3598,6 @@
                 kfs.sort((a, b) => a.t - b.t);
                 selKf = kfs.indexOf(k);
                 renderTrack();
-                drawAtPlayhead();
-            };
-            $('#gif-fr-text1', page).oninput = (e) => {
-                const k = kfs[selKf];
-                if (!k) return;
-                k.elements ||= [];
-                if (!k.elements[0]) k.elements[0] = { type: 'text', x: 0.5, y: 0.4, size: 0.12, bold: true };
-                k.elements[0].text = e.target.value;
-                drawAtPlayhead();
-            };
-            $('#gif-fr-text2', page).oninput = (e) => {
-                const k = kfs[selKf];
-                if (!k) return;
-                k.elements ||= [];
-                if (!k.elements[1]) k.elements[1] = { type: 'text', x: 0.5, y: 0.68, size: 0.14, bold: true };
-                k.elements[1].text = e.target.value;
-                drawAtPlayhead();
-            };
-            $('#gif-fr-col', page).oninput = (e) => {
-                const k = kfs[selKf];
-                if (k?.elements?.[0]) k.elements[0].color = e.target.value;
                 drawAtPlayhead();
             };
             $('#gif-fr-bg', page).oninput = (e) => {
@@ -3405,7 +3641,16 @@
                 drawAtPlayhead();
             };
 
-            const applyGen = (label) => { selKf = 0; playT = 0; renderTrack(); syncKfProps(); drawAtPlayhead(); toast(label); };
+            // Give generated elements matching ids across keyframes (by index)
+            // so the layer editor's id-based interpolation pairing still works.
+            function relinkEls() {
+                const maxLen = Math.max(0, ...kfs.map((k) => (k.elements || []).length));
+                for (let i = 0; i < maxLen; i++) {
+                    const id = nid();
+                    for (const kf of kfs) if (kf.elements?.[i] && !kf.elements[i].id) kf.elements[i].id = id;
+                }
+            }
+            const applyGen = (label) => { selKf = 0; playT = 0; selEl = null; relinkEls(); renderTrack(); syncKfProps(); drawAtPlayhead(); toast(label); };
 
             // Auto generators — keyframe sequences on the shared timeline.
             $('#gen-pulse', page).onclick = () => {
