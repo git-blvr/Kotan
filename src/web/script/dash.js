@@ -843,7 +843,11 @@
         const nav = document.createElement('div');
         nav.className = 'subnav';
         nav.innerHTML = heads.map((h) => `<button class="snv" data-sec="${h.closest('.card').dataset.sec}">${esc(h.dataset.secLabel)}</button>`).join('');
-        page.insertBefore(nav, page.firstChild);
+        // Below the page title, not above it — the title scrolls away first,
+        // then the nav pins under the topbar without ever covering it.
+        const titleWrap = $('.page-title', page)?.parentElement;
+        const ref = titleWrap?.parentElement === page && titleWrap.nextSibling ? titleWrap.nextSibling : page.firstChild;
+        page.insertBefore(nav, ref);
         $$('.snv', nav).forEach((b) => (b.onclick = () => {
             const t = $(`.card[data-sec="${b.dataset.sec}"]`, page);
             if (t) window.scrollTo({ top: t.getBoundingClientRect().top + window.scrollY - nav.getBoundingClientRect().bottom - 12, behavior: 'smooth' });
