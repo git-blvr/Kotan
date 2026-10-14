@@ -67,7 +67,8 @@ a:hover { color: var(--accent-2); }
     border-color: var(--border-hover);
 }
 
-.brand {
+.brand,
+.nav-logo {
     display: flex;
     align-items: center;
     gap: 10px;
@@ -75,6 +76,7 @@ a:hover { color: var(--accent-2); }
     font-size: 21px;
     font-weight: 800;
     letter-spacing: -0.02em;
+    text-decoration: none;
 }
 .brand-mark {
     width: 32px;
@@ -89,11 +91,19 @@ a:hover { color: var(--accent-2); }
     box-shadow: 0 4px 12px var(--accent-soft);
 }
 
+.nav-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+}
+
 .nav-links {
     display: flex;
     align-items: center;
     gap: 6px;
 }
+.nav-links a,
 .nav-links a.nav-item {
     display: inline-flex;
     align-items: center;
@@ -103,16 +113,31 @@ a:hover { color: var(--accent-2); }
     color: var(--text-2);
     font-size: 14px;
     font-weight: 500;
+    text-decoration: none;
     transition: all var(--speed);
 }
+.nav-links a:hover,
 .nav-links a.nav-item:hover {
     color: var(--text);
     background: var(--panel-2);
     transform: translateY(-1px);
 }
+.nav-links a.active,
 .nav-links a.nav-item.active {
     color: var(--accent);
     background: var(--accent-soft);
+}
+.nav-links svg,
+.nav-ic,
+.cta-ic {
+    width: 18px;
+    height: 18px;
+    display: inline-block;
+    flex-shrink: 0;
+    vertical-align: middle;
+}
+.nav-label {
+    display: inline-block;
 }
 
 .nav-actions {
