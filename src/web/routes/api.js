@@ -452,6 +452,9 @@ module.exports = async (app) => {
             }
             const s = await settings.getSettings(req.guild.id);
             if (!s.studio) s.studio = { variables: {} };
+            if (!s.studio.variables[cleanName] && Object.keys(s.studio.variables).length >= 100) {
+                return reply.code(400).send({ ok: false, error: 'Variable limit reached (100 per server)' });
+            }
             s.studio.variables[cleanName] = {
                 name: cleanName,
                 type: type === 'gif' ? 'gif' : 'image',
@@ -472,7 +475,9 @@ module.exports = async (app) => {
             return reply.send({ ok: true });
         });
 
-        gg.get('/studio/asset/:name', async (req, reply) => {
+        // Full re-render per request — capped tighter than the global limit
+        // and privately cached briefly so a refresh loop can't burn CPU.
+        gg.get('/studio/asset/:name', { preHandler: rateLimit({ max: 20 }) }, async (req, reply) => {
             const cleanName = String(req.params.name || '').trim().toLowerCase();
             const s = await settings.getSettings(req.guild.id);
             const v = s.studio?.variables?.[cleanName];
@@ -487,10 +492,10 @@ module.exports = async (app) => {
                 };
                 if (v.type === 'gif') {
                     const res = await studioRenderer.renderGif(v.config, dynamicVars);
-                    return reply.type('image/gif').send(res.buffer);
+                    return reply.header('cache-control', 'private, max-age=60').type('image/gif').send(res.buffer);
                 } else {
                     const res = await studioRenderer.renderImage(v.config, dynamicVars);
-                    return reply.type('image/png').send(res.buffer);
+                    return reply.header('cache-control', 'private, max-age=60').type('image/png').send(res.buffer);
                 }
             } catch (err) {
                 return reply.code(500).send({ error: err.message });

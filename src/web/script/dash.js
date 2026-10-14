@@ -3330,10 +3330,15 @@
                 if (!kfs.length) return { bgColor: '0b0c10', elements: [] };
                 if (kfs.length === 1) return clone(kfs[0]);
                 let i = kfs.length - 1;
-                for (let j = 0; j < kfs.length - 1; j++) if (tn < kfs[j + 1].t) { i = j; break; }
+                // tn before the first dot still sits inside the last→first
+                // wrap segment — scan forward segments only past the first.
+                if (tn >= kfs[0].t) {
+                    for (let j = 0; j < kfs.length - 1; j++) if (tn < kfs[j + 1].t) { i = j; break; }
+                }
                 const a = kfs[i], b = kfs[(i + 1) % kfs.length];
-                const t1 = i === kfs.length - 1 ? 1 + b.t : b.t;
-                const raw = Math.min(1, Math.max(0, (tn - a.t) / Math.max(t1 - a.t, 1e-6)));
+                const aT = i === kfs.length - 1 && tn < a.t ? a.t - 1 : a.t;
+                const t1 = i === kfs.length - 1 ? (tn < a.t ? b.t : 1 + b.t) : b.t;
+                const raw = Math.min(1, Math.max(0, (tn - aT) / Math.max(t1 - aT, 1e-6)));
                 const p = (EASE[easing] || EASE.easeInOut)(raw);
                 const bs = b.elements || [];
                 return {
@@ -3615,10 +3620,12 @@
                         const w = (el.w ?? 0.6) * width;
                         const h = Math.max(4, (el.h ?? 0.08) * height);
                         ctx.fillStyle = `#${String(el.bgColor || '2b2d31').replace('#', '')}`;
+                        ctx.beginPath();
                         ctx.roundRect(cx - w / 2, cy - h / 2, w, h, h / 2);
                         ctx.fill();
                         if (el.progress != null) {
                             ctx.fillStyle = `#${String(el.fill || '10b981').replace('#', '')}`;
+                            ctx.beginPath();
                             ctx.roundRect(cx - w / 2, cy - h / 2, w * Math.min(1, Math.max(0, el.progress)), h, h / 2);
                             ctx.fill();
                         }

@@ -1,5 +1,6 @@
 const path = require('node:path');
 const { createCanvas, loadImage, GlobalFonts } = require('@napi-rs/canvas');
+const { fetchImageBuffer } = require('./dominantColor');
 
 // High-Performance Rust-Accelerated Studio Renderer
 // Utilizes @napi-rs/canvas (compiled native Rust Skia bindings) for lightning-fast
@@ -15,6 +16,14 @@ const FONT = (() => {
 })();
 
 const isHttp = (u) => /^https?:\/\//i.test(u || '');
+
+// Remote images load through the allowlisted guarded fetch — plain
+// loadImage(url) would let a stored config pull internal addresses or a
+// memory-bomb image. null → caller falls back to solid colors/placeholders.
+const safeLoad = async (u) => {
+    const buf = await fetchImageBuffer(u);
+    return buf ? loadImage(buf).catch(() => null) : null;
+};
 const num01 = (v, d) => {
     const n = Number(v);
     return Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : d;
@@ -123,32 +132,27 @@ async function renderImage(cfg = {}, vars = {}) {
     // placeholders; blur via offscreen downscale, dim as a dark overlay.
     const bgUrl = replaceVars(cfg.background || '', vars);
     if (isHttp(bgUrl)) {
-        try {
-            const bg = await loadImage(bgUrl);
+        const bg = await safeLoad(bgUrl);
+        if (bg) {
             drawCoverImage(ctx, bg, W, H, +cfg.bgBlur || 0);
             drawDim(ctx, W, H, +cfg.bgDim || 0);
-        } catch {
-            // Bad URL falls back to solid/gradient
         }
     }
 
-    const elements = Array.isArray(cfg.elements) ? cfg.elements : [];
+    const elements = (Array.isArray(cfg.elements) ? cfg.elements : []).slice(0, 50);
 
-    // Preload media URLs (placeholders resolved first)
+    // Preload media URLs (placeholders resolved first, capped so a config
+    // can't fan out into dozens of fetches)
     const mediaImgs = new Map();
     const mediaUrls = [...new Set(elements
         .filter((e) => e && (e.type === 'media' || e.type === 'avatar') && e.url)
         .map((e) => replaceVars(e.url, vars))
-        .filter((u) => u && isHttp(u)))];
+        .filter((u) => u && isHttp(u)))].slice(0, 12);
 
     await Promise.all(
         mediaUrls.map(async (u) => {
-            try {
-                const img = await loadImage(u);
-                if (img) mediaImgs.set(u, img);
-            } catch {
-                // Ignore load error
-            }
+            const img = await safeLoad(u);
+            if (img) mediaImgs.set(u, img);
         })
     );
 
@@ -512,10 +516,16 @@ function lerpGifEl(a, b, p) {
 function sampleGifKeyframes(kfs, tn, easeFn) {
     if (kfs.length === 1) return { ...kfs[0] };
     let i = kfs.length - 1;
-    for (let j = 0; j < kfs.length - 1; j++) if (tn < kfs[j + 1].t) { i = j; break; }
+    // tn before the first keyframe still sits inside the last→first wrap
+    // segment — only scan forward segments once we're past the first dot.
+    if (tn >= kfs[0].t) {
+        for (let j = 0; j < kfs.length - 1; j++) if (tn < kfs[j + 1].t) { i = j; break; }
+    }
     const a = kfs[i], b = kfs[(i + 1) % kfs.length];
-    const t1 = i === kfs.length - 1 ? 1 + b.t : b.t;
-    const raw = Math.min(1, Math.max(0, (tn - a.t) / Math.max(t1 - a.t, 1e-6)));
+    // Wrap segment: a plays at a.t (or a.t-1 before t=0), b plays at b.t+1.
+    const aT = i === kfs.length - 1 && tn < a.t ? a.t - 1 : a.t;
+    const t1 = i === kfs.length - 1 ? (tn < a.t ? b.t : 1 + b.t) : b.t;
+    const raw = Math.min(1, Math.max(0, (tn - aT) / Math.max(t1 - aT, 1e-6)));
     const p = easeFn(raw);
     return {
         bgColor: gifLerpHex(a.bgColor || '0b0c10', b.bgColor || a.bgColor || '0b0c10', p),
@@ -570,11 +580,13 @@ function drawGifElement(ctx, el, W, H, vars, mediaImgs) {
         const w = num01(el.w || 0.6, 0.6) * W;
         const h = Math.max(4, num01(el.h || 0.08, 0.08) * H);
         ctx.fillStyle = `#${String(el.bgColor || '2b2d31').replace('#', '')}`;
+        ctx.beginPath();
         ctx.roundRect(cx - w / 2, cy - h / 2, w, h, h / 2);
         ctx.fill();
         if (el.progress != null) {
             const fillW = w * Math.min(1, Math.max(0, el.progress));
             ctx.fillStyle = `#${String(el.fill || '10b981').replace('#', '')}`;
+            ctx.beginPath();
             ctx.roundRect(cx - w / 2, cy - h / 2, fillW, h, h / 2);
             ctx.fill();
         }
@@ -624,16 +636,15 @@ async function renderGif(gifCfg = {}, vars = {}) {
     for (const f of gifCfg.frames || []) collect(f.elements);
     collect(gifCfg.elements);
     const mediaImgs = new Map();
-    await Promise.all([...mediaUrls].map(async (u) => {
-        try { mediaImgs.set(u, await loadImage(u)); } catch { /* ignore */ }
+    await Promise.all([...mediaUrls].slice(0, 12).map(async (u) => {
+        const img = await safeLoad(u);
+        if (img) mediaImgs.set(u, img);
     }));
 
     // Shared background image across the timeline (blur/dim applied per frame).
     let bgImg = null;
     const gifBgUrl = replaceVars(gifCfg.background || '', vars);
-    if (isHttp(gifBgUrl)) {
-        try { bgImg = await loadImage(gifBgUrl); } catch { /* ignore */ }
-    }
+    if (isHttp(gifBgUrl)) bgImg = await safeLoad(gifBgUrl);
 
     const renderedFrames = [];
     const pushFrame = (frameCfg, delay) => {
@@ -645,22 +656,30 @@ async function renderGif(gifCfg = {}, vars = {}) {
             drawCoverImage(ctx, bgImg, W, H, +gifCfg.bgBlur || 0);
             drawDim(ctx, W, H, +gifCfg.bgDim || 0);
         }
-        const elements = Array.isArray(frameCfg.elements) ? frameCfg.elements : (gifCfg.elements || []);
+        const elements = (Array.isArray(frameCfg.elements) ? frameCfg.elements : (gifCfg.elements || [])).slice(0, 50);
         for (const el of elements) drawGifElement(ctx, el, W, H, vars, mediaImgs);
         renderedFrames.push({ data: ctx.getImageData(0, 0, W, H).data, delay });
     };
+
+    // Frames buffer as raw RGBA until encoded — without a cap, 5s at 24fps on
+    // an 800x600 canvas is ~230MB per render. Keep total pixels under a fixed
+    // budget; fewer, longer-delayed frames preserve the duration instead.
+    const PIXEL_BUDGET = 24_000_000;
+    const maxFrames = Math.max(1, Math.floor(PIXEL_BUDGET / (W * H)));
 
     if (Array.isArray(gifCfg.keyframes) && gifCfg.keyframes.length) {
         // Keyframed timeline — sample `fps` frames per second over durationMs.
         const durationMs = Math.min(5000, Math.max(500, Math.round(gifCfg.durationMs) || 3000));
         const easeFn = GIF_EASE[gifCfg.easing] || GIF_EASE.easeInOut;
         const kfs = gifCfg.keyframes
+            .slice(0, 20)
             .map((k) => ({ ...k, t: Math.min(1, Math.max(0, +k.t || 0)) }))
             .sort((a, b) => a.t - b.t);
-        const total = Math.max(1, Math.round((durationMs / 1000) * fps));
-        for (let i = 0; i < total; i++) pushFrame(sampleGifKeyframes(kfs, i / total, easeFn), frameDelay);
+        const total = Math.max(1, Math.min(Math.round((durationMs / 1000) * fps), maxFrames));
+        const delay = Math.max(20, Math.round(durationMs / total));
+        for (let i = 0; i < total; i++) pushFrame(sampleGifKeyframes(kfs, i / total, easeFn), delay);
     } else {
-        const frames = Array.isArray(gifCfg.frames) ? gifCfg.frames : [];
+        const frames = (Array.isArray(gifCfg.frames) ? gifCfg.frames : []).slice(0, maxFrames);
         if (!frames.length) throw new Error('GIF has no frames defined');
         for (const frameCfg of frames) pushFrame(frameCfg, frameCfg.delay ?? frameDelay);
     }

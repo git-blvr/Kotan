@@ -127,4 +127,19 @@ async function accentFor(card, src, fallback) {
     return Number.isFinite(n) ? n : fallback;
 }
 
-module.exports = { dominantColor, toHex, accentFor, ALLOWED_IMAGE_HOSTS };
+// Guarded remote-image fetch for server-side canvas renderers (studio /
+// welcome). loadImage() alone would happily pull an internal URL or a
+// giant memory bomb — this goes through the toBuffer guard instead:
+// https only, image-host allowlist, redirect:'error', 8MB cap, 8s timeout.
+// Returns null instead of throwing so renderers can skip bad sources.
+async function fetchImageBuffer(url) {
+    if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) return null;
+    try {
+        const buf = await toBuffer(url);
+        return Buffer.isBuffer(buf) ? buf : null;
+    } catch {
+        return null;
+    }
+}
+
+module.exports = { dominantColor, toHex, accentFor, ALLOWED_IMAGE_HOSTS, fetchImageBuffer };

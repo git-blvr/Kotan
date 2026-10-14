@@ -2,6 +2,7 @@ const path = require('node:path');
 const { createCanvas, loadImage, GlobalFonts } = require('@napi-rs/canvas');
 const { AttachmentBuilder, MediaGalleryBuilder, MediaGalleryItemBuilder, EmbedBuilder } = require('discord.js');
 const { fmt, imgUrl } = require('./welcomeMsg');
+const { fetchImageBuffer } = require('./dominantColor');
 const config = require('../config');
 const logger = require('./logger');
 
@@ -22,6 +23,14 @@ const FONT = (() => {
 })();
 
 const isHttp = (u) => /^https?:\/\//i.test(u || '');
+
+// Remote loads go through the allowlisted guarded fetch (https + image hosts
+// only, no redirects, size cap, timeout). A stored custom URL can't be used
+// to make the bot pull internal addresses on every member join.
+const safeLoad = async (u) => {
+    const buf = await fetchImageBuffer(u);
+    return buf ? loadImage(buf).catch(() => null) : null;
+};
 const num01 = (v, d) => {
     const n = Number(v);
     return Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : d;
@@ -56,11 +65,11 @@ async function render(member, cfg) {
     ctx.fillStyle = `#${cfg.bgColor || '1e1f22'}`;
     ctx.fillRect(0, 0, W, H);
     if (isHttp(cfg.background)) {
-        try {
-            const bg = await loadImage(cfg.background);
+        const bg = await safeLoad(cfg.background);
+        if (bg) {
             const s = Math.max(W / bg.width, H / bg.height);
             ctx.drawImage(bg, (W - bg.width * s) / 2, (H - bg.height * s) / 2, bg.width * s, bg.height * s);
-        } catch { /* bad bg url — color fill stands */ }
+        }
     }
 
     // Preload every media source once — several elements may share it.
@@ -68,8 +77,9 @@ async function render(member, cfg) {
     const mediaImgs = new Map();
     await Promise.all(
         [...new Set(els.filter((e) => e.type === 'media').map((e) => mediaSrc(e, member)).filter(Boolean))]
+            .slice(0, 12)
             .map(async (u) => {
-                const img = await loadImage(u).catch(() => null);
+                const img = await safeLoad(u);
                 if (img) mediaImgs.set(u, img);
             })
     );
