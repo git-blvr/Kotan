@@ -49,10 +49,14 @@ async function startWebsite(client) {
     app.addHook('preHandler', async (req) => { req.client = client; });
 
     // Concurrency cap runs first — burst floods die at the cheapest check —
-    // then the global per-IP cap (one shared bucket across every route),
-    // then the per-route limits below.
+    // then the global per-IP cap, then the per-route limits below.
     app.addHook('onRequest', concurrencyCap(30));
-    app.addHook('onRequest', rateLimit({ windowMs: 60_000, max: 50, global: true }));
+    // Static files are excluded — they already have a larger per-route bucket
+    // (300/min); counting them here would triple-charge every page load.
+    const STATIC_SKIP = /^\/(?:script|stylesheets|assets)\//;
+    const globalLimit = rateLimit({ windowMs: 60_000, max: 120, global: true });
+    app.addHook('onRequest', (req, reply) =>
+        STATIC_SKIP.test(req.url.split('?')[0]) ? undefined : globalLimit(req, reply));
 
     // Security headers — the design uses inline styles in places, so CSP
     // permits 'unsafe-inline' for style only; scripts stay self-hosted.

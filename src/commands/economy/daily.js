@@ -12,28 +12,31 @@ async function run(ctx) {
     const base = eco?.dailyBase ?? daily.base;
     const streakBonus = eco?.dailyStreak ?? daily.streakBonus;
     const maxBonus = eco?.dailyMaxStreak ?? daily.maxStreakBonus;
-    const profile = await db.getProfile(ctx.guild.id, ctx.user.id);
-    const now = Date.now();
+    // Check + claim must be atomic — two concurrent dailies would otherwise
+    // both pass the cooldown check and pay out twice.
+    return db.withLock(`wallet:${ctx.guild.id}:${ctx.user.id}`, async () => {
+        const profile = await db.getProfile(ctx.guild.id, ctx.user.id);
+        const now = Date.now();
 
-    const remaining = profile.lastDaily + daily.cooldown - now;
-    if (remaining > 0) {
-        return sendError(
-            ctx,
-            `You already claimed your daily. Come back in **${formatDuration(remaining)}** (${timestamp(now + remaining)}).`
-        );
-    }
+        const remaining = profile.lastDaily + daily.cooldown - now;
+        if (remaining > 0) {
+            return sendError(
+                ctx,
+                `You already claimed your daily. Come back in **${formatDuration(remaining)}** (${timestamp(now + remaining)}).`
+            );
+        }
 
-    // Streak continues if claimed within the window, otherwise resets to 1.
-    const streak = now - profile.lastDaily < daily.streakWindow ? profile.dailyStreak + 1 : 1;
-    const bonus = Math.min(streak * streakBonus, maxBonus);
-    const reward = base + bonus;
+        // Streak continues if claimed within the window, otherwise resets to 1.
+        const streak = now - profile.lastDaily < daily.streakWindow ? profile.dailyStreak + 1 : 1;
+        const bonus = Math.min(streak * streakBonus, maxBonus);
+        const reward = base + bonus;
 
-    profile.wallet += Math.round(withCoinMult(profile, reward) * boostPerk(ctx.member, ctx.settings, 'coins'));
-    profile.lastDaily = now;
-    profile.dailyStreak = streak;
-    await db.saveProfile(ctx.guild.id, ctx.user.id, profile);
+        profile.wallet += Math.round(withCoinMult(profile, reward) * boostPerk(ctx.member, ctx.settings, 'coins'));
+        profile.lastDaily = now;
+        profile.dailyStreak = streak;
+        await db.saveProfile(ctx.guild.id, ctx.user.id, profile);
 
-    return ctx.reply(
+        return ctx.reply(
         cv2(
             success(
                 `You claimed ${formatCoins(reward, cur)} (base ${base} + streak bonus ${bonus}).\n` +
@@ -43,6 +46,7 @@ async function run(ctx) {
             )
         )
     );
+    });
 }
 
 module.exports = {

@@ -48,9 +48,11 @@ async function run(ctx) {
             cv2(base({ color: config.colors.warning, description: `Nobody got it — the word was **${word}**.` }))
         );
 
-    const profile = await db.getProfile(ctx.guild.id, winner.author.id);
-    profile.wallet += winAmount(winner.member, ctx.settings, profile, reward);
-    await db.saveProfile(ctx.guild.id, winner.author.id, profile);
+    await db.withLock(`wallet:${ctx.guild.id}:${winner.author.id}`, async () => {
+        const profile = await db.getProfile(ctx.guild.id, winner.author.id);
+        profile.wallet += winAmount(winner.member, ctx.settings, profile, reward);
+        await db.saveProfile(ctx.guild.id, winner.author.id, profile);
+    });
 
     return ctx.channel.send(
         cv2(

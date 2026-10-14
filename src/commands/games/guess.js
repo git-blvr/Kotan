@@ -37,9 +37,11 @@ async function run(ctx) {
 
         const n = Number.parseInt(guess.content.trim(), 10);
         if (n === target) {
-            const profile = await db.getProfile(ctx.guild.id, ctx.user.id);
-            profile.wallet += winAmount(ctx.member, ctx.settings, profile, reward);
-            await db.saveProfile(ctx.guild.id, ctx.user.id, profile);
+            await db.withLock(`wallet:${ctx.guild.id}:${ctx.user.id}`, async () => {
+                const profile = await db.getProfile(ctx.guild.id, ctx.user.id);
+                profile.wallet += winAmount(ctx.member, ctx.settings, profile, reward);
+                await db.saveProfile(ctx.guild.id, ctx.user.id, profile);
+            });
             return ctx.channel.send(
                 cv2(
                     base({

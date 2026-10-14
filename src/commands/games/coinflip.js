@@ -27,34 +27,38 @@ async function run(ctx, guess, betInput, pvpTarget) {
         );
     }
 
-    const profile = await db.getProfile(ctx.guild.id, ctx.user.id);
-    const bet = parseAmount(betInput, profile.wallet);
-    if (!bet)
-        return sendError(
-            ctx,
-            `How much? Usage: \`${ctx.prefix}coinflip <heads|tails> <bet>\` — or challenge someone: \`${ctx.prefix}cf @user <bet>\``
-        );
     const cur = ctx.settings?.economy?.currency;
-    if (bet > profile.wallet)
-        return sendError(ctx, `You only have ${formatCoins(profile.wallet, cur)} in your wallet.`);
-    if (betCapped(ctx, bet, cur, 'coinflip')) return;
+    // Read-modify-write under the user lock — concurrent flips can't read the
+    // same wallet and overwrite each other's deductions.
+    return db.withLock(`wallet:${ctx.guild.id}:${ctx.user.id}`, async () => {
+        const profile = await db.getProfile(ctx.guild.id, ctx.user.id);
+        const bet = parseAmount(betInput, profile.wallet);
+        if (!bet)
+            return sendError(
+                ctx,
+                `How much? Usage: \`${ctx.prefix}coinflip <heads|tails> <bet>\` — or challenge someone: \`${ctx.prefix}cf @user <bet>\``
+            );
+        if (bet > profile.wallet)
+            return sendError(ctx, `You only have ${formatCoins(profile.wallet, cur)} in your wallet.`);
+        if (betCapped(ctx, bet, cur, 'coinflip')) return;
 
-    const won = guess === result;
-    const delta = won ? scaled(ctx.settings, bet, 'coinflip') : -bet;
-    profile.wallet += delta > 0 ? winAmount(ctx.member, ctx.settings, profile, delta) : delta;
-    await db.saveProfile(ctx.guild.id, ctx.user.id, profile);
+        const won = guess === result;
+        const delta = won ? scaled(ctx.settings, bet, 'coinflip') : -bet;
+        profile.wallet += delta > 0 ? winAmount(ctx.member, ctx.settings, profile, delta) : delta;
+        await db.saveProfile(ctx.guild.id, ctx.user.id, profile);
 
-    return ctx.reply(
-        cv2(
-            base({
-                title: 'Coinflip',
-                color: won ? config.colors.success : config.colors.error,
-                description:
-                    `The coin landed on **${result}** — you ${won ? 'won' : 'lost'} ${formatCoins(Math.abs(delta), cur)}.\n` +
-                    `Wallet: ${formatCoins(profile.wallet, cur)}`,
-            })
-        )
-    );
+        return ctx.reply(
+            cv2(
+                base({
+                    title: 'Coinflip',
+                    color: won ? config.colors.success : config.colors.error,
+                    description:
+                        `The coin landed on **${result}** — you ${won ? 'won' : 'lost'} ${formatCoins(Math.abs(delta), cur)}.\n` +
+                        `Wallet: ${formatCoins(profile.wallet, cur)}`,
+                })
+            )
+        );
+    });
 }
 
 // Challenger wagers `bet` against a target member — winner takes the pot.
@@ -95,37 +99,47 @@ async function pvp(ctx, target, betInput, guess) {
     if (!reply || DECLINE.test(reply.content.trim()))
         return ctx.channel.send(cv2(base({ title: 'Coinflip', description: 'Wager declined — no coins moved.' })));
 
-    // Wallets may have shifted during the wait — recheck before moving money.
-    const [a, b] = await Promise.all([
-        db.getProfile(ctx.guild.id, ctx.user.id),
-        db.getProfile(ctx.guild.id, target.id),
-    ]);
-    if (bet > a.wallet || bet > b.wallet)
-        return ctx.channel.send(
-            cv2(base({ title: 'Coinflip', description: 'Wager cancelled — a wallet can no longer cover the bet.' }))
-        );
+    // Both wallets move under a sorted pair lock — recheck and settle
+    // atomically so concurrent games can't overwrite each other's balances.
+    return db.withLocks(
+        [`wallet:${ctx.guild.id}:${ctx.user.id}`, `wallet:${ctx.guild.id}:${target.id}`],
+        async () => {
+            const [a, b] = await Promise.all([
+                db.getProfile(ctx.guild.id, ctx.user.id),
+                db.getProfile(ctx.guild.id, target.id),
+            ]);
+            if (bet > a.wallet || bet > b.wallet)
+                return ctx.channel.send(
+                    cv2(base({ title: 'Coinflip', description: 'Wager cancelled — a wallet can no longer cover the bet.' }))
+                );
 
-    const result = flip();
-    const iWon = result === call;
-    const winner = iWon ? ctx.user : target.user;
-    a.wallet -= bet;
-    b.wallet -= bet;
-    const w = iWon ? a : b; w.wallet += winAmount(iWon ? ctx.member : target, ctx.settings, w, bet * 2);
-    await Promise.all([
-        db.saveProfile(ctx.guild.id, ctx.user.id, a),
-        db.saveProfile(ctx.guild.id, target.id, b),
-    ]);
+            const result = flip();
+            const iWon = result === call;
+            const winner = iWon ? ctx.user : target.user;
+            a.wallet -= bet;
+            b.wallet -= bet;
+            // The pot is loser-funded — exactly bet*2. Multipliers/boosters
+            // would mint coins out of thin air (winner gains more than the
+            // loser lost), so no winAmount here.
+            const w = iWon ? a : b;
+            w.wallet += bet * 2;
+            await Promise.all([
+                db.saveProfile(ctx.guild.id, ctx.user.id, a),
+                db.saveProfile(ctx.guild.id, target.id, b),
+            ]);
 
-    return ctx.channel.send(
-        cv2(
-            base({
-                title: 'Coinflip wager',
-                color: config.colors.success,
-                description:
-                    `The coin landed on **${result}** — **${winner.username}** takes ${formatCoins(bet * 2, cur)}.\n` +
-                    `${ctx.user.username}: ${formatCoins(a.wallet, cur)} · ${target.user.username}: ${formatCoins(b.wallet, cur)}`,
-            })
-        )
+            return ctx.channel.send(
+                cv2(
+                    base({
+                        title: 'Coinflip wager',
+                        color: config.colors.success,
+                        description:
+                            `The coin landed on **${result}** — **${winner.username}** takes ${formatCoins(bet * 2, cur)}.\n` +
+                            `${ctx.user.username}: ${formatCoins(a.wallet, cur)} · ${target.user.username}: ${formatCoins(b.wallet, cur)}`,
+                    })
+                )
+            );
+        }
     );
 }
 

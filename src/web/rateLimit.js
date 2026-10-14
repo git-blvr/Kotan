@@ -6,9 +6,10 @@ let lastSweep = 0;
 // Repeat offenders earn a temporary full block — under a sustained flood the
 // per-window 429 still costs a lookup + JSON send per request, while a banned
 // IP costs a Map.get and drops the connection before any real work runs.
-const strikes = new Map(); // ip -> violations in the current period
+const strikes = new Map(); // ip -> { count, resetAt } — windowed, decays
 const banned = new Map();  // ip -> unban timestamp
 const STRIKE_LIMIT = 6;
+const STRIKE_WINDOW = 10 * 60_000; // strikes expire — no lifetime accumulation
 const BAN_MS = 10 * 60_000;
 
 const isBanned = (ip) => {
@@ -21,10 +22,13 @@ const isBanned = (ip) => {
 };
 
 const punish = (ip) => {
-    const n = (strikes.get(ip) || 0) + 1;
-    strikes.set(ip, n);
-    if (n >= STRIKE_LIMIT) {
-        banned.set(ip, Date.now() + BAN_MS);
+    const now = Date.now();
+    let s = strikes.get(ip);
+    if (!s || s.resetAt < now) s = { count: 0, resetAt: now + STRIKE_WINDOW };
+    s.count++;
+    strikes.set(ip, s);
+    if (s.count >= STRIKE_LIMIT) {
+        banned.set(ip, now + BAN_MS);
         strikes.delete(ip);
     }
 };
@@ -35,7 +39,7 @@ function sweep(force = false) {
     lastSweep = now;
     for (const [k, b] of buckets) if (b.reset < now) buckets.delete(k);
     for (const [k, until] of banned) if (until < now) banned.delete(k);
-    for (const [k, n] of strikes) if (n <= 0) strikes.delete(k);
+    for (const [k, s] of strikes) if (s.resetAt < now) strikes.delete(k);
 }
 
 // Fastify preHandler — send+return inside a hook ends the request.

@@ -54,51 +54,63 @@ async function deposit(ctx, input) {
     if (isPrivileged(ctx))
         return sendError(ctx, "Server owners and managers can't deposit — your bank only accepts withdrawals.");
     const c = cur(ctx);
-    const profile = await db.getProfile(ctx.guild.id, ctx.user.id);
-    const amount = parseAmount(input, profile.wallet);
-    if (!amount) return sendError(ctx, `Invalid amount — try \`${ctx.prefix}bank deposit 5000\`, \`50k\`, \`half\` or \`all\`.`);
-    if (amount > profile.wallet) return sendError(ctx, `You only have ${formatCoins(profile.wallet, c)} in your wallet.`);
+    // Both the bank record and the guild wallet move — hold both locks so a
+    // concurrent deposit or wallet wager can't interleave the two writes.
+    return db.withLocks([`user:${ctx.user.id}`, `wallet:${ctx.guild.id}:${ctx.user.id}`], async () => {
+        const profile = await db.getProfile(ctx.guild.id, ctx.user.id);
+        // The unearned startBalance portion can't leave the guild — spending
+        // it here is fine, banking it launders it into every other server.
+        const grantLeft = Math.min(profile.wallet, profile.grant || 0);
+        const allowed = profile.wallet - grantLeft;
+        const amount = parseAmount(input, allowed);
+        if (!amount) return sendError(ctx, `Invalid amount — try \`${ctx.prefix}bank deposit 5000\`, \`50k\`, \`half\` or \`all\`.`);
+        if (amount > allowed)
+            return sendError(ctx, `${formatCoins(grantLeft, c)} of your wallet is your starting grant — it can be spent in this server but not banked.`);
 
-    const r = await db.bankDeposit(ctx.user.id, amount);
-    if (r.err === 'daycap')
-        return sendError(ctx, `Daily deposit cap is **${formatNumber(db.BANK_DAY_CAP)}** — **${formatNumber(r.remaining)}** left today.`);
-    if (r.err === 'monthcap')
-        return sendError(ctx, `Monthly deposit cap is **${formatNumber(db.BANK_MONTH_CAP)}** — **${formatNumber(r.remaining)}** left this month.`);
+        const r = await db.bankDeposit(ctx.user.id, amount);
+        if (r.err === 'daycap')
+            return sendError(ctx, `Daily deposit cap is **${formatNumber(db.BANK_DAY_CAP)}** — **${formatNumber(r.remaining)}** left today.`);
+        if (r.err === 'monthcap')
+            return sendError(ctx, `Monthly deposit cap is **${formatNumber(db.BANK_MONTH_CAP)}** — **${formatNumber(r.remaining)}** left this month.`);
 
-    profile.wallet -= amount;
-    await db.saveProfile(ctx.guild.id, ctx.user.id, profile);
-    return ctx.reply(
-        cv2(
-            success(
-                `Deposited ${formatCoins(amount, c)} into your global bank.\n` +
-                    `Wallet: ${formatCoins(profile.wallet, c)} · Bank: ${formatCoins(r.bank.balance, c)}`,
-                'Deposit complete'
+        profile.wallet -= amount;
+        profile.grant = Math.min(profile.grant || 0, profile.wallet);
+        await db.saveProfile(ctx.guild.id, ctx.user.id, profile);
+        return ctx.reply(
+            cv2(
+                success(
+                    `Deposited ${formatCoins(amount, c)} into your global bank.\n` +
+                        `Wallet: ${formatCoins(profile.wallet, c)} · Bank: ${formatCoins(r.bank.balance, c)}`,
+                    'Deposit complete'
+                )
             )
-        )
-    );
+        );
+    });
 }
 
 async function withdraw(ctx, input) {
     const c = cur(ctx);
-    const acc = await db.getBank(ctx.user.id);
-    const amount = parseAmount(input, acc.balance);
-    if (!amount) return sendError(ctx, `Invalid amount — try \`${ctx.prefix}bank withdraw 5000\`, \`50k\`, \`half\` or \`all\`.`);
+    return db.withLocks([`user:${ctx.user.id}`, `wallet:${ctx.guild.id}:${ctx.user.id}`], async () => {
+        const acc = await db.getBank(ctx.user.id);
+        const amount = parseAmount(input, acc.balance);
+        if (!amount) return sendError(ctx, `Invalid amount — try \`${ctx.prefix}bank withdraw 5000\`, \`50k\`, \`half\` or \`all\`.`);
 
-    const r = await db.bankWithdraw(ctx.user.id, amount);
-    if (r.err === 'funds') return sendError(ctx, `Your bank only holds ${formatCoins(acc.balance, c)} — nothing more to withdraw.`);
+        const r = await db.bankWithdraw(ctx.user.id, amount);
+        if (r.err === 'funds') return sendError(ctx, `Your bank only holds ${formatCoins(acc.balance, c)} — nothing more to withdraw.`);
 
-    const profile = await db.getProfile(ctx.guild.id, ctx.user.id);
-    profile.wallet += amount;
-    await db.saveProfile(ctx.guild.id, ctx.user.id, profile);
-    return ctx.reply(
-        cv2(
-            success(
-                `Withdrew ${formatCoins(amount, c)} into your ${ctx.guild.name} wallet.\n` +
-                    `Wallet: ${formatCoins(profile.wallet, c)} · Bank: ${formatCoins(r.bank.balance, c)}`,
-                'Withdrawal complete'
+        const profile = await db.getProfile(ctx.guild.id, ctx.user.id);
+        profile.wallet += amount;
+        await db.saveProfile(ctx.guild.id, ctx.user.id, profile);
+        return ctx.reply(
+            cv2(
+                success(
+                    `Withdrew ${formatCoins(amount, c)} into your ${ctx.guild.name} wallet.\n` +
+                        `Wallet: ${formatCoins(profile.wallet, c)} · Bank: ${formatCoins(r.bank.balance, c)}`,
+                    'Withdrawal complete'
+                )
             )
-        )
-    );
+        );
+    });
 }
 
 async function top(ctx) {

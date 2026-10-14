@@ -12,31 +12,39 @@ async function run(ctx, target, amountInput) {
     if (target.user.bot) return sendError(ctx, 'You cannot pay a bot.');
 
     const cur = ctx.settings?.economy?.currency;
-    const sender = await db.getProfile(ctx.guild.id, ctx.user.id);
-    const amount = parseAmount(amountInput, sender.wallet);
-    if (!amount) return sendError(ctx, 'Invalid amount. Examples: `250`, `1k`, `all`, `half`.');
-    // Per-payment cap — default 100k, a manager can raise it to 300k in the
-    // dashboard (Economy → Pay cap).
-    const cap = ctx.settings?.economy?.payMax ?? 100_000;
-    if (amount > cap)
-        return sendError(ctx, `Payments are capped at ${formatCoins(cap, cur)} per transfer — a manager can raise it up to **300,000** in the dashboard.`);
-    if (amount > sender.wallet)
-        return sendError(ctx, `You only have ${formatCoins(sender.wallet, cur)} in your wallet.`);
 
-    const receiver = await db.getProfile(ctx.guild.id, target.id);
-    sender.wallet -= amount;
-    receiver.wallet += amount;
-    await db.saveProfile(ctx.guild.id, ctx.user.id, sender);
-    await db.saveProfile(ctx.guild.id, target.id, receiver);
+    // Two wallets move under a sorted pair lock — concurrent pays can't
+    // interleave their read-modify-writes and duplicate or overdraft coins.
+    return db.withLocks(
+        [`wallet:${ctx.guild.id}:${ctx.user.id}`, `wallet:${ctx.guild.id}:${target.id}`],
+        async () => {
+            const sender = await db.getProfile(ctx.guild.id, ctx.user.id);
+            const amount = parseAmount(amountInput, sender.wallet);
+            if (!amount) return sendError(ctx, 'Invalid amount. Examples: `250`, `1k`, `all`, `half`.');
+            // Per-payment cap — default 100k, a manager can raise it to 300k
+            // in the dashboard (Economy → Pay cap).
+            const cap = ctx.settings?.economy?.payMax ?? 100_000;
+            if (amount > cap)
+                return sendError(ctx, `Payments are capped at ${formatCoins(cap, cur)} per transfer — a manager can raise it up to **300,000** in the dashboard.`);
+            if (amount > sender.wallet)
+                return sendError(ctx, `You only have ${formatCoins(sender.wallet, cur)} in your wallet.`);
 
-    return ctx.reply(
-        cv2(
-            success(
-                `You paid ${formatCoins(amount, cur)} to **${target.user.tag}**.\n` +
-                    `Your new balance: ${formatCoins(sender.wallet, cur)}`,
-                'Payment sent'
-            )
-        )
+            const receiver = await db.getProfile(ctx.guild.id, target.id);
+            sender.wallet -= amount;
+            receiver.wallet += amount;
+            await db.saveProfile(ctx.guild.id, ctx.user.id, sender);
+            await db.saveProfile(ctx.guild.id, target.id, receiver);
+
+            return ctx.reply(
+                cv2(
+                    success(
+                        `You paid ${formatCoins(amount, cur)} to **${target.user.tag}**.\n` +
+                            `Your new balance: ${formatCoins(sender.wallet, cur)}`,
+                        'Payment sent'
+                    )
+                )
+            );
+        }
     );
 }
 

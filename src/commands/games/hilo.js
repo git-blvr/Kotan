@@ -17,7 +17,7 @@ const show = (card) => `${RANKS[card]}${SUITS[Math.floor(Math.random() * SUITS.l
 
 async function run(ctx, betInput) {
     const cur = ctx.settings?.economy?.currency;
-    const profile = await db.getProfile(ctx.guild.id, ctx.user.id);
+    let profile = await db.getProfile(ctx.guild.id, ctx.user.id);
 
     const bet = parseAmount(betInput, profile.wallet);
     if (!bet) return sendError(ctx, `How much? Usage: \`${ctx.prefix}hilo <bet>\``);
@@ -49,8 +49,19 @@ async function run(ctx, betInput) {
     const second = draw();
     const outcome = second === first ? 'push' : second > first === guessHigh ? 'win' : 'lose';
 
-    profile.wallet += outcome === 'win' ? winAmount(ctx.member, ctx.settings, profile, scaled(ctx.settings, bet, 'hilo')) : outcome === 'lose' ? -bet : 0;
-    await db.saveProfile(ctx.guild.id, ctx.user.id, profile);
+    // Wallet may have moved during the 20s wait — settle under the lock on a
+    // fresh read, clamped so a spent-away bet can't push the balance negative.
+    profile = await db.withLock(`wallet:${ctx.guild.id}:${ctx.user.id}`, async () => {
+        const fresh = await db.getProfile(ctx.guild.id, ctx.user.id);
+        fresh.wallet =
+            outcome === 'win'
+                ? fresh.wallet + winAmount(ctx.member, ctx.settings, fresh, scaled(ctx.settings, bet, 'hilo'))
+                : outcome === 'lose'
+                  ? Math.max(0, fresh.wallet - bet)
+                  : fresh.wallet;
+        await db.saveProfile(ctx.guild.id, ctx.user.id, fresh);
+        return fresh;
+    });
 
     return ctx.channel.send(
         cv2(

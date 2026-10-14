@@ -525,8 +525,33 @@ async function getActivity(guildId, days = 30) {
 
 // ---------- economy ----------
 
+// Per-key async mutex — serializes a read-modify-write section so two
+// concurrent money moves can't interleave (double-spend / lost update).
+// Tail-chained: each caller waits for the previous holder; the stored tail
+// never rejects so a thrown section can't wedge the queue.
+const mutexTails = new Map();
+function withLock(key, fn) {
+    const k = String(key);
+    const prev = mutexTails.get(k) || Promise.resolve();
+    const cur = prev.then(() => fn());
+    const tail = cur.then(() => {}, () => {});
+    mutexTails.set(k, tail);
+    tail.then(() => { if (mutexTails.get(k) === tail) mutexTails.delete(k); });
+    return cur;
+}
+
+// Multi-key lock — keys are acquired in sorted order, so callers locking the
+// same pair in any order can't deadlock each other.
+async function withLocks(keys, fn) {
+    const ks = [...new Set(keys.map(String))].sort();
+    if (!ks.length) return fn();
+    const [k, ...rest] = ks;
+    return withLock(k, () => (rest.length ? withLocks(rest, fn) : fn()));
+}
+
 const DEFAULT_PROFILE = {
     wallet: 0,
+    grant: 0,   // unearned startBalance still sitting in the wallet — spendable in-guild, never bankable
     lastDaily: 0,
     dailyStreak: 0,
     inventory: {},  // itemId -> qty owned
@@ -540,8 +565,9 @@ async function getProfile(guildId, userId) {
     const profile = await profiles.get(key(guildId, userId));
     if (profile) return { ...DEFAULT_PROFILE, ...profile };
     // New member — seed the wallet with the guild's configured start balance.
+    // `grant` mirrors it so the seeded portion can be kept out of the global bank.
     const start = (await getGuildSettings(guildId).catch(() => null))?.economy?.startBalance ?? 0;
-    return { ...DEFAULT_PROFILE, wallet: start };
+    return { ...DEFAULT_PROFILE, wallet: start, grant: start };
 }
 
 async function saveProfile(guildId, userId, profile) {
@@ -549,27 +575,38 @@ async function saveProfile(guildId, userId, profile) {
     return profile;
 }
 
-// Leaderboards — iterate the guild's profiles and rank them. Fine at guild
-// scale; both commands are cooldown-gated.
-async function getTopLevels(guildId, limit = 10) {
-    const rows = [];
+// Leaderboards — iterate the guild's profiles and rank them. The scan is
+// cached per guild for 30s: .bal/rank pull top-1000 on every call, and an
+// uncached scan per invocation is an easy amplification target.
+const topCache = new Map(); // guildId -> { at, levels, rich }
+const TOP_CACHE_TTL = 30_000;
+const TOP_CACHE_DEPTH = 1000;
+
+async function topScan(guildId) {
+    const cached = topCache.get(guildId);
+    if (cached && cached.at > Date.now() - TOP_CACHE_TTL) return cached;
+    const levels = [], rich = [];
     for await (const [k, p] of profiles.iterator()) {
         if (!k.startsWith(`${guildId}:`) || !p) continue;
-        rows.push({ userId: k.slice(guildId.length + 1), level: p.level || 0, xp: p.xp || 0 });
+        const userId = k.slice(guildId.length + 1);
+        levels.push({ userId, level: p.level || 0, xp: p.xp || 0 });
+        rich.push({ userId, total: p.wallet || 0 });
     }
-    return rows.sort((a, b) => b.level - a.level || b.xp - a.xp).slice(0, limit);
+    const entry = {
+        at: Date.now(),
+        levels: levels.sort((a, b) => b.level - a.level || b.xp - a.xp).slice(0, TOP_CACHE_DEPTH),
+        rich: rich.sort((a, b) => b.total - a.total).slice(0, TOP_CACHE_DEPTH),
+    };
+    topCache.set(guildId, entry);
+    return entry;
+}
+
+async function getTopLevels(guildId, limit = 10) {
+    return (await topScan(guildId)).levels.slice(0, limit);
 }
 
 async function getTopRich(guildId, limit = 10) {
-    const rows = [];
-    for await (const [k, p] of profiles.iterator()) {
-        if (!k.startsWith(`${guildId}:`) || !p) continue;
-        rows.push({
-            userId: k.slice(guildId.length + 1),
-            total: p.wallet || 0,
-        });
-    }
-    return rows.sort((a, b) => b.total - a.total).slice(0, limit);
+    return (await topScan(guildId)).rich.slice(0, limit);
 }
 
 // Latest warns + tempbans merged by timestamp — feeds the Overview
@@ -927,6 +964,8 @@ module.exports = {
     closeDatabase,
     getProfile,
     saveProfile,
+    withLock,
+    withLocks,
     getTopLevels,
     getTopRich,
     getRecentModActions,

@@ -21,17 +21,23 @@ async function run(ctx, sides, betInput) {
         );
 
     const cur = ctx.settings?.economy?.currency;
-    const profile = await db.getProfile(ctx.guild.id, ctx.user.id);
-    const bet = parseAmount(betInput, profile.wallet);
-    if (!bet) return sendError(ctx, 'Invalid bet. Examples: `100`, `1k`, `all`, `half`.');
-    if (bet > profile.wallet)
-        return sendError(ctx, `You only have ${formatCoins(profile.wallet, cur)} in your wallet.`);
-    if (betCapped(ctx, bet, cur, 'roll')) return;
+    const locked = await db.withLock(`wallet:${ctx.guild.id}:${ctx.user.id}`, async () => {
+        const profile = await db.getProfile(ctx.guild.id, ctx.user.id);
+        const bet = parseAmount(betInput, profile.wallet);
+        if (!bet) return sendError(ctx, 'Invalid bet. Examples: `100`, `1k`, `all`, `half`.');
+        if (bet > profile.wallet)
+            return sendError(ctx, `You only have ${formatCoins(profile.wallet, cur)} in your wallet.`);
+        if (betCapped(ctx, bet, cur, 'roll')) return;
 
-    const botRoll = 1 + Math.floor(Math.random() * sides);
-    const outcome = you === botRoll ? 'tie' : you > botRoll ? 'win' : 'lose';
-    profile.wallet += outcome === 'win' ? winAmount(ctx.member, ctx.settings, profile, scaled(ctx.settings, bet, 'roll')) : outcome === 'lose' ? -bet : 0;
-    await db.saveProfile(ctx.guild.id, ctx.user.id, profile);
+        const botRoll = 1 + Math.floor(Math.random() * sides);
+        const outcome = you === botRoll ? 'tie' : you > botRoll ? 'win' : 'lose';
+        profile.wallet += outcome === 'win' ? winAmount(ctx.member, ctx.settings, profile, scaled(ctx.settings, bet, 'roll')) : outcome === 'lose' ? -bet : 0;
+        await db.saveProfile(ctx.guild.id, ctx.user.id, profile);
+        return { profile, bet, botRoll, outcome };
+    });
+    if (!locked || !locked.profile) return locked; // a sendError already replied
+
+    const { profile, bet, botRoll, outcome } = locked;
 
     return ctx.reply(
         cv2(

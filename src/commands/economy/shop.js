@@ -130,19 +130,21 @@ async function applyItem(member, guild, item, profile, cur) {
 async function buy({ guild, member, user, settings }, item, cur) {
     const st = settings || (await db.getGuildSettings(guild.id));
     const price = Math.round(item.price * (1 - inv.boostPerk(member, st, 'shop') / 100));
-    const profile = await db.getProfile(guild.id, user.id);
-    if (profile.wallet < price)
-        return { err: `**${item.name}** costs ${formatCoins(price, cur)} — you only have ${formatCoins(profile.wallet, cur)}.` };
-    profile.wallet -= price;
-    let msg;
-    try {
-        msg = await applyItem(member, guild, item, profile, cur);
-    } catch (e) {
-        logger.warn(`shop delivery failed (${item.id}): ${e.message}`);
-        return { err: `Couldn't deliver **${item.name}** — nothing was charged.` };
-    }
-    await db.saveProfile(guild.id, user.id, profile);
-    return { msg: `${msg}\n-# Wallet left: ${formatCoins(profile.wallet, cur)}`, profile };
+    return db.withLock(`wallet:${guild.id}:${user.id}`, async () => {
+        const profile = await db.getProfile(guild.id, user.id);
+        if (profile.wallet < price)
+            return { err: `**${item.name}** costs ${formatCoins(price, cur)} — you only have ${formatCoins(profile.wallet, cur)}.` };
+        profile.wallet -= price;
+        let msg;
+        try {
+            msg = await applyItem(member, guild, item, profile, cur);
+        } catch (e) {
+            logger.warn(`shop delivery failed (${item.id}): ${e.message}`);
+            return { err: `Couldn't deliver **${item.name}** — nothing was charged.` };
+        }
+        await db.saveProfile(guild.id, user.id, profile);
+        return { msg: `${msg}\n-# Wallet left: ${formatCoins(profile.wallet, cur)}`, profile };
+    });
 }
 
 const ephemeral = (payload) => ({
