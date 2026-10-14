@@ -3369,14 +3369,14 @@
                         <div class="gif-timeline-wrap">
                             <div class="gif-timeline-ctrls">
                                 <span class="studio-sec-title" style="margin:0;">Keyframes (<span id="gif-frame-count">${kfs.length}</span>)</span>
-                                <div style="display:flex;gap:6px;">
-                                    <button type="button" class="btn sm outline" id="gif-btn-copy-fr" title="Clone the selected keyframe right after itself â€” reuse the same state later for seamless loops">${ICONS.duplicate} Duplicate</button>
-                                    <button type="button" class="btn sm outline" id="gif-btn-dup-fr">+ At Playhead</button>
-                                    <button type="button" class="btn sm danger" id="gif-btn-del-fr">Delete</button>
+                                <div class="gif-kf-tools">
+                                    <button type="button" class="gif-tool-btn" id="gif-btn-dup-fr" title="Insert keyframe at playhead">${ICONS.plus}</button>
+                                    <button type="button" class="gif-tool-btn" id="gif-btn-copy-fr" title="Duplicate keyframe">${ICONS.duplicate}</button>
+                                    <button type="button" class="gif-tool-btn danger" id="gif-btn-del-fr" title="Delete keyframe">${ICONS.trash}</button>
                                 </div>
                             </div>
                             <div class="gif-kf-track" id="gif-strip"></div>
-                            <div class="gif-kf-hint">Click the track to scrub Â· click a dot to edit that keyframe</div>
+                            <div class="gif-kf-hint">Click the track to scrub · drag a dot to move it · click to edit</div>
                         </div>
                     </div>
 
@@ -3992,7 +3992,7 @@
                 renderTrack();
                 syncKfProps();
                 drawAtPlayhead();
-                toast('Keyframe duplicated â€” drag it to position');
+                toast('Keyframe duplicated');
             };
 
             // Insert a copy of the selected keyframe at the playhead.

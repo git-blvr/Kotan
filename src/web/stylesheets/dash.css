@@ -2078,6 +2078,31 @@ body.has-dirty .dpage { padding-bottom: 90px; }
     gap: 12px;
     flex-wrap: wrap;
 }
+.gif-kf-tools {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    background: var(--panel-2);
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    padding: 3px;
+}
+.gif-tool-btn {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--text-2);
+    cursor: pointer;
+    transition: all var(--speed);
+}
+.gif-tool-btn:hover { background: var(--panel-solid); color: var(--text); }
+.gif-tool-btn.danger:hover { color: var(--danger); background: var(--danger-soft); }
+.gif-tool-btn svg { width: 14px; height: 14px; }
+
 .gif-playback-btns {
     display: flex;
     align-items: center;
