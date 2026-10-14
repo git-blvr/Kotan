@@ -36,9 +36,11 @@ async function guildGate(req, reply) {
 }
 
 // Route-level caps on top of the global 240/min — write and upload endpoints
-// get tighter buckets since they're the expensive/abusable ones.
-const mutLimit = rateLimit({ max: 60 });
-const uploadLimit = rateLimit({ max: 15 });
+// get tighter buckets since they're the expensive/abusable ones. Authed
+// sessions get a wider lane on all of them (a compromised token is still
+// capped, just much higher than anonymous traffic).
+const mutLimit = rateLimit({ max: 60, authedMax: 600 });
+const uploadLimit = rateLimit({ max: 15, authedMax: 120 });
 
 // Matches the decoded buffer against the declared image type — the data-URL
 // prefix is client-supplied and says nothing about the actual bytes.
@@ -56,13 +58,13 @@ const magicOk = (ext, buf) => (ext === 'webp' ? isWebp(buf) : (MAGIC[ext] || [])
 const DOM_COLOR_HOSTS = ALLOWED_IMAGE_HOSTS;
 
 module.exports = async (app) => {
-    app.addHook('preHandler', rateLimit({ max: 240 }));
+    app.addHook('preHandler', rateLimit({ max: 240, authedMax: 2000 }));
 
     // ---------- public ----------
 
     app.get('/api/me', (req, reply) => reply.send({ user: req.session?.user || null }));
 
-    app.get('/api/stats', { preHandler: rateLimit({ max: 30 }) }, (req, reply) => {
+    app.get('/api/stats', { preHandler: rateLimit({ max: 30, authedMax: 600 }) }, (req, reply) => {
         const client = req.client;
         reply.send({
             guilds: client?.guilds.cache.size || 0,
@@ -71,7 +73,7 @@ module.exports = async (app) => {
         });
     });
 
-    app.get('/api/commands', { preHandler: rateLimit({ max: 30 }) }, (req, reply) => {
+    app.get('/api/commands', { preHandler: rateLimit({ max: 30, authedMax: 600 }) }, (req, reply) => {
         const client = req.client;
         const live = new Map();
         if (client) for (const c of client.commands.values()) live.set(c.name, c);
@@ -95,7 +97,7 @@ module.exports = async (app) => {
 
     // Real liveness: the website shares the bot process, so these are live
     // process reads — plus the minute-bucketed uptimeLog the bot persists.
-    app.get('/api/uptime', { preHandler: rateLimit({ max: 60 }) }, async (req, reply) => {
+    app.get('/api/uptime', { preHandler: rateLimit({ max: 60, authedMax: 600 }) }, async (req, reply) => {
         const client = req.client;
         const ready = !!client?.isReady();
         const { uptimeLog } = await db.getHeartbeat().catch(() => ({ uptimeLog: [] }));
@@ -228,7 +230,7 @@ module.exports = async (app) => {
 
         // Card editors' "dominant color" button — picks the accent matching
         // the card's thumbnail/icon so users don't have to eyeball a hex.
-        gg.get('/dominant-color', { preHandler: rateLimit({ max: 30 }) }, async (req, reply) => {
+        gg.get('/dominant-color', { preHandler: rateLimit({ max: 30, authedMax: 300 }) }, async (req, reply) => {
             let u;
             try { u = new URL(String(req.query?.src || '')); }
             catch { return reply.code(400).send({ ok: false, error: 'Invalid URL' }); }
@@ -274,7 +276,7 @@ module.exports = async (app) => {
         // per-channel message volume over the last `days` days. Member
         // info comes along so the page can filter by name/id/role without
         // a second round-trip per row.
-        gg.get('/activity', { preHandler: rateLimit({ max: 30 }) }, async (req, reply) => {
+        gg.get('/activity', { preHandler: rateLimit({ max: 30, authedMax: 300 }) }, async (req, reply) => {
             const days = Math.min(Math.max(parseInt(req.query.days, 10) || 30, 1), 90);
             const data = await db.getActivity(req.guild.id, days);
             const info = (m) => ({
@@ -477,7 +479,7 @@ module.exports = async (app) => {
 
         // Full re-render per request — capped tighter than the global limit
         // and privately cached briefly so a refresh loop can't burn CPU.
-        gg.get('/studio/asset/:name', { preHandler: rateLimit({ max: 20 }) }, async (req, reply) => {
+        gg.get('/studio/asset/:name', { preHandler: rateLimit({ max: 20, authedMax: 240 }) }, async (req, reply) => {
             const cleanName = String(req.params.name || '').trim().toLowerCase();
             const s = await settings.getSettings(req.guild.id);
             const v = s.studio?.variables?.[cleanName];

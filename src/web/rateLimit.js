@@ -3,6 +3,11 @@ const buckets = new Map();
 const MAX_BUCKETS = 50_000; // hard cap — a flood of unique IPs can't OOM the map
 let lastSweep = 0;
 
+// Loopback is exempt entirely — local dev/preview traffic should never
+// throttle. Externally reachable deployments are unaffected.
+const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
+const isLocal = (ip) => LOOPBACK.has(ip);
+
 // Repeat offenders earn a temporary full block — under a sustained flood the
 // per-window 429 still costs a lookup + JSON send per request, while a banned
 // IP costs a Map.get and drops the connection before any real work runs.
@@ -44,10 +49,14 @@ function sweep(force = false) {
 
 // Fastify preHandler — send+return inside a hook ends the request.
 // global:true keys on the IP alone — one shared bucket across all routes.
-function rateLimit({ windowMs = 60_000, max = 60, global = false } = {}) {
+// authedMax applies when req.session is populated (sessionMiddleware ran) —
+// signed-in dashboard traffic gets a much wider lane than anonymous requests.
+function rateLimit({ windowMs = 60_000, max = 60, authedMax = 0, global = false } = {}) {
     return async (req, reply) => {
+        if (isLocal(req.ip)) return;
         if (isBanned(req.ip)) return reply.code(429).end();
         sweep();
+        const cap = authedMax && req.session ? authedMax : max;
         const key = global ? req.ip : `${req.ip}|${req.routeOptions?.url || req.url.split('?')[0]}`;
         const now = Date.now();
         let b = buckets.get(key);
@@ -61,13 +70,13 @@ function rateLimit({ windowMs = 60_000, max = 60, global = false } = {}) {
             }
         }
         if (!b || b.reset < now) { b = { count: 0, reset: now + windowMs }; buckets.set(key, b); }
-        if (++b.count > max) {
+        if (++b.count > cap) {
             punish(req.ip);
             reply.header('Retry-After', String(Math.ceil((b.reset - now) / 1000)));
             return reply.code(429).send({ ok: false, error: 'Too many requests' });
         }
-        reply.header('X-RateLimit-Limit', String(max))
-            .header('X-RateLimit-Remaining', String(max - b.count))
+        reply.header('X-RateLimit-Limit', String(cap))
+            .header('X-RateLimit-Remaining', String(cap - b.count))
             .header('X-RateLimit-Reset', String(Math.ceil(b.reset / 1000)));
     };
 }
@@ -80,6 +89,7 @@ const inflight = new Map(); // ip -> open request count
 function concurrencyCap(max = 30) {
     return async (req, reply) => {
         const ip = req.ip;
+        if (isLocal(ip)) return;
         const n = (inflight.get(ip) || 0) + 1;
         inflight.set(ip, n);
         // 'close' fires exactly once per request — complete or aborted — so

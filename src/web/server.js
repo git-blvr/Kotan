@@ -48,15 +48,16 @@ async function startWebsite(client) {
     // Request decorators can't hold object values — attach via hook instead.
     app.addHook('preHandler', async (req) => { req.client = client; });
 
-    // Concurrency cap runs first — burst floods die at the cheapest check —
-    // then the global per-IP cap, then the per-route limits below.
-    app.addHook('onRequest', concurrencyCap(30));
-    // Static files are excluded — they already have a larger per-route bucket
-    // (300/min); counting them here would triple-charge every page load.
+    // Concurrency cap runs first — burst floods die at the cheapest check.
+    // 60 covers parallel SPA fetches easily; browsers cap ~6 per host anyway.
+    app.addHook('onRequest', concurrencyCap(60));
+    // Static files are excluded from the global bucket — they already have a
+    // larger per-route bucket (300/min); counting them here would triple-
+    // charge every page load.
     const STATIC_SKIP = /^\/(?:script|stylesheets|assets)\//;
-    const globalLimit = rateLimit({ windowMs: 60_000, max: 120, global: true });
-    app.addHook('onRequest', (req, reply) =>
-        STATIC_SKIP.test(req.url.split('?')[0]) ? undefined : globalLimit(req, reply));
+    // The global per-IP limit must run after sessionMiddleware (below) so
+    // signed-in users get the authedMax lane instead of the anonymous one.
+    const globalLimit = rateLimit({ windowMs: 60_000, max: 120, authedMax: 2000, global: true });
 
     // Security headers — the design uses inline styles in places, so CSP
     // permits 'unsafe-inline' for style only; scripts stay self-hosted.
@@ -77,6 +78,8 @@ async function startWebsite(client) {
 
     app.addHook('preHandler', sessionMiddleware);
     app.addHook('preHandler', sameOriginOnly);
+    app.addHook('preHandler', (req, reply) =>
+        STATIC_SKIP.test(req.url.split('?')[0]) ? undefined : globalLimit(req, reply));
 
     await app.register(authRoutes);
     await app.register(apiRoutes);
@@ -99,8 +102,8 @@ async function startWebsite(client) {
 
     // Public pages + static assets — per-IP limited so F5 spam can't
     // burn the process; pages serve from the memory cache above.
-    const pageLimit = rateLimit({ windowMs: 60_000, max: 120 });
-    const staticLimit = rateLimit({ windowMs: 60_000, max: 300 });
+    const pageLimit = rateLimit({ windowMs: 60_000, max: 120, authedMax: 1200 });
+    const staticLimit = rateLimit({ windowMs: 60_000, max: 300, authedMax: 3000 });
     for (const [route, file] of [['/', 'index.html'], ['/doc', 'doc.html'], ['/tos', 'tos.html'],
         ['/privacy', 'privacy.html'], ['/uptime', 'uptime.html'], ['/login', 'login.html']])
         app.get(route, { preHandler: pageLimit }, html(file));
