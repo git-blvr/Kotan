@@ -2299,6 +2299,73 @@ body.has-dirty .dpage { padding-bottom: 90px; }
    var that differs from the dark defaults in :root above.
    ========================================================================== */
 
+/* ---- Generic light mode — light presets without a bespoke block below
+   get a full surface set derived from the inline shell/card/dock vars,
+   keeping each theme's hue. Cream's hand-tuned block comes later at equal
+   specificity, so it still wins wherever both define a var. ---- */
+:root[data-mode="light"] {
+    color-scheme: light;
+
+    /* Ink — the light theme's dark text, tinted by the shell so warm
+       themes keep warm text and cool themes keep cool text */
+    --text: color-mix(in srgb, var(--shell-bg) 15%, #16141d);
+    --text-2: color-mix(in srgb, var(--shell-bg) 48%, #16141d);
+    --muted: color-mix(in srgb, var(--shell-bg) 66%, #3a3648);
+    --text-inverse: #fbf9f6;
+
+    /* Borders & panels — translucent ink overlays */
+    --border: color-mix(in srgb, var(--text) 14%, transparent);
+    --border-soft: color-mix(in srgb, var(--text) 8%, transparent);
+    --border-hover: color-mix(in srgb, var(--text) 22%, transparent);
+    --panel: color-mix(in srgb, var(--text) 5%, transparent);
+    --panel-solid: var(--card-bg);
+    --panel-2: color-mix(in srgb, var(--card-bg) 55%, var(--shell-bg));
+    --panel-hover: color-mix(in srgb, var(--card-bg) 30%, var(--shell-bg));
+
+    /* Surfaces */
+    --bg: var(--shell-bg);
+    --bg-alt: color-mix(in srgb, var(--shell-bg) 50%, #ffffff);
+    --bg-soft: var(--card-bg);
+    --card-hover: color-mix(in srgb, var(--card-bg) 78%, var(--shell-bg));
+    --card-sub-bg: color-mix(in srgb, var(--card-bg) 45%, var(--shell-bg));
+    --input-bg: var(--dock-bg);
+    --hover-surface: var(--panel-2);
+    --hover-surface-2: var(--panel-hover);
+    --dock-shadow: -10px 0 28px color-mix(in srgb, var(--text) 10%, transparent);
+
+    /* Servers rail */
+    --rail-bg: var(--bg-alt);
+    --rail-icon-bg: var(--card-bg);
+    --rail-icon-text: var(--muted);
+    --rail-pill-active: var(--accent);
+
+    /* Sidebar + account card */
+    --sidebar-text: var(--text);
+    --sidebar-sub: var(--muted);
+    --sidebar-item-hover: var(--panel-2);
+    --sidebar-item-active: color-mix(in srgb, var(--accent) 32%, var(--card-bg));
+    --acc-text: var(--text);
+    --acc-sub: var(--muted);
+    --acc-shadow: 0 4px 16px color-mix(in srgb, var(--text) 12%, transparent);
+    --acc-logout-bg: var(--panel-2);
+    --nav-box-bg: var(--panel-2);
+    --nav-box-hover: var(--panel-hover);
+
+    /* Misc */
+    --tooltip-bg: var(--text);
+    --tooltip-text: var(--dock-bg);
+    --card-shadow: 0 4px 16px color-mix(in srgb, var(--text) 8%, transparent);
+    --shadow-sm: 0 2px 8px color-mix(in srgb, var(--text) 5%, transparent);
+    --shadow: 0 8px 24px color-mix(in srgb, var(--text) 10%, transparent);
+    --shadow-lg: 0 16px 48px color-mix(in srgb, var(--text) 15%, transparent);
+
+    /* Status — light-surface tuned */
+    --ok: #059669;
+    --warn: #d97706;
+    --danger: #dc2626;
+    --info: #0284c7;
+}
+
 /* ---- Cream Latte — light, warm (matches the reference mockup) ---- */
 :root[data-color-theme="cream"] {
     --accent: #e2792b;
@@ -2456,6 +2523,34 @@ body.has-dirty .dpage { padding-bottom: 90px; }
     --card-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
     --shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
     --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.65);
+}
+
+/* ---- Accent- & status-derived extras — follow the live accent (preset or
+   custom) for every theme without a bespoke block above. Also supplies the
+   status colors the dark defaults never defined. ---- */
+:root:not([data-color-theme="cream"]):not([data-color-theme="cocoa"]) {
+    --accent-soft: color-mix(in srgb, var(--accent) 16%, transparent);
+    --accent-glow: color-mix(in srgb, var(--accent) 32%, transparent);
+    --brand: var(--accent);
+    --brand-2: var(--accent-2);
+    --warm: var(--accent);
+    --nav-btn-hover: var(--accent-2);
+    --nav-btn-shadow: 0 2px 10px var(--accent-glow);
+    --rail-home-shadow: 0 4px 12px var(--accent-glow);
+}
+
+/* Status colors for dark themes — previously undefined outside cream. */
+:root[data-mode="dark"] {
+    --ok: #22c55e;
+    --warn: #f59e0b;
+    --danger: #ef4444;
+    --info: #38bdf8;
+}
+:root {
+    --ok-soft: color-mix(in srgb, var(--ok) 15%, transparent);
+    --warn-soft: color-mix(in srgb, var(--warn) 15%, transparent);
+    --danger-soft: color-mix(in srgb, var(--danger) 15%, transparent);
+    --info-soft: color-mix(in srgb, var(--info) 15%, transparent);
 }
 
 /* ---- overview charts (mock style) ---- */

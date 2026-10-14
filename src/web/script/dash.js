@@ -101,6 +101,8 @@
             navBtn: '#e2792b',
             onAccent: '#ffffff',
             dockMode: '',
+            mode: 'light',
+            pair: 'cocoa',
         },
         cocoa: {
             label: 'Cocoa Roast (Dark)',
@@ -115,6 +117,8 @@
             navBtn: '#f08a3c',
             onAccent: '#2a170b',
             dockMode: '',
+            mode: 'dark',
+            pair: 'cream',
         },
         dark: {
             label: 'Obsidian Dark (Default)',
@@ -129,6 +133,24 @@
             navBtn: '#5865f2',
             onAccent: '#ffffff',
             dockMode: '',
+            mode: 'dark',
+            pair: 'porcelain',
+        },
+        porcelain: {
+            label: 'Porcelain (Light)',
+            desc: 'Porcelain White Canvas · Cool Blue Panels · Blurple Accent',
+            accent: '#5865f2',
+            accent2: '#4752c4',
+            shell: '#e6e8f4',
+            sidebar: '#e6e8f4',
+            dock: '#f8f9fd',
+            card: '#eceef7',
+            acc: '#eceef7',
+            navBtn: '#5865f2',
+            onAccent: '#ffffff',
+            dockMode: '',
+            mode: 'light',
+            pair: 'dark',
         },
         oled: {
             label: 'OLED Pitch Black',
@@ -143,6 +165,24 @@
             navBtn: '#2b2d31',
             onAccent: '#0c0c0e',
             dockMode: 'oled',
+            mode: 'dark',
+            pair: 'paper',
+        },
+        paper: {
+            label: 'Paper White (Light)',
+            desc: 'Pure White Canvas · Soft Gray Panels · Ink Accent',
+            accent: '#17171a',
+            accent2: '#3f3f46',
+            shell: '#f1f1f3',
+            sidebar: '#f1f1f3',
+            dock: '#ffffff',
+            card: '#eaeaed',
+            acc: '#eaeaed',
+            navBtn: '#17171a',
+            onAccent: '#ffffff',
+            dockMode: '',
+            mode: 'light',
+            pair: 'oled',
         },
         zinc: {
             label: 'Zinc Slate',
@@ -157,6 +197,24 @@
             navBtn: '#6366f1',
             onAccent: '#ffffff',
             dockMode: 'vibrant',
+            mode: 'dark',
+            pair: 'glacier',
+        },
+        glacier: {
+            label: 'Glacier (Light)',
+            desc: 'Glacier White Canvas · Slate Panels · Indigo Accent',
+            accent: '#6366f1',
+            accent2: '#4f46e5',
+            shell: '#e2e6f0',
+            sidebar: '#e2e6f0',
+            dock: '#f5f7fc',
+            card: '#e9edf6',
+            acc: '#e9edf6',
+            navBtn: '#6366f1',
+            onAccent: '#ffffff',
+            dockMode: '',
+            mode: 'light',
+            pair: 'zinc',
         },
         charcoal: {
             label: 'Warm Charcoal',
@@ -171,6 +229,24 @@
             navBtn: '#f59e0b',
             onAccent: '#1c1208',
             dockMode: '',
+            mode: 'dark',
+            pair: 'sandstone',
+        },
+        sandstone: {
+            label: 'Sandstone (Light)',
+            desc: 'Warm Sand Canvas · Stone Panels · Amber Accent',
+            accent: '#d97706',
+            accent2: '#b45309',
+            shell: '#ece7df',
+            sidebar: '#ece7df',
+            dock: '#f8f6f2',
+            card: '#eae4da',
+            acc: '#eae4da',
+            navBtn: '#d97706',
+            onAccent: '#ffffff',
+            dockMode: '',
+            mode: 'light',
+            pair: 'charcoal',
         },
     };
 
@@ -203,13 +279,13 @@
 
     function applyTheme(t = theme) {
         const root = document.documentElement;
-        root.dataset.mode = t.mode || '';
         root.dataset.density = t.density || '';
         root.dataset.motion = t.motion || '';
         root.dataset.glass = t.glass === 0 || t.glass === '0' ? '0' : '1';
 
         // Active color scheme
         const ctheme = COLOR_THEMES[t.colorTheme] || COLOR_THEMES.dark;
+        root.dataset.mode = ctheme.mode || 'dark';
         root.dataset.colorTheme = t.colorTheme || 'dark';
         const dMode = t.dockMode !== undefined ? t.dockMode : (ctheme.dockMode || '');
         if (dMode) root.dataset.dockMode = dMode;
@@ -232,7 +308,11 @@
         // Surfaces
         const sh = t.customShell || ctheme.shell;
         const sb = t.customSidebar || ctheme.sidebar;
-        const dk = t.customDock || ctheme.dock;
+        // Dock elevation resolved here — the [data-dock-mode] stylesheet
+        // blocks can never win over the inline --dock-bg set below.
+        let dk = t.customDock || ctheme.dock;
+        if (!t.customDock && dMode === 'oled') dk = ctheme.mode === 'light' ? '#ffffff' : '#0d0d0f';
+        else if (!t.customDock && dMode === 'vibrant') dk = `color-mix(in srgb, ${dk} 88%, ${acc})`;
         const cd = t.customCard || ctheme.card;
         const ac = t.customAcc || ctheme.acc;
         const nb = t.customNavBtn || ctheme.navBtn;
@@ -283,11 +363,11 @@
                     </div>
                 </div>
                 <div>
-                    <div class="theme-sec-title">Dock Background Elevation</div>
+                    <div class="theme-sec-title">Dock Elevation</div>
                     <div class="segmented-control">
-                        <button type="button" class="segmented-btn ${!theme.dockMode ? 'active' : ''}" data-dock="">Standard Dark</button>
-                        <button type="button" class="segmented-btn ${theme.dockMode === 'vibrant' ? 'active' : ''}" data-dock="vibrant">Elevated Slate</button>
-                        <button type="button" class="segmented-btn ${theme.dockMode === 'oled' ? 'active' : ''}" data-dock="oled">Pitch Black</button>
+                        <button type="button" class="segmented-btn ${!theme.dockMode ? 'active' : ''}" data-dock="">Standard</button>
+                        <button type="button" class="segmented-btn ${theme.dockMode === 'vibrant' ? 'active' : ''}" data-dock="vibrant">Accent Tinted</button>
+                        <button type="button" class="segmented-btn ${theme.dockMode === 'oled' ? 'active' : ''}" data-dock="oled">Max Contrast</button>
                     </div>
                 </div>
                 <div>
@@ -802,7 +882,11 @@
         $('#burger').onclick = () => $('#dside').classList.toggle('open');
         const tgBtn = $('#db-theme-toggle');
         if (tgBtn) tgBtn.onclick = () => {
-            theme.colorTheme = theme.colorTheme === 'cream' ? 'cocoa' : 'cream';
+            // Flip to the paired light/dark twin — keeps the accent family
+            // (and any custom colors) so the two modes stay in sync.
+            const cur = COLOR_THEMES[theme.colorTheme];
+            theme.colorTheme = cur?.pair || 'cream';
+            delete theme.dockMode;
             applyTheme();
         };
         const thBtn = $('#db-theme-btn');
@@ -811,10 +895,11 @@
 
     function applyAppearance() {
         const ap = CTX.settings?.appearance || {};
-        document.documentElement.dataset.glass = ap.theme === 'glass' ? '1' : '';
+        // Per-guild overrides apply only when configured — never clear the
+        // user's saved theme accent/glass back to CSS defaults.
+        if (ap.theme === 'glass') document.documentElement.dataset.glass = '1';
         const root = document.documentElement.style;
         if (ap.accent) { root.setProperty('--accent', ap.accent); root.setProperty('--accent-2', ap.accent); }
-        else { root.removeProperty('--accent'); root.removeProperty('--accent-2'); }
         const bg = $('.dwrap', app);
         if (bg) {
             if (ap.background) {
