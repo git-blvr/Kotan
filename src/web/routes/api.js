@@ -1,5 +1,6 @@
 const { PermissionFlagsBits } = require('discord.js');
 const fs = require('fs');
+const fsp = fs.promises;
 const path = require('path');
 const db = require('../../utils/database');
 const config = require('../../config');
@@ -359,7 +360,24 @@ module.exports = async (app) => {
         // Dashboard wallpaper upload — stored per-guild under data/bgs and
         // served back through /bg (kept out of src/web so uploads aren't source files).
         const BG_DIR = path.join(__dirname, '..', '..', '..', 'data', 'bgs');
-        const bgFile = (gid) => (fs.existsSync(BG_DIR) ? fs.readdirSync(BG_DIR).find((f) => f.startsWith(`${gid}.`)) : null);
+
+        // Async bg file lookup with a short-lived cache to avoid a directory
+        // scan on every single /bg request. Cache is invalidated on upload/delete.
+        const bgCache = new Map(); // guildId -> { file: string|null, exp: number }
+        const BG_CACHE_TTL = 60_000;
+        async function bgFile(gid) {
+            const hit = bgCache.get(gid);
+            if (hit && hit.exp > Date.now()) return hit.file;
+            let file = null;
+            try {
+                const entries = await fsp.readdir(BG_DIR);
+                file = entries.find((f) => f.startsWith(`${gid}.`)) || null;
+            } catch { /* BG_DIR doesn't exist yet */ }
+            bgCache.set(gid, { file, exp: Date.now() + BG_CACHE_TTL });
+            return file;
+        }
+        const invalidateBg = (gid) => bgCache.delete(gid);
+
         gg.post('/appearance/bg', { preHandler: uploadLimit, bodyLimit: 9_000_000 }, async (req, reply) => {
             const dataUrl = String(req.body?.image || '');
             const m = /^data:image\/(png|jpe?g|webp|gif);base64,([a-z0-9+/=\s]+)$/i.exec(dataUrl);
@@ -371,15 +389,15 @@ module.exports = async (app) => {
                 return reply.code(400).send({ ok: false, error: 'Decoded image must be under 6MB' });
             if (!magicOk(ext, buf))
                 return reply.code(400).send({ ok: false, error: `File is not a valid ${ext.toUpperCase()}` });
-            const fsp = fs.promises;
             await fsp.mkdir(BG_DIR, { recursive: true });
-            const old = bgFile(req.guild.id);
+            const old = await bgFile(req.guild.id);
             if (old) await fsp.rm(path.join(BG_DIR, old), { force: true });
             await fsp.writeFile(path.join(BG_DIR, `${req.guild.id}.${ext}`), buf, { mode: 0o600 });
+            invalidateBg(req.guild.id);
             return reply.send({ ok: true, url: `/api/guilds/${req.guild.id}/bg?v=${Date.now()}` });
         });
         gg.get('/bg', async (req, reply) => {
-            const f = bgFile(req.guild.id);
+            const f = await bgFile(req.guild.id);
             if (!f) return reply.code(404).send({ error: 'No wallpaper set' });
             const mime = { png: 'image/png', jpg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif' }[path.extname(f).slice(1)] || 'image/png';
             return reply.type(mime).header('cache-control', 'public, max-age=3600').send(fs.createReadStream(path.join(BG_DIR, f)));

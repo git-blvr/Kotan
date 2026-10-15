@@ -36,6 +36,14 @@ function manageableGuilds(client, session) {
 const liveCache = new Map(); // `${guildId}:${userId}` -> { ok, exp }
 const LIVE_TTL = 10 * 60 * 1000;
 
+// Periodic sweep so the cache can't grow unbounded over long uptimes.
+// 30-min interval is cheap — a single Map pass — and ensures stale entries
+// don't accumulate across guild membership changes or user revocations.
+setInterval(() => {
+    const now = Date.now();
+    for (const [k, v] of liveCache) if (v.exp <= now) liveCache.delete(k);
+}, 30 * 60_000).unref(); // .unref() so it doesn't keep the process alive alone
+
 async function verifyMemberAccess(guild, userId) {
     if (!guild || !userId) return false;
     if (isDeveloper(userId) || guild.ownerId === userId) return true;

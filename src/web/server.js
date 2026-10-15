@@ -1,4 +1,5 @@
 const fs = require('node:fs');
+const fsp = fs.promises;
 const path = require('node:path');
 const fastify = require('fastify');
 const env = require('./env');
@@ -12,15 +13,29 @@ const { rateLimit, concurrencyCap } = require('./rateLimit');
 const WEB_DIR = __dirname;
 const page = (name) => path.join(WEB_DIR, 'pages', name);
 
-// Page bodies cached briefly in memory so refresh storms don't hit disk
-// on every request. Short TTL keeps edits visible without a restart.
+// Page bodies cached in memory — async reads so the event loop never blocks
+// on disk I/O. TTL of 30s is generous enough for production while still
+// picking up edits without a restart.
 const pageCache = new Map();
-function cachedPage(name) {
+const PAGE_CACHE_TTL = 30_000;
+
+async function cachedPage(name) {
     const c = pageCache.get(name);
     if (c && c.exp > Date.now()) return c.buf;
-    const buf = fs.readFileSync(page(name));
-    pageCache.set(name, { buf, exp: Date.now() + 2000 });
+    const buf = await fsp.readFile(page(name));
+    pageCache.set(name, { buf, exp: Date.now() + PAGE_CACHE_TTL });
     return buf;
+}
+
+// Pre-warm the page cache at startup so the first visitors don't pay the
+// read cost. Missing files are silently skipped (e.g. optional pages).
+async function warmPageCache() {
+    const pages = [
+        'index.html', 'dashboard.html', 'login.html', 'error.html',
+        'doc.html', 'tos.html', 'privacy.html', 'uptime.html',
+        'admin.html', 'restricted.html',
+    ];
+    await Promise.allSettled(pages.map((n) => cachedPage(n)));
 }
 
 const MIME = {
@@ -30,6 +45,19 @@ const MIME = {
     '.woff': 'font/woff', '.woff2': 'font/woff2', '.json': 'application/json',
     '.map': 'application/json', '.txt': 'text/plain',
 };
+
+// Static file cache — served assets are immutable for the life of the
+// process; only re-read when the in-memory entry has expired.
+const staticCache = new Map();
+const STATIC_CACHE_TTL = 5 * 60_000; // 5 minutes
+
+async function cachedStatic(filePath) {
+    const c = staticCache.get(filePath);
+    if (c && c.exp > Date.now()) return c.buf;
+    const buf = await fsp.readFile(filePath);
+    staticCache.set(filePath, { buf, exp: Date.now() + STATIC_CACHE_TTL });
+    return buf;
+}
 
 // Starts the dashboard server inside the bot process. Called from ready.js —
 // the site reads the shared DB layer and the live discord.js client directly,
@@ -47,6 +75,10 @@ async function startWebsite(client) {
     });
     // Request decorators can't hold object values — attach via hook instead.
     app.addHook('preHandler', async (req) => { req.client = client; });
+
+    // HTTP request logger — toggled by WEB_REQUEST_LOG env var or at runtime
+    // via logger.httpLog.enabled. Uses onResponse so elapsedTime is available.
+    app.addHook('onResponse', logger.httpLog.hook);
 
     // Concurrency cap runs first — burst floods die at the cheapest check.
     // 60 covers parallel SPA fetches easily; browsers cap ~6 per host anyway.
@@ -86,18 +118,18 @@ async function startWebsite(client) {
 
     // Dashboard shells — gated server-side; the SPA inside then re-checks per
     // guild via the API (which enforces the same rules on every request).
-    const html = (name) => (req, reply) => reply.type('text/html').send(cachedPage(name));
+    const html = (name) => async (req, reply) => reply.type('text/html').send(await cachedPage(name));
     app.get('/dashboard', { preHandler: requireAuth }, html('dashboard.html'));
-    app.get('/dashboard/admin/blacklist', { preHandler: requireAuth }, (req, reply) => {
-        if (!isDeveloper(req.session.user.id)) return reply.code(404).type('text/html').send(cachedPage('error.html'));
-        return reply.type('text/html').send(cachedPage('admin.html'));
+    app.get('/dashboard/admin/blacklist', { preHandler: requireAuth }, async (req, reply) => {
+        if (!isDeveloper(req.session.user.id)) return reply.code(404).type('text/html').send(await cachedPage('error.html'));
+        return reply.type('text/html').send(await cachedPage('admin.html'));
     });
-    app.get('/dashboard/:id', { preHandler: requireAuth }, (req, reply) => {
+    app.get('/dashboard/:id', { preHandler: requireAuth }, async (req, reply) => {
         const err = checkGuildAccess(req.client, req.session, req.params.id);
         if (err?.error === 'restricted')
-            return reply.code(403).type('text/html').send(cachedPage('restricted.html'));
-        if (err) return reply.code(err.status).type('text/html').send(cachedPage('error.html'));
-        return reply.type('text/html').send(cachedPage('dashboard.html'));
+            return reply.code(403).type('text/html').send(await cachedPage('restricted.html'));
+        if (err) return reply.code(err.status).type('text/html').send(await cachedPage('error.html'));
+        return reply.type('text/html').send(await cachedPage('dashboard.html'));
     });
 
     // Public pages + static assets — per-IP limited so F5 spam can't
@@ -132,27 +164,37 @@ async function startWebsite(client) {
         reply.type('application/xml').send(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls}</urlset>`);
     });
 
-    // Static mounts — safe flat-file reads with cache headers.
-    const mount = (prefix, dir, maxAge) => app.get(`${prefix}/:file`, { preHandler: staticLimit }, (req, reply) => {
+    // Static mounts — async reads with in-memory cache and strict filename
+    // validation. Cache headers let CDN/browser avoid re-fetching unchanged assets.
+    const mount = (prefix, dir, maxAge) => app.get(`${prefix}/:file`, { preHandler: staticLimit }, async (req, reply) => {
         const file = String(req.params.file);
-        if (!/^[\w.-]+$/.test(file) || file.startsWith('.')) return reply.code(404).send({ ok: false });
+        // Reject anything that isn't a simple filename — no directories, no
+        // dotfiles, no path separators. Strictly whitelisting alphanumerics +
+        // hyphens/underscores/dots keeps traversal and trick extensions out.
+        if (!/^[\w.-]+$/.test(file) || file.startsWith('.') || file.includes('..'))
+            return reply.code(404).send({ ok: false });
+        const ext = path.extname(file).toLowerCase();
+        if (!MIME[ext]) return reply.code(404).send({ ok: false }); // reject unknown types
         let buf;
-        try { buf = fs.readFileSync(path.join(dir, file)); }
+        try { buf = await cachedStatic(path.join(dir, file)); }
         catch { return reply.code(404).send({ ok: false }); }
         return reply
             .header('Cache-Control', `public, max-age=${maxAge}`)
-            .type(MIME[path.extname(file).toLowerCase()] || 'application/octet-stream')
+            .type(MIME[ext])
             .send(buf);
     });
     mount('/script', path.join(WEB_DIR, 'script'), 300);
     mount('/stylesheets', path.join(WEB_DIR, 'stylesheets'), 300);
     mount('/assets', path.join(WEB_DIR, 'assets'), 3600);
 
-    app.setNotFoundHandler((req, reply) => reply.code(404).type('text/html').send(cachedPage('error.html')));
-    app.setErrorHandler((err, req, reply) => {
+    app.setNotFoundHandler(async (req, reply) => reply.code(404).type('text/html').send(await cachedPage('error.html')));
+    app.setErrorHandler(async (err, req, reply) => {
         logger.error('Website error:', err);
-        reply.code(500).type('text/html').send(cachedPage('error.html'));
+        reply.code(500).type('text/html').send(await cachedPage('error.html'));
     });
+
+    // Pre-warm page cache before accepting connections.
+    await warmPageCache();
 
     await app.listen({ port: env.PORT, host: env.HOST });
     // Socket-level flood hygiene — slowheaders, stalled request bodies and
@@ -162,7 +204,9 @@ async function startWebsite(client) {
     app.server.maxConnections = 2048;    // refuse sockets beyond this
     const displayHost = env.HOST === '127.0.0.1' ? 'localhost' : env.HOST;
     const exposure = env.HOST === '0.0.0.0' ? ' (exposed to LAN)' : '';
+    const logStatus = logger.httpLog.enabled ? 'on' : 'off (set WEB_REQUEST_LOG=true to enable)';
     logger.success(`Dashboard listening on http://${displayHost}:${env.PORT}${exposure}`);
+    logger.info(`Request logging: ${logStatus}`);
     return app;
 }
 
