@@ -63,7 +63,7 @@ async function startWebsite(client) {
     // permits 'unsafe-inline' for style only; scripts stay self-hosted.
     app.addHook('onSend', async (req, reply) => {
         reply.headers({
-            'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' https://cdn.discordapp.com https://i.imgur.com data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'",
+            'Content-Security-Policy': "default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' https://cdn.discordapp.com https://i.imgur.com data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'",
             'X-Content-Type-Options': 'nosniff',
             'X-Frame-Options': 'DENY', // legacy fallback for frame-ancestors
             'Referrer-Policy': 'same-origin',
