@@ -582,11 +582,25 @@
     }
 
     // ==========================================================================
-    // Login Redirect Flow
+    // Login Redirect Flow & Mock Card Interactions
     // ==========================================================================
     if ($('#login-btn')) {
         const next = new URLSearchParams(location.search).get('next');
         if (next && next.startsWith('/')) $('#login-btn').href = `/auth/discord?next=${encodeURIComponent(next)}`;
         if (new URLSearchParams(location.search).get('error')) $('#err').style.display = 'block';
+    }
+
+    const mockAvatar = $('#dc-mock-avatar');
+    if (mockAvatar) {
+        mockAvatar.addEventListener('error', () => {
+            mockAvatar.src = 'https://cdn.discordapp.com/embed/avatars/0.png';
+        });
+    }
+
+    const verifyBtn = $('#demo-verify-btn');
+    if (verifyBtn) {
+        verifyBtn.addEventListener('click', () => {
+            verifyBtn.innerHTML = 'Verified <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+        });
     }
 })();

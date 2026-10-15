@@ -40,10 +40,11 @@ module.exports = {
     //   public / lan    → 0.0.0.0    — visible to the whole network
     //   <ip>            → bind to that specific interface
     HOST: (() => {
-        const h = (env.WEB_HOST || 'local').trim().toLowerCase();
+        const val = env.WEB_HOST || env.HOST || env.SERVER_HOST || 'local';
+        const h = val.trim().toLowerCase();
         if (['public', 'lan', 'all', '0.0.0.0'].includes(h)) return '0.0.0.0';
         if (['local', 'localhost', 'loopback', '127.0.0.1'].includes(h)) return '127.0.0.1';
-        return env.WEB_HOST.trim(); // custom interface IP
+        return val.trim(); // custom interface IP
     })(),
     // SERVER_PORT (injected by panel hosts for the allocated public port) wins —
     // on those hosts it's the ONLY reachable port; WEB_PORT for local override.

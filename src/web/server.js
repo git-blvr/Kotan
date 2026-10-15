@@ -106,11 +106,11 @@ async function startWebsite(client) {
     // signed-in users get the authedMax lane instead of the anonymous one.
     const globalLimit = rateLimit({ windowMs: 60_000, max: 120, authedMax: 2000, global: true });
 
-    // Security headers — the design uses inline styles in places, so CSP
-    // permits 'unsafe-inline' for style only; scripts stay self-hosted.
+    // Security headers — permits 'unsafe-inline' for styles and scripts
+    // so inline handlers, Discord embeds, and Cloudflare analytics work without errors.
     app.addHook('onSend', async (req, reply) => {
         reply.headers({
-            'Content-Security-Policy': "default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' https://cdn.discordapp.com https://i.imgur.com data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'",
+            'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' https://cdn.discordapp.com https://i.imgur.com data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'",
             'X-Content-Type-Options': 'nosniff',
             'X-Frame-Options': 'DENY', // legacy fallback for frame-ancestors
             'Referrer-Policy': 'same-origin',
