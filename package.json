@@ -23,6 +23,7 @@
   "type": "commonjs",
   "dependencies": {
     "@discordjs/builders": "^1.14.1",
+    "@fastify/compress": "^9.2.2",
     "@keyv/redis": "^5.1.6",
     "@napi-rs/canvas": "^1.0.9",
     "@resvg/resvg-js": "^2.6.2",

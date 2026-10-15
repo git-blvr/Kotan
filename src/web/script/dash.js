@@ -1,4 +1,4 @@
-﻿/* Kotan dashboard SPA â€” served as a static shell, all data via /api.
+/* Kotan dashboard SPA â€” served as a static shell, all data via /api.
    Routes: /dashboard -> server picker; /dashboard/:id -> guild app with
    hash sub-routes (#/overview â€¦ #/settings). Server-side guards and the
    API enforce access independently â€” this is presentation only. */
@@ -5467,14 +5467,22 @@
     const router = async () => {
         const slug = (location.hash.replace(/^#\/?/, '') || 'overview').split('?')[0];
         if (!CTX) {
-            const [ctx, me] = await Promise.all([api(`/api/guilds/${guildId}`), api('/api/me')]);
+            // Fire all 4 requests in parallel — guild, me, channels and roles
+            // are all needed before anything renders. Two sequential
+            // Promise.all calls would waste one full network RTT on every
+            // cold load; one parallel batch halves the wait.
+            const [ctx, me, ch, ro] = await Promise.all([
+                api(`/api/guilds/${guildId}`),
+                api('/api/me'),
+                api(`/api/guilds/${guildId}/channels`),
+                api(`/api/guilds/${guildId}/roles`),
+            ]);
             if (ctx.ok === false) {
                 app.className = 'dmain';
                 app.innerHTML = `<div class="center-page"><div class="card login-card"><h1>${ctx.error === 'restricted' ? 'Access restricted' : 'Unavailable'}</h1><p>${esc(ctx.error === 'restricted' ? 'This server has been restricted by Kotan\'s developers.' : ctx.error || 'Could not load this server.')}</p><a class="btn" href="/dashboard">Back</a></div></div>`;
                 return;
             }
             CTX = { ...ctx, user: me.user };
-            const [ch, ro] = await Promise.all([api(`/api/guilds/${guildId}/channels`), api(`/api/guilds/${guildId}/roles`)]);
             DATA.channels = ch.channels || [];
             DATA.categories = ch.categories || [];
             DATA.voice = ch.voice || [];
