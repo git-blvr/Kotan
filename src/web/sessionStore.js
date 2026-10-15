@@ -16,14 +16,24 @@ const SESSION_TTL = 30 * 24 * 60 * 60 * 1000;
 
 const keyFor = (sid) => crypto.createHash('sha256').update(sid).digest('hex');
 
+// In-memory cache for hot sessions — prevents concurrent SPA fetches from
+// thrashing SQLite for the same user profile over and over.
+const memCache = new Map(); // sid -> { session, exp }
+const MEM_CACHE_TTL = 15_000; // 15 seconds
+
 async function create(data) {
     const sid = crypto.randomBytes(32).toString('base64url');
     await db.sessions.set(keyFor(sid), data, SESSION_TTL);
+    memCache.set(sid, { session: data, exp: Date.now() + MEM_CACHE_TTL });
     return sid;
 }
 
 async function get(sid) {
     if (!sid || typeof sid !== 'string') return null;
+    const cached = memCache.get(sid);
+    if (cached && cached.exp > Date.now()) {
+        return cached.session?.user ? cached.session : null;
+    }
     const k = keyFor(sid);
     let s = await db.sessions.get(k).catch(() => null);
     if (!s) {
@@ -35,15 +45,27 @@ async function get(sid) {
             db.sessions.delete(sid).catch(() => {});
         }
     }
-    return s && s.user ? s : null;
+    if (s && s.user) {
+        memCache.set(sid, { session: s, exp: Date.now() + MEM_CACHE_TTL });
+        return s;
+    }
+    memCache.delete(sid);
+    return null;
 }
 
-const destroy = (sid) =>
-    sid &&
-    Promise.all([
+const destroy = (sid) => {
+    if (!sid) return;
+    memCache.delete(sid);
+    return Promise.all([
         db.sessions.delete(keyFor(sid)).catch(() => {}),
         db.sessions.delete(sid).catch(() => {}), // legacy plaintext-keyed row
     ]);
-const touch = (sid, data) => db.sessions.set(keyFor(sid), data, SESSION_TTL).catch(() => {});
+};
+
+const touch = (sid, data) => {
+    if (!sid) return;
+    memCache.set(sid, { session: data, exp: Date.now() + MEM_CACHE_TTL });
+    return db.sessions.set(keyFor(sid), data, SESSION_TTL).catch(() => {});
+};
 
 module.exports = { create, get, destroy, touch, SESSION_TTL };

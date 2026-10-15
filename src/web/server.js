@@ -123,10 +123,19 @@ async function startWebsite(client) {
             reply.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     });
 
-    app.addHook('preHandler', sessionMiddleware);
+    // Skip session lookup on static assets — scripts/styles/images don't need
+    // session state and shouldn't pay a database lookup cost.
+    app.addHook('preHandler', async (req) => {
+        if (!STATIC_SKIP.test(req.url.split('?')[0])) {
+            await sessionMiddleware(req);
+        }
+    });
     app.addHook('preHandler', sameOriginOnly);
-    app.addHook('preHandler', (req, reply) =>
-        STATIC_SKIP.test(req.url.split('?')[0]) ? undefined : globalLimit(req, reply));
+    app.addHook('preHandler', async (req, reply) => {
+        if (!STATIC_SKIP.test(req.url.split('?')[0])) {
+            return globalLimit(req, reply);
+        }
+    });
 
     await app.register(authRoutes);
     await app.register(apiRoutes);

@@ -92,14 +92,26 @@ function concurrencyCap(max = 30) {
         if (isLocal(ip)) return;
         const n = (inflight.get(ip) || 0) + 1;
         inflight.set(ip, n);
-        // 'close' fires exactly once per request — complete or aborted — so
-        // the count can't leak on clients that vanish mid-response.
-        req.raw.once('close', () => {
+
+        let cleaned = false;
+        const cleanup = () => {
+            if (cleaned) return;
+            cleaned = true;
             const cur = (inflight.get(ip) || 1) - 1;
             cur <= 0 ? inflight.delete(ip) : inflight.set(ip, cur);
-        });
+        };
+
+        // Listen on multiple events (request close, response finish/close) so
+        // aborted requests, cached responses, or pipe errors can never leak slots.
+        req.raw.once('close', cleanup);
+        reply.raw.once('finish', cleanup);
+        reply.raw.once('close', cleanup);
+
         if (n > max) {
-            punish(ip);
+            // Only punish severe floods (2x max) to avoid strike-banning users
+            // during transient browser burst loads (e.g. rapid asset fetches).
+            if (n > max * 2) punish(ip);
+            reply.header('Retry-After', '2');
             return reply.code(429).send({ ok: false, error: 'Too many concurrent requests' });
         }
     };

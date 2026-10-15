@@ -22,8 +22,11 @@ function parseCookies(req) {
     return out;
 }
 
+const STATIC_SKIP = /^\/(?:script|stylesheets|assets)\//;
+
 // Attaches req.session / req.sid for every request (preHandler hook).
 async function sessionMiddleware(req) {
+    if (req.url && STATIC_SKIP.test(req.url.split('?')[0])) return;
     const raw = parseCookies(req)[COOKIE];
     req.sid = typeof raw === 'string' && raw.length <= 128 ? raw : null;
     req.session = req.sid ? await sessions.get(req.sid) : null;
