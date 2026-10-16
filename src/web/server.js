@@ -19,11 +19,17 @@ const page = (name) => path.join(WEB_DIR, 'pages', name);
 // picking up edits without a restart.
 const pageCache = new Map();
 const PAGE_CACHE_TTL = 30_000;
+const BOOT_TAG = Date.now().toString(36);
+const ASSET_FALLBACK_SCRIPT = `<script>(function(){var d=false;function r(f){if(d)return;if(!f&&getComputedStyle(document.documentElement).getPropertyValue('--accent').trim())return;d=true;var t=Date.now().toString(36);document.querySelectorAll('link[rel="stylesheet"][href^="/"]').forEach(function(l){l.href=l.getAttribute('href').split('?')[0]+'?v='+t});document.querySelectorAll('script[src^="/script/"]').forEach(function(s){var n=document.createElement('script');n.src=s.getAttribute('src').split('?')[0]+'?v='+t;n.defer=true;s.replaceWith(n)})}window.addEventListener('error',function(e){if(e.target&&e.target.tagName==='LINK'&&e.target.rel==='stylesheet')r(true)},true);window.addEventListener('load',function(){r(false)},{once:true})})()</script></head>`;
 
 async function cachedPage(name) {
     const c = pageCache.get(name);
     if (c && c.exp > Date.now()) return c.buf;
-    const buf = await fsp.readFile(page(name));
+    const raw = await fsp.readFile(page(name), 'utf8');
+    const stamped = raw
+        .replace(/(\/(?:stylesheets|script|assets)\/[\w.-]+)(?:\?v=[^"'\s>]*)?/g, `$1?v=${BOOT_TAG}`)
+        .replace('</head>', ASSET_FALLBACK_SCRIPT);
+    const buf = Buffer.from(stamped, 'utf8');
     pageCache.set(name, { buf, exp: Date.now() + PAGE_CACHE_TTL });
     return buf;
 }
@@ -40,11 +46,20 @@ async function warmPageCache() {
 }
 
 const MIME = {
-    '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml',
-    '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
-    '.webp': 'image/webp', '.gif': 'image/gif', '.ico': 'image/x-icon',
-    '.woff': 'font/woff', '.woff2': 'font/woff2', '.json': 'application/json',
-    '.map': 'application/json', '.txt': 'text/plain',
+    '.js': 'text/javascript; charset=utf-8',
+    '.css': 'text/css; charset=utf-8',
+    '.svg': 'image/svg+xml; charset=utf-8',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.webp': 'image/webp',
+    '.gif': 'image/gif',
+    '.ico': 'image/x-icon',
+    '.woff': 'font/woff',
+    '.woff2': 'font/woff2',
+    '.json': 'application/json; charset=utf-8',
+    '.map': 'application/json; charset=utf-8',
+    '.txt': 'text/plain; charset=utf-8',
 };
 
 // Static file cache — served assets are immutable for the life of the
@@ -106,21 +121,23 @@ async function startWebsite(client) {
     // signed-in users get the authedMax lane instead of the anonymous one.
     const globalLimit = rateLimit({ windowMs: 60_000, max: 120, authedMax: 2000, global: true });
 
-    // Security headers — permits 'unsafe-inline' for styles and scripts
-    // so inline handlers, Discord embeds, and Cloudflare analytics work without errors.
-    app.addHook('onSend', async (req, reply) => {
+    // Security headers — set on onRequest before compression or streaming.
+    // Permits 'unsafe-inline' for styles and scripts so Discord embeds and analytics work.
+    app.addHook('onRequest', async (req, reply) => {
         reply.headers({
             'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' https://cdn.discordapp.com https://i.imgur.com data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'",
             'X-Content-Type-Options': 'nosniff',
-            'X-Frame-Options': 'DENY', // legacy fallback for frame-ancestors
+            'X-Frame-Options': 'DENY',
             'Referrer-Policy': 'same-origin',
             'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
         });
-        // HSTS only when the deployment actually serves HTTPS (COOKIE_SECURE
-        // is the existing "production HTTPS" flag) — sending it on plain HTTP
-        // would pin browsers to a broken scheme.
-        if (env.COOKIE_SECURE)
+        // HSTS ONLY when the incoming request is actually HTTPS (or through an SSL proxy).
+        // Sending HSTS over plain HTTP breaks the site by forcing browsers to upgrade
+        // asset requests to https://<host>:3000 (which fails SSL handshake and drops CSS).
+        const isHttps = req.protocol === 'https' || req.headers['x-forwarded-proto'] === 'https';
+        if (env.COOKIE_SECURE && isHttps) {
             reply.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+        }
     });
 
     // Skip session lookup on static assets — scripts/styles/images don't need
@@ -142,18 +159,20 @@ async function startWebsite(client) {
 
     // Dashboard shells — gated server-side; the SPA inside then re-checks per
     // guild via the API (which enforces the same rules on every request).
-    const html = (name) => async (req, reply) => reply.type('text/html').send(await cachedPage(name));
+    const sendHtml = async (reply, name, code = 200) =>
+        reply.code(code).header('Cache-Control', 'no-cache, no-store, must-revalidate').type('text/html; charset=utf-8').send(await cachedPage(name));
+    const html = (name) => async (req, reply) => sendHtml(reply, name);
     app.get('/dashboard', { preHandler: requireAuth }, html('dashboard.html'));
     app.get('/dashboard/admin/blacklist', { preHandler: requireAuth }, async (req, reply) => {
-        if (!isDeveloper(req.session.user.id)) return reply.code(404).type('text/html').send(await cachedPage('error.html'));
-        return reply.type('text/html').send(await cachedPage('admin.html'));
+        if (!isDeveloper(req.session.user.id)) return sendHtml(reply, 'error.html', 404);
+        return sendHtml(reply, 'admin.html');
     });
     app.get('/dashboard/:id', { preHandler: requireAuth }, async (req, reply) => {
         const err = checkGuildAccess(req.client, req.session, req.params.id);
         if (err?.error === 'restricted')
-            return reply.code(403).type('text/html').send(await cachedPage('restricted.html'));
-        if (err) return reply.code(err.status).type('text/html').send(await cachedPage('error.html'));
-        return reply.type('text/html').send(await cachedPage('dashboard.html'));
+            return sendHtml(reply, 'restricted.html', 403);
+        if (err) return sendHtml(reply, 'error.html', err.status);
+        return sendHtml(reply, 'dashboard.html');
     });
 
     // Public pages + static assets — per-IP limited so F5 spam can't
@@ -214,10 +233,10 @@ async function startWebsite(client) {
     mount('/stylesheets', path.join(WEB_DIR, 'stylesheets'), 3600);
     mount('/assets', path.join(WEB_DIR, 'assets'), 604800);
 
-    app.setNotFoundHandler(async (req, reply) => reply.code(404).type('text/html').send(await cachedPage('error.html')));
+    app.setNotFoundHandler(async (req, reply) => sendHtml(reply, 'error.html', 404));
     app.setErrorHandler(async (err, req, reply) => {
         logger.error('Website error:', err);
-        reply.code(500).type('text/html').send(await cachedPage('error.html'));
+        return sendHtml(reply, 'error.html', 500);
     });
 
     // Pre-warm page cache before accepting connections.
